@@ -1,0 +1,157 @@
+openapi: 3.0.0
+info:
+  title: CodeVote API (18-Table Schema)
+  description: API REST para sistema de votaciones universitarias. Implementa endpoints para Estudiantes, Procesos Electorales, Listas Candidatas y Votos.
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:3000/api
+    description: Servidor de Desarrollo Local
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+security:
+  - bearerAuth: []
+
+paths:
+  /auth/login:
+    post:
+      summary: Iniciar sesión
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                correo_institucional:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Login exitoso, devuelve JWT.
+
+  /estudiantes:
+    get:
+      summary: Listar estudiantes
+      responses:
+        '200':
+          description: Lista de estudiantes
+    post:
+      summary: Crear estudiante
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cedula:
+                  type: string
+                nombres:
+                  type: string
+                apellidos:
+                  type: string
+                correo_institucional:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '201':
+          description: Creado
+
+  /estudiantes/{cedula}:
+    get:
+      summary: Obtener estudiante
+      parameters:
+        - name: cedula
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+    patch:
+      summary: Actualizar estudiante
+      parameters:
+        - name: cedula
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: OK
+    delete:
+      summary: Eliminar estudiante
+      parameters:
+        - name: cedula
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Eliminado
+
+  /procesos-electorales:
+    get:
+      summary: Listar procesos
+      responses:
+        '200':
+          description: OK
+
+  /listas-candidatas:
+    get:
+      summary: Listar listas
+      responses:
+        '200':
+          description: OK
+
+  /votos:
+    post:
+      summary: Emitir voto
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fk_id_votacion:
+                  type: integer
+                fk_id_lista:
+                  type: integer
+                tipo_voto:
+                  type: string
+                  enum: [valido, blanco, nulo]
+      responses:
+        '201':
+          description: Creado
+    
+  /votos/resultados/{votacionId}:
+    get:
+      summary: Ver resultados
+      parameters:
+        - name: votacionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Resultados
