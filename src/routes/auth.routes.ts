@@ -23,8 +23,8 @@ router.post('/login', async (req, res) => {
     return;
   }
 
-  // Si es un admin determinado, le damos rol admin. Por ahora todos estudiante.
-  const is_admin = correo_institucional === 'admin@codevote.com';
+  // Si es un admin determinado, le damos rol admin.
+  const is_admin = correo_institucional === 'schininin@uide.edu.ec';
 
   const token = jwt.sign(
     { sub: usuario.cedula, email: usuario.correo_institucional, rol: is_admin ? 'admin' : 'estudiante' },
