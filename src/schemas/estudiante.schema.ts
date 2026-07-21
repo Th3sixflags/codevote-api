@@ -9,6 +9,7 @@ export const crearEstudianteSchema = z.object({
   estado_academico:     z.enum(['activo', 'inactivo', 'egresado', 'graduado']).optional(),
   fk_id_carrera:        z.number().int().positive().optional(),
   password:             z.string().min(6),
+  rol:                  z.enum(['estudiante', 'admin']).optional(),
 });
 
 export const actualizarEstudianteSchema = crearEstudianteSchema.partial();

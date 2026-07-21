@@ -1,3 +1,6 @@
+-- Fuerza la codificación de la conexión (tildes y ñ)
+SET NAMES utf8mb4;
+
 USE codevote_db;
 
 -- 1. facultad
@@ -39,6 +42,9 @@ INSERT INTO estudiante (cedula, nombres, apellidos, correo_institucional, promed
 ('1700000018', 'Antonella', 'Medina', 'amedina@uide.edu.ec', 8.5, 'activo', 2, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e'),
 ('1700000019', 'Joaquín', 'Navarro', 'jnavarro@uide.edu.ec', 9.2, 'activo', 3, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e'),
 ('1700000020', 'Renata', 'León', 'rleon@uide.edu.ec', 8.1, 'activo', 1, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e');
+
+-- Usuario administrador de prueba (el resto queda con el rol 'estudiante' por defecto)
+UPDATE estudiante SET rol = 'admin' WHERE cedula = '1700000001';
 
 -- 5. responsable
 INSERT INTO responsable (nombres, apellidos, cargo, correo) VALUES 

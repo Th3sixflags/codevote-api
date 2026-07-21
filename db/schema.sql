@@ -1,3 +1,7 @@
+-- Fuerza la codificación de la conexión para que tildes y ñ se guarden bien,
+-- sin depender del charset por defecto del cliente MySQL.
+SET NAMES utf8mb4;
+
 CREATE DATABASE IF NOT EXISTS codevote_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 USE codevote_db;
@@ -36,6 +40,7 @@ CREATE TABLE estudiante (
   estado_academico ENUM('activo', 'inactivo', 'egresado', 'graduado') NOT NULL DEFAULT 'activo',
   fk_id_carrera INT,
   password VARCHAR(255) NOT NULL, -- Added for JWT Auth
+  rol ENUM('estudiante', 'admin') NOT NULL DEFAULT 'estudiante', -- Usado por el login y los middlewares de autorización
   CONSTRAINT fk_estudiante_carrera FOREIGN KEY (fk_id_carrera) REFERENCES carrera(id_carrera)
 );
 

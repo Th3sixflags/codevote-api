@@ -28,9 +28,9 @@ export async function findByEmail(email: string) {
 export async function create(data: CrearEstudianteDTO) {
   const hash = await bcrypt.hash(data.password, 12);
   await pool.query(
-    `INSERT INTO estudiante (cedula, nombres, apellidos, correo_institucional, promedio, estado_academico, fk_id_carrera, password)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [data.cedula, data.nombres, data.apellidos, data.correo_institucional, data.promedio ?? null, data.estado_academico ?? 'activo', data.fk_id_carrera ?? null, hash]
+    `INSERT INTO estudiante (cedula, nombres, apellidos, correo_institucional, promedio, estado_academico, fk_id_carrera, password, rol)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [data.cedula, data.nombres, data.apellidos, data.correo_institucional, data.promedio ?? null, data.estado_academico ?? 'activo', data.fk_id_carrera ?? null, hash, data.rol ?? 'estudiante']
   );
   return findByCedula(data.cedula);
 }

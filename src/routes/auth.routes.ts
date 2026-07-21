@@ -13,7 +13,7 @@ router.post('/login', async (req, res) => {
   }
 
   const [rows] = await pool.query(
-    'SELECT cedula, nombres, apellidos, correo_institucional, password FROM estudiante WHERE correo_institucional = ?',
+    'SELECT cedula, nombres, apellidos, correo_institucional, password, rol FROM estudiante WHERE correo_institucional = ?',
     [correo_institucional]
   ) as [any[], any];
 
@@ -23,18 +23,15 @@ router.post('/login', async (req, res) => {
     return;
   }
 
-  // Si es un admin determinado, le damos rol admin.
-  const is_admin = correo_institucional === 'schininin@uide.edu.ec';
-
   const token = jwt.sign(
-    { sub: usuario.cedula, email: usuario.correo_institucional, rol: is_admin ? 'admin' : 'estudiante' },
+    { sub: usuario.cedula, email: usuario.correo_institucional, rol: usuario.rol },
     process.env.JWT_SECRET!,
     { expiresIn: (process.env.JWT_EXPIRES_IN ?? '1h') as any }
   );
 
   res.json({
     token,
-    usuario: { cedula: usuario.cedula, nombres: usuario.nombres, apellidos: usuario.apellidos, rol: is_admin ? 'admin' : 'estudiante' },
+    usuario: { cedula: usuario.cedula, nombres: usuario.nombres, apellidos: usuario.apellidos, rol: usuario.rol },
   });
 });
 
