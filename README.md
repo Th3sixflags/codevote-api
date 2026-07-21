@@ -33,14 +33,14 @@ El proyecto utiliza un modelo Entidad-Relación de 18 tablas:
 
 ## Instalación
 
-\`\`\`bash
+```bash
 npm install
-\`\`\`
+```
 
 ## Variables de Entorno
 Crea un archivo `.env` en la raíz del proyecto basándote en el archivo de ejemplo `.env.example`:
 
-\`\`\`env
+```env
 PORT=3000
 DB_HOST=localhost
 DB_USER=root
@@ -48,7 +48,7 @@ DB_PASSWORD=
 DB_NAME=codevote_db
 JWT_SECRET=tu_secreto_super_seguro
 JWT_EXPIRES_IN=1h
-\`\`\`
+```
 
 ## Scripts de Base de Datos
 Ejecuta los siguientes scripts en MySQL (desde MySQL Workbench o la terminal) para preparar la BD:
@@ -57,21 +57,21 @@ Ejecuta los siguientes scripts en MySQL (desde MySQL Workbench o la terminal) pa
 
 ## Ejecución
 Para arrancar el servidor de desarrollo en el puerto 3000:
-\`\`\`bash
+```bash
 npm run dev
-\`\`\`
+```
 
 ## Cómo obtener el Token JWT (Autenticación)
 
 Para utilizar los endpoints protegidos, primero debes autenticarte:
 1. Realiza una petición `POST` a `/api/auth/login`.
 2. En el body (formato JSON), envía las credenciales de un estudiante. Ejemplo:
-   \`\`\`json
+   ```json
    {
        "correo_institucional": "schininin@uide.edu.ec",
        "password": "password123"
    }
-   \`\`\`
+   ```
    *(Nota: Todos los estudiantes del `seed.sql` tienen la contraseña `password123`)*
 3. La API devolverá un objeto JSON que incluye el atributo `"token"`.
 4. Copia ese token e inclúyelo en los **Headers** de tus siguientes peticiones:
@@ -117,3 +117,116 @@ Para utilizar los endpoints protegidos, primero debes autenticarte:
 |--------|----------|-------------|---------|
 | POST | `/api/votos` | Emite un nuevo voto (Válido, Blanco, Nulo) | Estudiante |
 | GET | `/api/votos/resultados/:id` | Ver escrutinio/resultados de votación | Estudiante/Admin |
+
+---
+
+# Despliegue e Integración con el Frontend
+
+## Requisitos del servidor
+- **Node.js 20+**
+- **MySQL 8.x**
+- Puerto **3000** abierto (o el que se defina en `PORT`)
+
+## 1. Preparar la base de datos
+
+```bash
+mysql -u <usuario> -p < db/schema.sql
+mysql -u <usuario> -p codevote_db < db/seed.sql
+```
+
+`schema.sql` crea la BD y las 18 tablas (incluida la columna `rol` de `estudiante`).
+`seed.sql` carga los datos de prueba y marca al administrador.
+
+> Ambos archivos ejecutan `SET NAMES utf8mb4` para que las tildes y la ñ se guarden
+> correctamente sin depender del charset por defecto del cliente MySQL.
+
+## 2. Variables de entorno
+
+Copiar `.env.example` a `.env` y completar:
+
+```env
+PORT=3000
+HOST=0.0.0.0
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=<usuario>
+DB_PASSWORD=<contraseña>
+DB_NAME=codevote_db
+JWT_SECRET=<cadena larga y única de este entorno>
+JWT_EXPIRES_IN=1h
+CORS_ORIGIN=https://codevote.lat
+```
+
+- **`HOST=0.0.0.0`** hace que el servidor sea accesible desde fuera del host/contenedor.
+- **`CORS_ORIGIN`** acepta varios orígenes separados por coma. Si se deja vacío se
+  permite cualquier origen (**solo para pruebas**, no usar en producción).
+
+## 3. Ejecutar
+
+```bash
+npm ci
+npm run build
+npm start
+```
+
+Comprobar que responde:
+
+```bash
+curl http://localhost:3000/health     # {"status":"ok"}
+```
+
+### Con Docker
+
+```bash
+docker build -t codevote-api .
+docker run -d -p 3000:3000 --env-file .env codevote-api
+```
+
+## 4. Usuarios de prueba
+
+Todos los usuarios del seed usan la contraseña **`password123`**.
+
+| Correo | Rol |
+|--------|-----|
+| `schininin@uide.edu.ec` | admin |
+| `mgonzalez@uide.edu.ec` | estudiante |
+
+> Son credenciales de demostración presentes en el repositorio: no deben usarse
+> como cuentas reales ni considerarse seguras.
+
+## 5. Endpoints que consume el frontend
+
+| Método | Endpoint | Auth |
+|--------|----------|------|
+| POST | `/api/auth/login` | Público |
+| GET | `/api/procesos-electorales` | Token |
+| GET | `/api/procesos-electorales/:id` | Token |
+| GET | `/api/listas-candidatas/proceso/:id` | Token |
+| GET | `/api/votaciones/proceso/:id` | Token |
+| POST | `/api/votos` | Token |
+| GET | `/api/votos/resultados/:id` | Token |
+
+Formato de respuesta del login:
+
+```json
+{
+  "token": "<jwt>",
+  "usuario": { "cedula": "...", "nombres": "...", "apellidos": "...", "rol": "estudiante|admin" }
+}
+```
+
+El token se envía en las peticiones protegidas como `Authorization: Bearer <token>`.
+
+## 6. Nota importante para el frontend
+
+El frontend usa un **proxy de Vite que solo existe en desarrollo**. Al compilarlo para
+producción hay que indicarle la URL del backend, o las llamadas a `/api` fallarán:
+
+```bash
+VITE_API_URL=https://<dominio-del-backend>/api npm run build
+```
+
+> Si el frontend se sirve por **HTTPS** (`https://codevote.lat`) y el backend por HTTP,
+> el navegador bloqueará las peticiones por *mixed content*. Lo recomendable es exponer
+> el backend bajo el mismo dominio (por ejemplo `https://codevote.lat/api` con un
+> reverse proxy) o darle su propio certificado.

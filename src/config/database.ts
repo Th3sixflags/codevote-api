@@ -6,6 +6,8 @@ export const pool = mysql.createPool({
   user:               process.env.DB_USER     ?? 'root',
   password:           process.env.DB_PASSWORD ?? '',
   database:           process.env.DB_NAME     ?? 'codevote_db',
+  // Necesario para que tildes y ñ se lean/escriban correctamente
+  charset:            'utf8mb4',
   waitForConnections: true,
   connectionLimit:    10,
 });
