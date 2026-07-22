@@ -36,7 +36,10 @@ jobs:
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
         run: |
-          ssh -i ~/.ssh/id_ed25519 "$DEPLOY_USER@$DEPLOY_HOST" 'bash -s' << 'REMOTE'
+          # ServerAlive* mantiene viva la conexión durante builds lentos,
+          # para que no se corte con "Broken pipe" si el servidor va justo.
+          ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=20 \
+              -i ~/.ssh/id_ed25519 "$DEPLOY_USER@$DEPLOY_HOST" 'bash -s' << 'REMOTE'
             set -e
             cd /home/ubuntu/codevote-api
 
@@ -48,8 +51,8 @@ jobs:
             # (el contenedor se llama codevote-api, pero Compose usa el servicio).
             sudo docker compose up -d --build backend
 
-            # Comprobación de salud: si /health no responde, el despliegue falla.
-            sleep 3
+            # Comprobación de salud: espera a que el backend levante.
+            sleep 8
             curl --fail --silent http://127.0.0.1:3000/health > /dev/null
             echo "Backend desplegado correctamente."
           REMOTE

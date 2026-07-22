@@ -1,6 +1,8 @@
 # Etapa 1: Construcción (TypeScript -> JavaScript)
 FROM node:20-alpine AS build
 WORKDIR /app
+# Limita la memoria del compilador para no saturar servidores pequeños
+ENV NODE_OPTIONS=--max-old-space-size=512
 COPY package*.json ./
 RUN npm ci
 COPY tsconfig.json ./
