@@ -79,44 +79,57 @@ Para utilizar los endpoints protegidos, primero debes autenticarte:
 
 ## Tabla de Endpoints
 
-### Autenticación
-| Método | Endpoint | Descripción | Acceso |
-|--------|----------|-------------|---------|
-| POST | `/api/auth/login` | Inicia sesión y devuelve el token JWT | Público |
+La API expone **94 endpoints** (+ `/health`) sobre las 18 tablas del modelo.
+La especificación completa está en [`openapi.yaml`](./openapi.yaml).
 
-### Estudiantes (Usuarios)
-| Método | Endpoint | Descripción | Acceso |
-|--------|----------|-------------|---------|
-| GET | `/api/estudiantes` | Lista todos los estudiantes | Admin |
-| GET | `/api/estudiantes/:cedula` | Obtiene un estudiante | Estudiante/Admin |
-| POST | `/api/estudiantes` | Registra un nuevo estudiante | Admin |
-| PATCH | `/api/estudiantes/:cedula` | Actualiza datos de un estudiante | Admin |
-| DELETE | `/api/estudiantes/:cedula` | Elimina un estudiante | Admin |
+Convenciones:
+- Todos requieren `Authorization: Bearer <token>` salvo `/api/auth/login` y `/health`.
+- `POST`, `PATCH` y `DELETE` requieren rol **admin**.
+- Cada recurso expone: `GET /` · `GET /:id` · `POST /` · `PATCH /:id` · `DELETE /:id`
 
-### Procesos Electorales
-| Método | Endpoint | Descripción | Acceso |
-|--------|----------|-------------|---------|
-| GET | `/api/procesos-electorales` | Lista procesos electorales | Estudiante/Admin |
-| GET | `/api/procesos-electorales/:id` | Detalle de un proceso | Estudiante/Admin |
-| POST | `/api/procesos-electorales` | Crea un nuevo proceso | Admin |
-| PATCH | `/api/procesos-electorales/:id` | Edita un proceso | Admin |
-| DELETE | `/api/procesos-electorales/:id` | Elimina un proceso | Admin |
+### Autenticación y sistema
+| Método | Endpoint | Acceso |
+|--------|----------|--------|
+| POST | `/api/auth/login` | Público |
+| GET | `/health` | Público |
 
-### Listas Candidatas
-| Método | Endpoint | Descripción | Acceso |
-|--------|----------|-------------|---------|
-| GET | `/api/listas-candidatas` | Lista todas las listas inscritas | Estudiante/Admin |
-| GET | `/api/listas-candidatas/:id` | Detalle de una lista | Estudiante/Admin |
-| GET | `/api/listas-candidatas/proceso/:id`| Listas de un proceso específico | Estudiante/Admin |
-| POST | `/api/listas-candidatas` | Inscribe una nueva lista | Admin |
-| PATCH | `/api/listas-candidatas/:id` | Edita una lista | Admin |
-| DELETE | `/api/listas-candidatas/:id` | Elimina una lista | Admin |
+### Catálogos institucionales
+| Recurso | Ruta base | Lectura |
+|---------|-----------|---------|
+| Facultades | `/api/facultades` | Autenticado |
+| Directores | `/api/directores` | Autenticado |
+| Carreras | `/api/carreras` | Autenticado |
+| Responsables | `/api/responsables` | Autenticado |
+| Estudiantes | `/api/estudiantes` | Admin (listado) |
 
-### Votos
-| Método | Endpoint | Descripción | Acceso |
-|--------|----------|-------------|---------|
-| POST | `/api/votos` | Emite un nuevo voto (Válido, Blanco, Nulo) | Estudiante |
-| GET | `/api/votos/resultados/:id` | Ver escrutinio/resultados de votación | Estudiante/Admin |
+### Proceso electoral
+| Recurso | Ruta base | Subrutas |
+|---------|-----------|----------|
+| Procesos electorales | `/api/procesos-electorales` | — |
+| Cronogramas | `/api/cronogramas` | `GET /proceso/:procesoId` |
+| Votaciones *(solo lectura)* | `/api/votaciones` | `GET /proceso/:procesoId` |
+
+### Candidaturas
+| Recurso | Ruta base | Subrutas |
+|---------|-----------|----------|
+| Listas candidatas | `/api/listas-candidatas` | `GET /proceso/:procesoId` |
+| Candidatos | `/api/candidatos` | `GET /lista/:listaId` |
+| Planes de trabajo | `/api/planes-trabajo` | `GET /lista/:listaId` |
+| Requisitos | `/api/requisitos` | — |
+| Validaciones de requisito | `/api/validaciones-requisito` | `GET /candidato/:candidatoId` |
+
+### Votación y resultados
+| Recurso | Ruta base | Notas |
+|---------|-----------|-------|
+| Votos | `/api/votos` | `POST /` emitir · `GET /resultados/:votacionId` escrutinio |
+| Códigos de voto | `/api/codigos-voto` | **Solo admin** · `GET /votacion/:votacionId` |
+| Actas de resultados | `/api/actas-resultados` | `GET /votacion/:votacionId` |
+
+### Veeduría
+| Recurso | Ruta base | Subrutas |
+|---------|-----------|----------|
+| Veedores | `/api/veedores` | — |
+| Veedurías | `/api/veedurias` | `GET /votacion/:votacionId` |
 
 ---
 

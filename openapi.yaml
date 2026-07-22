@@ -1,12 +1,1551 @@
-openapi: 3.0.0
+openapi: 3.0.3
 info:
-  title: CodeVote API (18-Table Schema)
-  description: API REST para sistema de votaciones universitarias. Implementa endpoints para Estudiantes, Procesos Electorales, Listas Candidatas y Votos.
-  version: 1.0.0
+  title: CodeVote API
+  version: 1.1.0
+  description: |
+    API REST del sistema de votaciones estudiantiles CodeVote (UIDE).
 
+    **Autenticación:** todos los endpoints salvo `/auth/login` y `/health`
+    requieren un token JWT en la cabecera `Authorization: Bearer <token>`.
+    Las operaciones de escritura (POST/PATCH/DELETE) requieren rol `admin`.
 servers:
   - url: http://localhost:3000/api
-    description: Servidor de Desarrollo Local
+    description: Desarrollo local
+  - url: https://codevote.lat/api
+    description: Producción
+tags:
+  - name: Autenticación
+  - name: Facultades
+  - name: Directores
+  - name: Carreras
+  - name: Responsables
+  - name: Estudiantes
+  - name: Procesos electorales
+  - name: Cronogramas
+  - name: Listas candidatas
+  - name: Candidatos
+  - name: Planes de trabajo
+  - name: Requisitos
+  - name: Validaciones de requisito
+  - name: Códigos de voto
+  - name: Actas de resultados
+  - name: Veedores
+  - name: Veedurías
+  - name: Votaciones
+  - name: Votos
+  - name: Sistema
+
+paths:
+  /auth/login:
+    post:
+      tags: [Autenticación]
+      summary: Inicia sesión y devuelve un token JWT
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [correo_institucional, password]
+              properties:
+                correo_institucional:
+                  type: string
+                  format: email
+                  example: schininin@uide.edu.ec
+                password:
+                  type: string
+                  example: password123
+      responses:
+        '200':
+          description: Autenticación correcta
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token: { type: string }
+                  usuario:
+                    type: object
+                    properties:
+                      cedula:    { type: string }
+                      nombres:   { type: string }
+                      apellidos: { type: string }
+                      rol:       { type: string, enum: ["estudiante", "admin"] }
+        '400': { $ref: '#/components/responses/SolicitudInvalida' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+
+  /facultades:
+    get:
+      tags: [Facultades]
+      summary: Lista todos los registros
+      responses:
+        '200':
+          description: Listado
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Facultad' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+    post:
+      tags: [Facultades]
+      summary: Crea un registro (requiere rol admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FacultadInput' }
+      responses:
+        '201':
+          description: Creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Facultad' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
+
+  /facultades/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      tags: [Facultades]
+      summary: Obtiene un registro por su identificador
+      responses:
+        '200':
+          description: Registro encontrado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Facultad' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+    patch:
+      tags: [Facultades]
+      summary: Actualiza un registro (requiere rol admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FacultadInput' }
+      responses:
+        '200':
+          description: Actualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Facultad' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
+    delete:
+      tags: [Facultades]
+      summary: Elimina un registro (requiere rol admin)
+      responses:
+        '204': { description: Eliminado }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+
+  /directores:
+    get:
+      tags: [Directores]
+      summary: Lista todos los registros
+      responses:
+        '200':
+          description: Listado
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Director' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+    post:
+      tags: [Directores]
+      summary: Crea un registro (requiere rol admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DirectorInput' }
+      responses:
+        '201':
+          description: Creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Director' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
+
+  /directores/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      tags: [Directores]
+      summary: Obtiene un registro por su identificador
+      responses:
+        '200':
+          description: Registro encontrado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Director' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+    patch:
+      tags: [Directores]
+      summary: Actualiza un registro (requiere rol admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DirectorInput' }
+      responses:
+        '200':
+          description: Actualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Director' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
+    delete:
+      tags: [Directores]
+      summary: Elimina un registro (requiere rol admin)
+      responses:
+        '204': { description: Eliminado }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+
+  /carreras:
+    get:
+      tags: [Carreras]
+      summary: Lista todos los registros
+      responses:
+        '200':
+          description: Listado
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Carrera' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+    post:
+      tags: [Carreras]
+      summary: Crea un registro (requiere rol admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CarreraInput' }
+      responses:
+        '201':
+          description: Creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Carrera' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
+
+  /carreras/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      tags: [Carreras]
+      summary: Obtiene un registro por su identificador
+      responses:
+        '200':
+          description: Registro encontrado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Carrera' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+    patch:
+      tags: [Carreras]
+      summary: Actualiza un registro (requiere rol admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CarreraInput' }
+      responses:
+        '200':
+          description: Actualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Carrera' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
+    delete:
+      tags: [Carreras]
+      summary: Elimina un registro (requiere rol admin)
+      responses:
+        '204': { description: Eliminado }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+
+  /responsables:
+    get:
+      tags: [Responsables]
+      summary: Lista todos los registros
+      responses:
+        '200':
+          description: Listado
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Responsable' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+    post:
+      tags: [Responsables]
+      summary: Crea un registro (requiere rol admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ResponsableInput' }
+      responses:
+        '201':
+          description: Creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Responsable' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
+
+  /responsables/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      tags: [Responsables]
+      summary: Obtiene un registro por su identificador
+      responses:
+        '200':
+          description: Registro encontrado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Responsable' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+    patch:
+      tags: [Responsables]
+      summary: Actualiza un registro (requiere rol admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ResponsableInput' }
+      responses:
+        '200':
+          description: Actualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Responsable' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
+    delete:
+      tags: [Responsables]
+      summary: Elimina un registro (requiere rol admin)
+      responses:
+        '204': { description: Eliminado }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+
+  /estudiantes:
+    get:
+      tags: [Estudiantes]
+      summary: Lista todos los registros
+      responses:
+        '200':
+          description: Listado
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Estudiante' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+    post:
+      tags: [Estudiantes]
+      summary: Crea un registro (requiere rol admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EstudianteInput' }
+      responses:
+        '201':
+          description: Creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Estudiante' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
+
+  /estudiantes/{cedula}:
+    parameters:
+      - name: cedula
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      tags: [Estudiantes]
+      summary: Obtiene un registro por su identificador
+      responses:
+        '200':
+          description: Registro encontrado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Estudiante' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+    patch:
+      tags: [Estudiantes]
+      summary: Actualiza un registro (requiere rol admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EstudianteInput' }
+      responses:
+        '200':
+          description: Actualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Estudiante' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
+    delete:
+      tags: [Estudiantes]
+      summary: Elimina un registro (requiere rol admin)
+      responses:
+        '204': { description: Eliminado }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+
+  /procesos-electorales:
+    get:
+      tags: [Procesos electorales]
+      summary: Lista todos los registros
+      responses:
+        '200':
+          description: Listado
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ProcesoElectoral' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+    post:
+      tags: [Procesos electorales]
+      summary: Crea un registro (requiere rol admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProcesoElectoralInput' }
+      responses:
+        '201':
+          description: Creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProcesoElectoral' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
+
+  /procesos-electorales/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      tags: [Procesos electorales]
+      summary: Obtiene un registro por su identificador
+      responses:
+        '200':
+          description: Registro encontrado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProcesoElectoral' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+    patch:
+      tags: [Procesos electorales]
+      summary: Actualiza un registro (requiere rol admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProcesoElectoralInput' }
+      responses:
+        '200':
+          description: Actualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProcesoElectoral' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
+    delete:
+      tags: [Procesos electorales]
+      summary: Elimina un registro (requiere rol admin)
+      responses:
+        '204': { description: Eliminado }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+
+  /cronogramas:
+    get:
+      tags: [Cronogramas]
+      summary: Lista todos los registros
+      responses:
+        '200':
+          description: Listado
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Cronograma' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+    post:
+      tags: [Cronogramas]
+      summary: Crea un registro (requiere rol admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CronogramaInput' }
+      responses:
+        '201':
+          description: Creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Cronograma' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
+
+  /cronogramas/proceso/{procesoId}:
+    get:
+      tags: [Cronogramas]
+      summary: Lista los cronogramas de un proceso electoral
+      parameters:
+        - name: procesoId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Listado
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Cronograma' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+
+  /cronogramas/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      tags: [Cronogramas]
+      summary: Obtiene un registro por su identificador
+      responses:
+        '200':
+          description: Registro encontrado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Cronograma' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+    patch:
+      tags: [Cronogramas]
+      summary: Actualiza un registro (requiere rol admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CronogramaInput' }
+      responses:
+        '200':
+          description: Actualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Cronograma' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
+    delete:
+      tags: [Cronogramas]
+      summary: Elimina un registro (requiere rol admin)
+      responses:
+        '204': { description: Eliminado }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+
+  /listas-candidatas:
+    get:
+      tags: [Listas candidatas]
+      summary: Lista todos los registros
+      responses:
+        '200':
+          description: Listado
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ListaCandidata' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+    post:
+      tags: [Listas candidatas]
+      summary: Crea un registro (requiere rol admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ListaCandidataInput' }
+      responses:
+        '201':
+          description: Creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ListaCandidata' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
+
+  /listas-candidatas/proceso/{procesoId}:
+    get:
+      tags: [Listas candidatas]
+      summary: Lista las listas candidatas de un proceso
+      parameters:
+        - name: procesoId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Listado
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ListaCandidata' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+
+  /listas-candidatas/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      tags: [Listas candidatas]
+      summary: Obtiene un registro por su identificador
+      responses:
+        '200':
+          description: Registro encontrado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ListaCandidata' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+    patch:
+      tags: [Listas candidatas]
+      summary: Actualiza un registro (requiere rol admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ListaCandidataInput' }
+      responses:
+        '200':
+          description: Actualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ListaCandidata' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
+    delete:
+      tags: [Listas candidatas]
+      summary: Elimina un registro (requiere rol admin)
+      responses:
+        '204': { description: Eliminado }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+
+  /candidatos:
+    get:
+      tags: [Candidatos]
+      summary: Lista todos los registros
+      responses:
+        '200':
+          description: Listado
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Candidato' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+    post:
+      tags: [Candidatos]
+      summary: Crea un registro (requiere rol admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CandidatoInput' }
+      responses:
+        '201':
+          description: Creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Candidato' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
+
+  /candidatos/lista/{listaId}:
+    get:
+      tags: [Candidatos]
+      summary: Lista los candidatos de una lista candidata
+      parameters:
+        - name: listaId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Listado
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Candidato' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+
+  /candidatos/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      tags: [Candidatos]
+      summary: Obtiene un registro por su identificador
+      responses:
+        '200':
+          description: Registro encontrado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Candidato' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+    patch:
+      tags: [Candidatos]
+      summary: Actualiza un registro (requiere rol admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CandidatoInput' }
+      responses:
+        '200':
+          description: Actualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Candidato' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
+    delete:
+      tags: [Candidatos]
+      summary: Elimina un registro (requiere rol admin)
+      responses:
+        '204': { description: Eliminado }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+
+  /planes-trabajo:
+    get:
+      tags: [Planes de trabajo]
+      summary: Lista todos los registros
+      responses:
+        '200':
+          description: Listado
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PlanTrabajo' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+    post:
+      tags: [Planes de trabajo]
+      summary: Crea un registro (requiere rol admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PlanTrabajoInput' }
+      responses:
+        '201':
+          description: Creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PlanTrabajo' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
+
+  /planes-trabajo/lista/{listaId}:
+    get:
+      tags: [Planes de trabajo]
+      summary: Lista los planes de trabajo de una lista
+      parameters:
+        - name: listaId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Listado
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PlanTrabajo' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+
+  /planes-trabajo/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      tags: [Planes de trabajo]
+      summary: Obtiene un registro por su identificador
+      responses:
+        '200':
+          description: Registro encontrado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PlanTrabajo' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+    patch:
+      tags: [Planes de trabajo]
+      summary: Actualiza un registro (requiere rol admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PlanTrabajoInput' }
+      responses:
+        '200':
+          description: Actualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PlanTrabajo' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
+    delete:
+      tags: [Planes de trabajo]
+      summary: Elimina un registro (requiere rol admin)
+      responses:
+        '204': { description: Eliminado }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+
+  /requisitos:
+    get:
+      tags: [Requisitos]
+      summary: Lista todos los registros
+      responses:
+        '200':
+          description: Listado
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Requisito' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+    post:
+      tags: [Requisitos]
+      summary: Crea un registro (requiere rol admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RequisitoInput' }
+      responses:
+        '201':
+          description: Creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Requisito' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
+
+  /requisitos/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      tags: [Requisitos]
+      summary: Obtiene un registro por su identificador
+      responses:
+        '200':
+          description: Registro encontrado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Requisito' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+    patch:
+      tags: [Requisitos]
+      summary: Actualiza un registro (requiere rol admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RequisitoInput' }
+      responses:
+        '200':
+          description: Actualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Requisito' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
+    delete:
+      tags: [Requisitos]
+      summary: Elimina un registro (requiere rol admin)
+      responses:
+        '204': { description: Eliminado }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+
+  /validaciones-requisito:
+    get:
+      tags: [Validaciones de requisito]
+      summary: Lista todos los registros
+      responses:
+        '200':
+          description: Listado
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ValidacionRequisito' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+    post:
+      tags: [Validaciones de requisito]
+      summary: Crea un registro (requiere rol admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ValidacionRequisitoInput' }
+      responses:
+        '201':
+          description: Creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ValidacionRequisito' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
+
+  /validaciones-requisito/candidato/{candidatoId}:
+    get:
+      tags: [Validaciones de requisito]
+      summary: Lista las validaciones de un candidato
+      parameters:
+        - name: candidatoId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Listado
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ValidacionRequisito' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+
+  /validaciones-requisito/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      tags: [Validaciones de requisito]
+      summary: Obtiene un registro por su identificador
+      responses:
+        '200':
+          description: Registro encontrado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ValidacionRequisito' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+    patch:
+      tags: [Validaciones de requisito]
+      summary: Actualiza un registro (requiere rol admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ValidacionRequisitoInput' }
+      responses:
+        '200':
+          description: Actualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ValidacionRequisito' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
+    delete:
+      tags: [Validaciones de requisito]
+      summary: Elimina un registro (requiere rol admin)
+      responses:
+        '204': { description: Eliminado }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+
+  /codigos-voto:
+    get:
+      tags: [Códigos de voto]
+      summary: Lista todos los registros
+      responses:
+        '200':
+          description: Listado
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/CodigoVoto' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+    post:
+      tags: [Códigos de voto]
+      summary: Crea un registro (requiere rol admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CodigoVotoInput' }
+      responses:
+        '201':
+          description: Creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CodigoVoto' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
+
+  /codigos-voto/votacion/{votacionId}:
+    get:
+      tags: [Códigos de voto]
+      summary: Lista los códigos de una votación
+      parameters:
+        - name: votacionId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Listado
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/CodigoVoto' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+
+  /codigos-voto/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      tags: [Códigos de voto]
+      summary: Obtiene un registro por su identificador
+      responses:
+        '200':
+          description: Registro encontrado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CodigoVoto' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+    patch:
+      tags: [Códigos de voto]
+      summary: Actualiza un registro (requiere rol admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CodigoVotoInput' }
+      responses:
+        '200':
+          description: Actualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CodigoVoto' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
+    delete:
+      tags: [Códigos de voto]
+      summary: Elimina un registro (requiere rol admin)
+      responses:
+        '204': { description: Eliminado }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+
+  /actas-resultados:
+    get:
+      tags: [Actas de resultados]
+      summary: Lista todos los registros
+      responses:
+        '200':
+          description: Listado
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ActaResultados' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+    post:
+      tags: [Actas de resultados]
+      summary: Crea un registro (requiere rol admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ActaResultadosInput' }
+      responses:
+        '201':
+          description: Creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ActaResultados' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
+
+  /actas-resultados/votacion/{votacionId}:
+    get:
+      tags: [Actas de resultados]
+      summary: Obtiene el acta de una votación
+      parameters:
+        - name: votacionId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Listado
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ActaResultados' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+
+  /actas-resultados/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      tags: [Actas de resultados]
+      summary: Obtiene un registro por su identificador
+      responses:
+        '200':
+          description: Registro encontrado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ActaResultados' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+    patch:
+      tags: [Actas de resultados]
+      summary: Actualiza un registro (requiere rol admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ActaResultadosInput' }
+      responses:
+        '200':
+          description: Actualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ActaResultados' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
+    delete:
+      tags: [Actas de resultados]
+      summary: Elimina un registro (requiere rol admin)
+      responses:
+        '204': { description: Eliminado }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+
+  /veedores:
+    get:
+      tags: [Veedores]
+      summary: Lista todos los registros
+      responses:
+        '200':
+          description: Listado
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Veedor' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+    post:
+      tags: [Veedores]
+      summary: Crea un registro (requiere rol admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VeedorInput' }
+      responses:
+        '201':
+          description: Creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Veedor' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
+
+  /veedores/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      tags: [Veedores]
+      summary: Obtiene un registro por su identificador
+      responses:
+        '200':
+          description: Registro encontrado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Veedor' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+    patch:
+      tags: [Veedores]
+      summary: Actualiza un registro (requiere rol admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VeedorInput' }
+      responses:
+        '200':
+          description: Actualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Veedor' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
+    delete:
+      tags: [Veedores]
+      summary: Elimina un registro (requiere rol admin)
+      responses:
+        '204': { description: Eliminado }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+
+  /veedurias:
+    get:
+      tags: [Veedurías]
+      summary: Lista todos los registros
+      responses:
+        '200':
+          description: Listado
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Veeduria' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+    post:
+      tags: [Veedurías]
+      summary: Crea un registro (requiere rol admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VeeduriaInput' }
+      responses:
+        '201':
+          description: Creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Veeduria' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
+
+  /veedurias/votacion/{votacionId}:
+    get:
+      tags: [Veedurías]
+      summary: Lista las veedurías de una votación
+      parameters:
+        - name: votacionId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Listado
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Veeduria' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+
+  /veedurias/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      tags: [Veedurías]
+      summary: Obtiene un registro por su identificador
+      responses:
+        '200':
+          description: Registro encontrado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Veeduria' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+    patch:
+      tags: [Veedurías]
+      summary: Actualiza un registro (requiere rol admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VeeduriaInput' }
+      responses:
+        '200':
+          description: Actualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Veeduria' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
+    delete:
+      tags: [Veedurías]
+      summary: Elimina un registro (requiere rol admin)
+      responses:
+        '204': { description: Eliminado }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+
+  /votaciones:
+    get:
+      tags: [Votaciones]
+      summary: Lista todas las votaciones (papeletas)
+      responses:
+        '200':
+          description: Listado
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Votacion' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+
+  /votaciones/proceso/{procesoId}:
+    get:
+      tags: [Votaciones]
+      summary: Lista las votaciones de un proceso electoral
+      parameters:
+        - name: procesoId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Listado
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Votacion' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+
+  /votaciones/{id}:
+    get:
+      tags: [Votaciones]
+      summary: Obtiene una votación por su identificador
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Votación encontrada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Votacion' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+
+  /votos:
+    post:
+      tags: [Votos]
+      summary: Emite un voto
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fk_id_votacion, tipo_voto, fk_id_lista]
+              properties:
+                fk_id_votacion: { type: integer, example: 1 }
+                fk_id_lista:
+                  type: integer
+                  nullable: true
+                  description: Identificador de la lista. Debe ser null si el voto es blanco o nulo.
+                tipo_voto:
+                  type: string
+                  enum: ["valido", "blanco", "nulo"]
+      responses:
+        '201':
+          description: Voto registrado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Voto' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
+
+  /votos/resultados/{votacionId}:
+    get:
+      tags: [Votos]
+      summary: Escrutinio agregado de una votación
+      parameters:
+        - name: votacionId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Conteo por opción
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    opcion:      { type: string, description: Nombre de la lista, o "blanco"/"nulo" }
+                    total_votos: { type: integer }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+
+  /health:
+    get:
+      tags: [Sistema]
+      summary: Verificación de disponibilidad del servicio
+      security: []
+      responses:
+        '200':
+          description: Servicio operativo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
 
 components:
   securitySchemes:
@@ -15,143 +1554,643 @@ components:
       scheme: bearer
       bearerFormat: JWT
 
+  responses:
+    NoAutenticado:
+      description: Token ausente, inválido o expirado
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    SinPermiso:
+      description: El usuario autenticado no tiene rol admin
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NoEncontrado:
+      description: El recurso solicitado no existe
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    SolicitudInvalida:
+      description: Faltan campos obligatorios en la solicitud
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    ValidacionFallida:
+      description: El cuerpo de la solicitud no supera la validación
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error: { type: string }
+
+    Votacion:
+      type: object
+      properties:
+        id_votacion:     { type: integer }
+        titulo_papeleta: { type: string }
+        fecha_apertura:  { type: string, format: date-time }
+        fecha_cierre:    { type: string, format: date-time }
+        estado:          { type: string, example: abierta }
+        id_proceso:      { type: integer }
+        nombre_proceso:  { type: string }
+
+    Voto:
+      type: object
+      properties:
+        id_voto:         { type: integer }
+        tipo_voto:       { type: string, enum: ["valido", "blanco", "nulo"] }
+        fecha_hora:      { type: string, format: date-time }
+        id_votacion:     { type: integer }
+        titulo_papeleta: { type: string }
+        id_lista:        { type: integer, nullable: true }
+        nombre_lista:    { type: string, nullable: true }
+
+    FacultadInput:
+      type: object
+      required: [nombre_facultad]
+      properties:
+        nombre_facultad:
+          type: string
+          maxLength: 100
+
+    Facultad:
+      type: object
+      properties:
+        id_facultad:
+          type: integer
+        nombre_facultad:
+          type: string
+          maxLength: 100
+
+    DirectorInput:
+      type: object
+      required: [nombres, apellidos, correo]
+      properties:
+        nombres:
+          type: string
+          maxLength: 80
+        apellidos:
+          type: string
+          maxLength: 80
+        correo:
+          type: string
+          format: "email"
+          maxLength: 120
+
+    Director:
+      type: object
+      properties:
+        id_director:
+          type: integer
+        nombres:
+          type: string
+          maxLength: 80
+        apellidos:
+          type: string
+          maxLength: 80
+        correo:
+          type: string
+          format: "email"
+          maxLength: 120
+
+    CarreraInput:
+      type: object
+      required: [nombre_carrera]
+      properties:
+        nombre_carrera:
+          type: string
+          maxLength: 100
+        fk_id_director:
+          type: integer
+        fk_id_facultad:
+          type: integer
+
+    Carrera:
+      type: object
+      properties:
+        id_carrera:
+          type: integer
+        nombre_carrera:
+          type: string
+          maxLength: 100
+        fk_id_director:
+          type: integer
+        fk_id_facultad:
+          type: integer
+
+    ResponsableInput:
+      type: object
+      required: [nombres, apellidos, correo]
+      properties:
+        nombres:
+          type: string
+          maxLength: 80
+        apellidos:
+          type: string
+          maxLength: 80
+        cargo:
+          type: string
+          maxLength: 60
+        correo:
+          type: string
+          format: "email"
+          maxLength: 120
+
+    Responsable:
+      type: object
+      properties:
+        id_responsable:
+          type: integer
+        nombres:
+          type: string
+          maxLength: 80
+        apellidos:
+          type: string
+          maxLength: 80
+        cargo:
+          type: string
+          maxLength: 60
+        correo:
+          type: string
+          format: "email"
+          maxLength: 120
+
+    EstudianteInput:
+      type: object
+      required: [cedula, nombres, apellidos, correo_institucional, password]
+      properties:
+        cedula:
+          type: string
+          minLength: 10
+          maxLength: 10
+        nombres:
+          type: string
+          maxLength: 80
+        apellidos:
+          type: string
+          maxLength: 80
+        correo_institucional:
+          type: string
+          format: "email"
+        password:
+          type: string
+          minLength: 6
+        promedio:
+          type: number
+        estado_academico:
+          type: string
+          enum: ["activo", "inactivo", "egresado", "graduado"]
+        fk_id_carrera:
+          type: integer
+        rol:
+          type: string
+          enum: ["estudiante", "admin"]
+
+    Estudiante:
+      type: object
+      properties:
+        cedula:
+          type: string
+          minLength: 10
+          maxLength: 10
+        nombres:
+          type: string
+          maxLength: 80
+        apellidos:
+          type: string
+          maxLength: 80
+        correo_institucional:
+          type: string
+          format: "email"
+        promedio:
+          type: number
+        estado_academico:
+          type: string
+          enum: ["activo", "inactivo", "egresado", "graduado"]
+        fk_id_carrera:
+          type: integer
+        rol:
+          type: string
+          enum: ["estudiante", "admin"]
+
+    ProcesoElectoralInput:
+      type: object
+      required: [nombre_proceso, tipo_proceso, fecha_convocatoria, fecha_inicio_votacion, fecha_fin_votacion]
+      properties:
+        nombre_proceso:
+          type: string
+          maxLength: 120
+        tipo_proceso:
+          type: string
+          enum: ["consejo_estudiantil", "representante_carrera", "referendum"]
+        fecha_convocatoria:
+          type: string
+          format: "date"
+        fecha_inicio_votacion:
+          type: string
+          example: "2026-07-01 08:00:00"
+        fecha_fin_votacion:
+          type: string
+          example: "2026-07-02 17:00:00"
+        estado:
+          type: string
+          enum: ["planificado", "convocado", "inscripcion", "campaña", "votacion", "escrutinio", "finalizado", "cancelado"]
+        descripcion:
+          type: string
+          maxLength: 250
+
+    ProcesoElectoral:
+      type: object
+      properties:
+        id_proceso:
+          type: integer
+        nombre_proceso:
+          type: string
+          maxLength: 120
+        tipo_proceso:
+          type: string
+          enum: ["consejo_estudiantil", "representante_carrera", "referendum"]
+        fecha_convocatoria:
+          type: string
+          format: "date"
+        fecha_inicio_votacion:
+          type: string
+          example: "2026-07-01 08:00:00"
+        fecha_fin_votacion:
+          type: string
+          example: "2026-07-02 17:00:00"
+        estado:
+          type: string
+          enum: ["planificado", "convocado", "inscripcion", "campaña", "votacion", "escrutinio", "finalizado", "cancelado"]
+        descripcion:
+          type: string
+          maxLength: 250
+
+    CronogramaInput:
+      type: object
+      required: [fk_id_proceso, fk_id_responsable, actividad, fecha_inicio, fecha_fin]
+      properties:
+        fk_id_proceso:
+          type: integer
+        fk_id_responsable:
+          type: integer
+        actividad:
+          type: string
+          maxLength: 120
+        fecha_inicio:
+          type: string
+          format: "date"
+        fecha_fin:
+          type: string
+          format: "date"
+
+    Cronograma:
+      type: object
+      properties:
+        id_cronograma:
+          type: integer
+        fk_id_proceso:
+          type: integer
+        fk_id_responsable:
+          type: integer
+        actividad:
+          type: string
+          maxLength: 120
+        fecha_inicio:
+          type: string
+          format: "date"
+        fecha_fin:
+          type: string
+          format: "date"
+
+    ListaCandidataInput:
+      type: object
+      required: [fk_id_proceso, nombre_lista, fecha_inscripcion]
+      properties:
+        fk_id_proceso:
+          type: integer
+        nombre_lista:
+          type: string
+          maxLength: 80
+        lema:
+          type: string
+          maxLength: 120
+        estado_revision:
+          type: string
+          enum: ["en_revision", "aprobada", "rechazada"]
+        fecha_inscripcion:
+          type: string
+          format: "date"
+
+    ListaCandidata:
+      type: object
+      properties:
+        id_lista:
+          type: integer
+        fk_id_proceso:
+          type: integer
+        nombre_lista:
+          type: string
+          maxLength: 80
+        lema:
+          type: string
+          maxLength: 120
+        estado_revision:
+          type: string
+          enum: ["en_revision", "aprobada", "rechazada"]
+        fecha_inscripcion:
+          type: string
+          format: "date"
+
+    CandidatoInput:
+      type: object
+      required: [cargo, fk_cedula_estudiante, fk_id_lista]
+      properties:
+        cargo:
+          type: string
+          enum: ["presidente", "vicepresidente", "secretario", "tesorero", "vocal"]
+        cumple_requisitos:
+          type: boolean
+        foto_url:
+          type: string
+          maxLength: 255
+        fk_cedula_estudiante:
+          type: string
+          minLength: 10
+          maxLength: 10
+        fk_id_lista:
+          type: integer
+
+    Candidato:
+      type: object
+      properties:
+        id_candidato:
+          type: integer
+        cargo:
+          type: string
+          enum: ["presidente", "vicepresidente", "secretario", "tesorero", "vocal"]
+        cumple_requisitos:
+          type: boolean
+        foto_url:
+          type: string
+          maxLength: 255
+        fk_cedula_estudiante:
+          type: string
+          minLength: 10
+          maxLength: 10
+        fk_id_lista:
+          type: integer
+
+    PlanTrabajoInput:
+      type: object
+      required: [area, propuesta, fk_id_lista]
+      properties:
+        area:
+          type: string
+          enum: ["academico", "deportivo", "cultural", "infraestructura", "social"]
+        propuesta:
+          type: string
+        archivo_url:
+          type: string
+          maxLength: 255
+        fk_id_lista:
+          type: integer
+
+    PlanTrabajo:
+      type: object
+      properties:
+        id_plan:
+          type: integer
+        area:
+          type: string
+          enum: ["academico", "deportivo", "cultural", "infraestructura", "social"]
+        propuesta:
+          type: string
+        archivo_url:
+          type: string
+          maxLength: 255
+        fk_id_lista:
+          type: integer
+
+    RequisitoInput:
+      type: object
+      required: [nombre_requisito, tipo_requisito]
+      properties:
+        nombre_requisito:
+          type: string
+          maxLength: 100
+        descripcion:
+          type: string
+          maxLength: 250
+        tipo_requisito:
+          type: string
+          maxLength: 40
+
+    Requisito:
+      type: object
+      properties:
+        id_requisito:
+          type: integer
+        nombre_requisito:
+          type: string
+          maxLength: 100
+        descripcion:
+          type: string
+          maxLength: 250
+        tipo_requisito:
+          type: string
+          maxLength: 40
+
+    ValidacionRequisitoInput:
+      type: object
+      required: [fecha_validacion, fk_id_candidato, fk_id_requisito]
+      properties:
+        cumple:
+          type: boolean
+        observacion:
+          type: string
+          maxLength: 250
+        fecha_validacion:
+          type: string
+          format: "date"
+        fk_id_candidato:
+          type: integer
+        fk_id_requisito:
+          type: integer
+
+    ValidacionRequisito:
+      type: object
+      properties:
+        id_validacion:
+          type: integer
+        cumple:
+          type: boolean
+        observacion:
+          type: string
+          maxLength: 250
+        fecha_validacion:
+          type: string
+          format: "date"
+        fk_id_candidato:
+          type: integer
+        fk_id_requisito:
+          type: integer
+
+    CodigoVotoInput:
+      type: object
+      required: [fk_id_votacion, codigo_hash, fk_cedula_estudiante]
+      properties:
+        fk_id_votacion:
+          type: integer
+        codigo_hash:
+          type: string
+          maxLength: 255
+        estado_codigo:
+          type: string
+          enum: ["generado", "enviado", "usado", "expirado"]
+        fecha_envio:
+          type: string
+          example: "2026-07-01 08:00:00"
+        fk_cedula_estudiante:
+          type: string
+          minLength: 10
+          maxLength: 10
+
+    CodigoVoto:
+      type: object
+      properties:
+        id_codigo:
+          type: integer
+        fk_id_votacion:
+          type: integer
+        codigo_hash:
+          type: string
+          maxLength: 255
+        estado_codigo:
+          type: string
+          enum: ["generado", "enviado", "usado", "expirado"]
+        fecha_envio:
+          type: string
+          example: "2026-07-01 08:00:00"
+        fk_cedula_estudiante:
+          type: string
+          minLength: 10
+          maxLength: 10
+
+    ActaResultadosInput:
+      type: object
+      required: [fk_id_votacion]
+      properties:
+        fk_id_votacion:
+          type: integer
+        total_votantes:
+          type: integer
+        votos_validos:
+          type: integer
+        votos_blanco:
+          type: integer
+        votos_nulos:
+          type: integer
+        lista_ganadora:
+          type: string
+          maxLength: 80
+        fecha_emision:
+          type: string
+          example: "2026-07-02 18:00:00"
+
+    ActaResultados:
+      type: object
+      properties:
+        id_acta:
+          type: integer
+        fk_id_votacion:
+          type: integer
+        total_votantes:
+          type: integer
+        votos_validos:
+          type: integer
+        votos_blanco:
+          type: integer
+        votos_nulos:
+          type: integer
+        lista_ganadora:
+          type: string
+          maxLength: 80
+        fecha_emision:
+          type: string
+          example: "2026-07-02 18:00:00"
+
+    VeedorInput:
+      type: object
+      required: [nombre, tipo_veedor, correo]
+      properties:
+        nombre:
+          type: string
+          maxLength: 100
+        institucion:
+          type: string
+          maxLength: 100
+        tipo_veedor:
+          type: string
+          enum: ["interno", "externo", "docente", "estudiante"]
+        correo:
+          type: string
+          format: "email"
+          maxLength: 120
+
+    Veedor:
+      type: object
+      properties:
+        id_veedor:
+          type: integer
+        nombre:
+          type: string
+          maxLength: 100
+        institucion:
+          type: string
+          maxLength: 100
+        tipo_veedor:
+          type: string
+          enum: ["interno", "externo", "docente", "estudiante"]
+        correo:
+          type: string
+          format: "email"
+          maxLength: 120
+
+    VeeduriaInput:
+      type: object
+      required: [fk_id_votacion, fk_id_veedor, momento]
+      properties:
+        fk_id_votacion:
+          type: integer
+        fk_id_veedor:
+          type: integer
+        momento:
+          type: string
+          enum: ["apertura", "desarrollo", "cierre", "escrutinio"]
+        observacion:
+          type: string
+          maxLength: 250
+
+    Veeduria:
+      type: object
+      properties:
+        id_veeduria:
+          type: integer
+        fk_id_votacion:
+          type: integer
+        fk_id_veedor:
+          type: integer
+        momento:
+          type: string
+          enum: ["apertura", "desarrollo", "cierre", "escrutinio"]
+        observacion:
+          type: string
+          maxLength: 250
+
 security:
   - bearerAuth: []
-
-paths:
-  /auth/login:
-    post:
-      summary: Iniciar sesión
-      security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                correo_institucional:
-                  type: string
-                password:
-                  type: string
-      responses:
-        '200':
-          description: Login exitoso, devuelve JWT.
-
-  /estudiantes:
-    get:
-      summary: Listar estudiantes
-      responses:
-        '200':
-          description: Lista de estudiantes
-    post:
-      summary: Crear estudiante
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                cedula:
-                  type: string
-                nombres:
-                  type: string
-                apellidos:
-                  type: string
-                correo_institucional:
-                  type: string
-                password:
-                  type: string
-      responses:
-        '201':
-          description: Creado
-
-  /estudiantes/{cedula}:
-    get:
-      summary: Obtener estudiante
-      parameters:
-        - name: cedula
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: OK
-    patch:
-      summary: Actualizar estudiante
-      parameters:
-        - name: cedula
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-      responses:
-        '200':
-          description: OK
-    delete:
-      summary: Eliminar estudiante
-      parameters:
-        - name: cedula
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '204':
-          description: Eliminado
-
-  /procesos-electorales:
-    get:
-      summary: Listar procesos
-      responses:
-        '200':
-          description: OK
-
-  /listas-candidatas:
-    get:
-      summary: Listar listas
-      responses:
-        '200':
-          description: OK
-
-  /votos:
-    post:
-      summary: Emitir voto
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                fk_id_votacion:
-                  type: integer
-                fk_id_lista:
-                  type: integer
-                tipo_voto:
-                  type: string
-                  enum: [valido, blanco, nulo]
-      responses:
-        '201':
-          description: Creado
-    
-  /votos/resultados/{votacionId}:
-    get:
-      summary: Ver resultados
-      parameters:
-        - name: votacionId
-          in: path
-          required: true
-          schema:
-            type: integer
-      responses:
-        '200':
-          description: Resultados
