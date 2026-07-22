@@ -44,8 +44,9 @@ jobs:
             git pull origin master
 
             # Reconstruye y reinicia SOLO el backend; MySQL no se toca.
-            sudo docker compose build codevote-api
-            sudo docker compose up -d codevote-api
+            # "backend" es el nombre del SERVICIO en docker-compose.yml
+            # (el contenedor se llama codevote-api, pero Compose usa el servicio).
+            sudo docker compose up -d --build backend
 
             # Comprobación de salud: si /health no responde, el despliegue falla.
             sleep 3
