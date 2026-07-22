@@ -28,7 +28,18 @@ app.use(rateLimiter);
 
 registerRoutes(app);
 
-app.get('/health', (_req, res) => res.json({ status: 'ok' }));
+// Estado del servicio. Se expone en ambas rutas:
+// /health      -> para comprobaciones internas (pipeline, dentro del servidor)
+// /api/health  -> accesible desde fuera, ya que Nginx enruta /api/ al backend
+const estadoServicio = (_req: express.Request, res: express.Response) =>
+  res.json({
+    status: 'ok',
+    servicio: 'codevote-api',
+    fecha: new Date().toISOString(),
+  });
+
+app.get('/health', estadoServicio);
+app.get('/api/health', estadoServicio);
 
 // El errorHandler debe registrarse siempre al final
 app.use(errorHandler);
