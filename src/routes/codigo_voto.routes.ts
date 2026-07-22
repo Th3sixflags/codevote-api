@@ -6,6 +6,8 @@ const router = Router();
 
 // El orden importa: las rutas específicas van antes que /:id
 router.get('/',                     requireAuth, requireAdmin, ctrl.listar);
+// Cada estudiante puede consultar únicamente sus propios comprobantes
+router.get('/mis-codigos',          requireAuth,               ctrl.listarMisCodigos);
 router.get('/votacion/:votacionId', requireAuth, requireAdmin, ctrl.listarPorVotacion);
 router.get('/:id',                  requireAuth, requireAdmin, ctrl.obtener);
 router.post('/',                    requireAuth, requireAdmin, ctrl.crear);

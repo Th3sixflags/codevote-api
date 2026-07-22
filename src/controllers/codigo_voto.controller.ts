@@ -21,6 +21,12 @@ export async function listarPorVotacion(req: Request, res: Response) {
   res.json(registros);
 }
 
+/** Comprobantes del usuario autenticado. No requiere rol admin. */
+export async function listarMisCodigos(req: Request, res: Response) {
+  const registros = await service.listarPorEstudiante(req.user!.sub);
+  res.json(registros);
+}
+
 export async function crear(req: Request, res: Response) {
   const data  = crearCodigoVotoSchema.parse(req.body);
   const nuevo = await service.crearCodigoVoto(data);

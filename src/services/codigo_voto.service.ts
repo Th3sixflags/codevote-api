@@ -14,6 +14,10 @@ export async function listarPorVotacion(id: number) {
   return repo.findByVotacion(id);
 }
 
+export async function listarPorEstudiante(cedula: string) {
+  return repo.findByEstudiante(cedula);
+}
+
 export async function crearCodigoVoto(data: CrearCodigoVotoDTO) {
   return repo.create(data);
 }

@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 
 const BASE_QUERY = `
   SELECT
-    e.cedula, e.nombres, e.apellidos, e.correo_institucional, e.promedio, e.estado_academico,
+    e.cedula, e.nombres, e.apellidos, e.correo_institucional, e.promedio, e.estado_academico, e.rol,
     c.id_carrera, c.nombre_carrera
   FROM estudiante e
   LEFT JOIN carrera c ON c.id_carrera = e.fk_id_carrera

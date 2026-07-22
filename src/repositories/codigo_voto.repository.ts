@@ -4,10 +4,12 @@ import { CrearCodigoVotoDTO, ActualizarCodigoVotoDTO } from '../schemas/codigo_v
 const BASE_QUERY = `
   SELECT
     cv.id_codigo, cv.codigo_hash, cv.estado_codigo, cv.fecha_envio,
-    cv.fk_id_votacion, v.titulo_papeleta,
+    cv.fk_id_votacion, v.titulo_papeleta, v.fecha_cierre,
+    p.id_proceso, p.nombre_proceso,
     cv.fk_cedula_estudiante
   FROM codigo_voto cv
   JOIN votacion v ON v.id_votacion = cv.fk_id_votacion
+  JOIN proceso_electoral p ON p.id_proceso = v.fk_id_proceso
 `;
 
 export async function findAll() {
@@ -22,6 +24,15 @@ export async function findById(id: number) {
 
 export async function findByVotacion(id: number) {
   const [rows] = await pool.query(BASE_QUERY + ' WHERE cv.fk_id_votacion = ?', [id]);
+  return rows as any[];
+}
+
+/** Comprobantes emitidos a un estudiante (usado por "Mis Recibos"). */
+export async function findByEstudiante(cedula: string) {
+  const [rows] = await pool.query(
+    BASE_QUERY + ' WHERE cv.fk_cedula_estudiante = ? ORDER BY cv.fecha_envio DESC, cv.id_codigo DESC',
+    [cedula]
+  );
   return rows as any[];
 }
 
