@@ -1,0 +1,54 @@
+name: Desplegar backend
+
+# Se ejecuta en cada push a master (la rama por defecto del repo).
+on:
+  push:
+    branches: [master]
+
+jobs:
+  # 1) Verifica que el TypeScript compile antes de desplegar nada.
+  verificar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+
+  # 2) Despliega en el servidor AWS por SSH usando Docker Compose.
+  desplegar:
+    needs: verificar
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configurar la clave SSH
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s' "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s' "${{ secrets.SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Desplegar en el servidor (Docker Compose)
+        env:
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          ssh -i ~/.ssh/id_ed25519 "$DEPLOY_USER@$DEPLOY_HOST" 'bash -s' << 'REMOTE'
+            set -e
+            cd /home/ubuntu/codevote-api
+
+            # Trae el código nuevo
+            git pull origin master
+
+            # Reconstruye y reinicia SOLO el backend; MySQL no se toca.
+            sudo docker compose build codevote-api
+            sudo docker compose up -d codevote-api
+
+            # Comprobación de salud: si /health no responde, el despliegue falla.
+            sleep 3
+            curl --fail --silent http://127.0.0.1:3000/health > /dev/null
+            echo "Backend desplegado correctamente."
+          REMOTE
