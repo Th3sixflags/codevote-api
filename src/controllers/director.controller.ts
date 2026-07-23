@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
-import { crearDirectorSchema, actualizarDirectorSchema } from '../schemas/director.schema';
-import * as service from '../services/director.service';
+import { crearDirectorSchema, actualizarDirectorSchema } from '../schemas/director.schema.js';
+import * as service from '../services/director.service.js';
 
 export async function listar(_req: Request, res: Response) {
   const registros = await service.listarDirector();

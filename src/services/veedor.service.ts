@@ -1,5 +1,5 @@
-import * as repo from '../repositories/veedor.repository';
-import { CrearVeedorDTO, ActualizarVeedorDTO } from '../schemas/veedor.schema';
+import * as repo from '../repositories/veedor.repository.js';
+import { CrearVeedorDTO, ActualizarVeedorDTO } from '../schemas/veedor.schema.js';
 
 export async function listarVeedor() {
   return repo.findAll();

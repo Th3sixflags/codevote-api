@@ -1,5 +1,5 @@
-import * as repo from '../repositories/veeduria.repository';
-import { CrearVeeduriaDTO, ActualizarVeeduriaDTO } from '../schemas/veeduria.schema';
+import * as repo from '../repositories/veeduria.repository.js';
+import { CrearVeeduriaDTO, ActualizarVeeduriaDTO } from '../schemas/veeduria.schema.js';
 
 export async function listarVeeduria() {
   return repo.findAll();

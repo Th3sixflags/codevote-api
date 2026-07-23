@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
-import { crearActaResultadosSchema, actualizarActaResultadosSchema } from '../schemas/acta_resultados.schema';
-import * as service from '../services/acta_resultados.service';
+import { crearActaResultadosSchema, actualizarActaResultadosSchema } from '../schemas/acta_resultados.schema.js';
+import * as service from '../services/acta_resultados.service.js';
 
 export async function listar(_req: Request, res: Response) {
   const registros = await service.listarActaResultados();

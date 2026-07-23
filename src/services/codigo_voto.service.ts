@@ -1,5 +1,5 @@
-import * as repo from '../repositories/codigo_voto.repository';
-import { CrearCodigoVotoDTO, ActualizarCodigoVotoDTO } from '../schemas/codigo_voto.schema';
+import * as repo from '../repositories/codigo_voto.repository.js';
+import { CrearCodigoVotoDTO, ActualizarCodigoVotoDTO } from '../schemas/codigo_voto.schema.js';
 
 export async function listarCodigoVoto() {
   return repo.findAll();

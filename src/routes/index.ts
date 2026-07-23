@@ -1,23 +1,23 @@
 import { Express } from 'express';
-import authRoutes                from './auth.routes';
-import estudianteRoutes          from './estudiante.routes';
-import facultadRoutes            from './facultad.routes';
-import directorRoutes            from './director.routes';
-import carreraRoutes             from './carrera.routes';
-import responsableRoutes         from './responsable.routes';
-import procesoElectoralRoutes    from './proceso_electoral.routes';
-import cronogramaRoutes          from './cronograma.routes';
-import votacionRoutes            from './votacion.routes';
-import listaCandidataRoutes      from './lista_candidata.routes';
-import candidatoRoutes           from './candidato.routes';
-import requisitoRoutes           from './requisito.routes';
-import validacionRequisitoRoutes from './validacion_requisito.routes';
-import planTrabajoRoutes         from './plan_trabajo.routes';
-import votoRoutes                from './voto.routes';
-import codigoVotoRoutes          from './codigo_voto.routes';
-import actaResultadosRoutes      from './acta_resultados.routes';
-import veedorRoutes              from './veedor.routes';
-import veeduriaRoutes            from './veeduria.routes';
+import authRoutes                from './auth.routes.js';
+import estudianteRoutes          from './estudiante.routes.js';
+import facultadRoutes            from './facultad.routes.js';
+import directorRoutes            from './director.routes.js';
+import carreraRoutes             from './carrera.routes.js';
+import responsableRoutes         from './responsable.routes.js';
+import procesoElectoralRoutes    from './proceso_electoral.routes.js';
+import cronogramaRoutes          from './cronograma.routes.js';
+import votacionRoutes            from './votacion.routes.js';
+import listaCandidataRoutes      from './lista_candidata.routes.js';
+import candidatoRoutes           from './candidato.routes.js';
+import requisitoRoutes           from './requisito.routes.js';
+import validacionRequisitoRoutes from './validacion_requisito.routes.js';
+import planTrabajoRoutes         from './plan_trabajo.routes.js';
+import votoRoutes                from './voto.routes.js';
+import codigoVotoRoutes          from './codigo_voto.routes.js';
+import actaResultadosRoutes      from './acta_resultados.routes.js';
+import veedorRoutes              from './veedor.routes.js';
+import veeduriaRoutes            from './veeduria.routes.js';
 
 export function registerRoutes(app: Express) {
   // Autenticación

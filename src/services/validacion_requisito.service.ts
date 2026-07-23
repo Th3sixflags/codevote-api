@@ -1,5 +1,5 @@
-import * as repo from '../repositories/validacion_requisito.repository';
-import { CrearValidacionRequisitoDTO, ActualizarValidacionRequisitoDTO } from '../schemas/validacion_requisito.schema';
+import * as repo from '../repositories/validacion_requisito.repository.js';
+import { CrearValidacionRequisitoDTO, ActualizarValidacionRequisitoDTO } from '../schemas/validacion_requisito.schema.js';
 
 export async function listarValidacionRequisito() {
   return repo.findAll();

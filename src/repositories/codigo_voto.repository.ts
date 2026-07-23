@@ -1,5 +1,5 @@
-import { pool } from '../config/database';
-import { CrearCodigoVotoDTO, ActualizarCodigoVotoDTO } from '../schemas/codigo_voto.schema';
+import { pool } from '../config/database.js';
+import { CrearCodigoVotoDTO, ActualizarCodigoVotoDTO } from '../schemas/codigo_voto.schema.js';
 
 const BASE_QUERY = `
   SELECT

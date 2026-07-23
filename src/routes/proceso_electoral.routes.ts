@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { requireAuth, requireAdmin } from '../middleware/auth';
-import * as ctrl from '../controllers/proceso_electoral.controller';
+import { requireAuth, requireAdmin } from '../middleware/auth.js';
+import * as ctrl from '../controllers/proceso_electoral.controller.js';
 
 const router = Router();
 

@@ -1,5 +1,5 @@
-import { pool } from '../config/database';
-import { CrearEstudianteDTO, ActualizarEstudianteDTO } from '../schemas/estudiante.schema';
+import { pool } from '../config/database.js';
+import { CrearEstudianteDTO, ActualizarEstudianteDTO } from '../schemas/estudiante.schema.js';
 import bcrypt from 'bcryptjs';
 
 const BASE_QUERY = `

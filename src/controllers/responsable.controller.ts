@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
-import { crearResponsableSchema, actualizarResponsableSchema } from '../schemas/responsable.schema';
-import * as service from '../services/responsable.service';
+import { crearResponsableSchema, actualizarResponsableSchema } from '../schemas/responsable.schema.js';
+import * as service from '../services/responsable.service.js';
 
 export async function listar(_req: Request, res: Response) {
   const registros = await service.listarResponsable();

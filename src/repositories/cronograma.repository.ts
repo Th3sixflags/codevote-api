@@ -1,5 +1,5 @@
-import { pool } from '../config/database';
-import { CrearCronogramaDTO, ActualizarCronogramaDTO } from '../schemas/cronograma.schema';
+import { pool } from '../config/database.js';
+import { CrearCronogramaDTO, ActualizarCronogramaDTO } from '../schemas/cronograma.schema.js';
 
 const BASE_QUERY = `
   SELECT

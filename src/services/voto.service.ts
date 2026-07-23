@@ -1,5 +1,5 @@
-import * as repo from '../repositories/voto.repository';
-import { CrearVotoDTO } from '../schemas/voto.schema';
+import * as repo from '../repositories/voto.repository.js';
+import { CrearVotoDTO } from '../schemas/voto.schema.js';
 
 export async function registrarVoto(data: CrearVotoDTO) {
   return repo.create(data);

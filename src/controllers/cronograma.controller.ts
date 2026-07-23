@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
-import { crearCronogramaSchema, actualizarCronogramaSchema } from '../schemas/cronograma.schema';
-import * as service from '../services/cronograma.service';
+import { crearCronogramaSchema, actualizarCronogramaSchema } from '../schemas/cronograma.schema.js';
+import * as service from '../services/cronograma.service.js';
 
 export async function listar(_req: Request, res: Response) {
   const registros = await service.listarCronograma();

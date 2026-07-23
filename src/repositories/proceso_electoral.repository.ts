@@ -1,5 +1,5 @@
-import { pool } from '../config/database';
-import { CrearProcesoDTO, ActualizarProcesoDTO } from '../schemas/proceso_electoral.schema';
+import { pool } from '../config/database.js';
+import { CrearProcesoDTO, ActualizarProcesoDTO } from '../schemas/proceso_electoral.schema.js';
 
 export async function findAll() {
   const [rows] = await pool.query('SELECT * FROM proceso_electoral ORDER BY fecha_inicio_votacion DESC');

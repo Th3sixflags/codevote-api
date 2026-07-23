@@ -1,5 +1,5 @@
-import { pool } from '../config/database';
-import { CrearVeeduriaDTO, ActualizarVeeduriaDTO } from '../schemas/veeduria.schema';
+import { pool } from '../config/database.js';
+import { CrearVeeduriaDTO, ActualizarVeeduriaDTO } from '../schemas/veeduria.schema.js';
 
 const BASE_QUERY = `
   SELECT

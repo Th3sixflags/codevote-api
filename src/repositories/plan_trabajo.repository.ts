@@ -1,5 +1,5 @@
-import { pool } from '../config/database';
-import { CrearPlanTrabajoDTO, ActualizarPlanTrabajoDTO } from '../schemas/plan_trabajo.schema';
+import { pool } from '../config/database.js';
+import { CrearPlanTrabajoDTO, ActualizarPlanTrabajoDTO } from '../schemas/plan_trabajo.schema.js';
 
 const BASE_QUERY = `
   SELECT

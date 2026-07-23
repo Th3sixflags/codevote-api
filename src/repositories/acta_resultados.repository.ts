@@ -1,5 +1,5 @@
-import { pool } from '../config/database';
-import { CrearActaResultadosDTO, ActualizarActaResultadosDTO } from '../schemas/acta_resultados.schema';
+import { pool } from '../config/database.js';
+import { CrearActaResultadosDTO, ActualizarActaResultadosDTO } from '../schemas/acta_resultados.schema.js';
 
 const BASE_QUERY = `
   SELECT

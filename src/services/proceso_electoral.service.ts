@@ -1,5 +1,5 @@
-import * as repo from '../repositories/proceso_electoral.repository';
-import { CrearProcesoDTO, ActualizarProcesoDTO } from '../schemas/proceso_electoral.schema';
+import * as repo from '../repositories/proceso_electoral.repository.js';
+import { CrearProcesoDTO, ActualizarProcesoDTO } from '../schemas/proceso_electoral.schema.js';
 
 export async function listarProcesos() {
   return repo.findAll();

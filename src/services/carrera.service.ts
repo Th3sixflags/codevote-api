@@ -1,5 +1,5 @@
-import * as repo from '../repositories/carrera.repository';
-import { CrearCarreraDTO, ActualizarCarreraDTO } from '../schemas/carrera.schema';
+import * as repo from '../repositories/carrera.repository.js';
+import { CrearCarreraDTO, ActualizarCarreraDTO } from '../schemas/carrera.schema.js';
 
 export async function listarCarrera() {
   return repo.findAll();

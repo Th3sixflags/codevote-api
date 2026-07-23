@@ -1,5 +1,5 @@
-import * as repo from '../repositories/acta_resultados.repository';
-import { CrearActaResultadosDTO, ActualizarActaResultadosDTO } from '../schemas/acta_resultados.schema';
+import * as repo from '../repositories/acta_resultados.repository.js';
+import { CrearActaResultadosDTO, ActualizarActaResultadosDTO } from '../schemas/acta_resultados.schema.js';
 
 export async function listarActaResultados() {
   return repo.findAll();

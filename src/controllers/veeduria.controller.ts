@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
-import { crearVeeduriaSchema, actualizarVeeduriaSchema } from '../schemas/veeduria.schema';
-import * as service from '../services/veeduria.service';
+import { crearVeeduriaSchema, actualizarVeeduriaSchema } from '../schemas/veeduria.schema.js';
+import * as service from '../services/veeduria.service.js';
 
 export async function listar(_req: Request, res: Response) {
   const registros = await service.listarVeeduria();

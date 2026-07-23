@@ -1,5 +1,5 @@
-import * as repo from '../repositories/estudiante.repository';
-import { CrearEstudianteDTO, ActualizarEstudianteDTO } from '../schemas/estudiante.schema';
+import * as repo from '../repositories/estudiante.repository.js';
+import { CrearEstudianteDTO, ActualizarEstudianteDTO } from '../schemas/estudiante.schema.js';
 
 export async function listarEstudiantes() {
   return repo.findAll();

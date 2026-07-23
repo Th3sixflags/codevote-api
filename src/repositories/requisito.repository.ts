@@ -1,5 +1,5 @@
-import { pool } from '../config/database';
-import { CrearRequisitoDTO, ActualizarRequisitoDTO } from '../schemas/requisito.schema';
+import { pool } from '../config/database.js';
+import { CrearRequisitoDTO, ActualizarRequisitoDTO } from '../schemas/requisito.schema.js';
 
 const BASE_QUERY = `
   SELECT * FROM requisito

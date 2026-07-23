@@ -1,5 +1,5 @@
-import { pool } from '../config/database';
-import { CrearListaDTO, ActualizarListaDTO } from '../schemas/lista_candidata.schema';
+import { pool } from '../config/database.js';
+import { CrearListaDTO, ActualizarListaDTO } from '../schemas/lista_candidata.schema.js';
 
 const BASE_QUERY = `
   SELECT

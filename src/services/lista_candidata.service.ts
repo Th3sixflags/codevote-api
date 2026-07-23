@@ -1,5 +1,5 @@
-import * as repo from '../repositories/lista_candidata.repository';
-import { CrearListaDTO, ActualizarListaDTO } from '../schemas/lista_candidata.schema';
+import * as repo from '../repositories/lista_candidata.repository.js';
+import { CrearListaDTO, ActualizarListaDTO } from '../schemas/lista_candidata.schema.js';
 
 export async function listarListas() {
   return repo.findAll();

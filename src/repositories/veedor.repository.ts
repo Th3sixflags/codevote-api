@@ -1,5 +1,5 @@
-import { pool } from '../config/database';
-import { CrearVeedorDTO, ActualizarVeedorDTO } from '../schemas/veedor.schema';
+import { pool } from '../config/database.js';
+import { CrearVeedorDTO, ActualizarVeedorDTO } from '../schemas/veedor.schema.js';
 
 const BASE_QUERY = `
   SELECT * FROM veedor

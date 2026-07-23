@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import * as service from '../services/votacion.service';
+import * as service from '../services/votacion.service.js';
 
 export async function listar(_req: Request, res: Response) {
   const votaciones = await service.listarVotaciones();

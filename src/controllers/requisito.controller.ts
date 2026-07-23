@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
-import { crearRequisitoSchema, actualizarRequisitoSchema } from '../schemas/requisito.schema';
-import * as service from '../services/requisito.service';
+import { crearRequisitoSchema, actualizarRequisitoSchema } from '../schemas/requisito.schema.js';
+import * as service from '../services/requisito.service.js';
 
 export async function listar(_req: Request, res: Response) {
   const registros = await service.listarRequisito();

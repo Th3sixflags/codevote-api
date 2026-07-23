@@ -1,5 +1,5 @@
-import * as repo from '../repositories/facultad.repository';
-import { CrearFacultadDTO, ActualizarFacultadDTO } from '../schemas/facultad.schema';
+import * as repo from '../repositories/facultad.repository.js';
+import { CrearFacultadDTO, ActualizarFacultadDTO } from '../schemas/facultad.schema.js';
 
 export async function listarFacultad() {
   return repo.findAll();

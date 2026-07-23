@@ -1,5 +1,5 @@
-import * as repo from '../repositories/director.repository';
-import { CrearDirectorDTO, ActualizarDirectorDTO } from '../schemas/director.schema';
+import * as repo from '../repositories/director.repository.js';
+import { CrearDirectorDTO, ActualizarDirectorDTO } from '../schemas/director.schema.js';
 
 export async function listarDirector() {
   return repo.findAll();

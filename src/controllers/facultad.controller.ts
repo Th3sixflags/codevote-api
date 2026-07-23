@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
-import { crearFacultadSchema, actualizarFacultadSchema } from '../schemas/facultad.schema';
-import * as service from '../services/facultad.service';
+import { crearFacultadSchema, actualizarFacultadSchema } from '../schemas/facultad.schema.js';
+import * as service from '../services/facultad.service.js';
 
 export async function listar(_req: Request, res: Response) {
   const registros = await service.listarFacultad();

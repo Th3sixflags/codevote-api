@@ -1,5 +1,5 @@
-import * as repo from '../repositories/cronograma.repository';
-import { CrearCronogramaDTO, ActualizarCronogramaDTO } from '../schemas/cronograma.schema';
+import * as repo from '../repositories/cronograma.repository.js';
+import { CrearCronogramaDTO, ActualizarCronogramaDTO } from '../schemas/cronograma.schema.js';
 
 export async function listarCronograma() {
   return repo.findAll();

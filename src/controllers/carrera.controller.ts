@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
-import { crearCarreraSchema, actualizarCarreraSchema } from '../schemas/carrera.schema';
-import * as service from '../services/carrera.service';
+import { crearCarreraSchema, actualizarCarreraSchema } from '../schemas/carrera.schema.js';
+import * as service from '../services/carrera.service.js';
 
 export async function listar(_req: Request, res: Response) {
   const registros = await service.listarCarrera();

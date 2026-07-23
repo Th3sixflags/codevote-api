@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
-import { crearVotoSchema } from '../schemas/voto.schema';
-import * as service from '../services/voto.service';
+import { crearVotoSchema } from '../schemas/voto.schema.js';
+import * as service from '../services/voto.service.js';
 
 export async function votar(req: Request, res: Response) {
   const data = crearVotoSchema.parse(req.body);

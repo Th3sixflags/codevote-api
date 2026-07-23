@@ -1,5 +1,5 @@
-import * as repo from '../repositories/requisito.repository';
-import { CrearRequisitoDTO, ActualizarRequisitoDTO } from '../schemas/requisito.schema';
+import * as repo from '../repositories/requisito.repository.js';
+import { CrearRequisitoDTO, ActualizarRequisitoDTO } from '../schemas/requisito.schema.js';
 
 export async function listarRequisito() {
   return repo.findAll();

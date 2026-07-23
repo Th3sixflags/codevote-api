@@ -1,5 +1,5 @@
-import * as repo from '../repositories/responsable.repository';
-import { CrearResponsableDTO, ActualizarResponsableDTO } from '../schemas/responsable.schema';
+import * as repo from '../repositories/responsable.repository.js';
+import { CrearResponsableDTO, ActualizarResponsableDTO } from '../schemas/responsable.schema.js';
 
 export async function listarResponsable() {
   return repo.findAll();

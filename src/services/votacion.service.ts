@@ -1,4 +1,4 @@
-import * as repo from '../repositories/votacion.repository';
+import * as repo from '../repositories/votacion.repository.js';
 
 export async function listarVotaciones() {
   return repo.findAll();

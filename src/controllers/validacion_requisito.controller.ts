@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
-import { crearValidacionRequisitoSchema, actualizarValidacionRequisitoSchema } from '../schemas/validacion_requisito.schema';
-import * as service from '../services/validacion_requisito.service';
+import { crearValidacionRequisitoSchema, actualizarValidacionRequisitoSchema } from '../schemas/validacion_requisito.schema.js';
+import * as service from '../services/validacion_requisito.service.js';
 
 export async function listar(_req: Request, res: Response) {
   const registros = await service.listarValidacionRequisito();

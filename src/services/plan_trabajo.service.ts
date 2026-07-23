@@ -1,5 +1,5 @@
-import * as repo from '../repositories/plan_trabajo.repository';
-import { CrearPlanTrabajoDTO, ActualizarPlanTrabajoDTO } from '../schemas/plan_trabajo.schema';
+import * as repo from '../repositories/plan_trabajo.repository.js';
+import { CrearPlanTrabajoDTO, ActualizarPlanTrabajoDTO } from '../schemas/plan_trabajo.schema.js';
 
 export async function listarPlanTrabajo() {
   return repo.findAll();

@@ -1,5 +1,5 @@
-import { pool } from '../config/database';
-import { CrearVotoDTO } from '../schemas/voto.schema';
+import { pool } from '../config/database.js';
+import { CrearVotoDTO } from '../schemas/voto.schema.js';
 
 const BASE_QUERY = `
   SELECT

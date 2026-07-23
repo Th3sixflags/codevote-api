@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
-import { crearCodigoVotoSchema, actualizarCodigoVotoSchema } from '../schemas/codigo_voto.schema';
-import * as service from '../services/codigo_voto.service';
+import { crearCodigoVotoSchema, actualizarCodigoVotoSchema } from '../schemas/codigo_voto.schema.js';
+import * as service from '../services/codigo_voto.service.js';
 
 export async function listar(_req: Request, res: Response) {
   const registros = await service.listarCodigoVoto();

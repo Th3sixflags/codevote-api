@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
-import { crearVeedorSchema, actualizarVeedorSchema } from '../schemas/veedor.schema';
-import * as service from '../services/veedor.service';
+import { crearVeedorSchema, actualizarVeedorSchema } from '../schemas/veedor.schema.js';
+import * as service from '../services/veedor.service.js';
 
 export async function listar(_req: Request, res: Response) {
   const registros = await service.listarVeedor();

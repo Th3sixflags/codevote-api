@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
-import { crearProcesoSchema, actualizarProcesoSchema } from '../schemas/proceso_electoral.schema';
-import * as service from '../services/proceso_electoral.service';
+import { crearProcesoSchema, actualizarProcesoSchema } from '../schemas/proceso_electoral.schema.js';
+import * as service from '../services/proceso_electoral.service.js';
 
 export async function listar(_req: Request, res: Response) {
   const procesos = await service.listarProcesos();

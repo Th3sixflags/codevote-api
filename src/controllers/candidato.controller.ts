@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
-import { crearCandidatoSchema, actualizarCandidatoSchema } from '../schemas/candidato.schema';
-import * as service from '../services/candidato.service';
+import { crearCandidatoSchema, actualizarCandidatoSchema } from '../schemas/candidato.schema.js';
+import * as service from '../services/candidato.service.js';
 
 export async function listar(_req: Request, res: Response) {
   const registros = await service.listarCandidato();

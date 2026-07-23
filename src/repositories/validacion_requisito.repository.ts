@@ -1,5 +1,5 @@
-import { pool } from '../config/database';
-import { CrearValidacionRequisitoDTO, ActualizarValidacionRequisitoDTO } from '../schemas/validacion_requisito.schema';
+import { pool } from '../config/database.js';
+import { CrearValidacionRequisitoDTO, ActualizarValidacionRequisitoDTO } from '../schemas/validacion_requisito.schema.js';
 
 const BASE_QUERY = `
   SELECT

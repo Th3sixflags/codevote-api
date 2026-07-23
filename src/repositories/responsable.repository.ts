@@ -1,5 +1,5 @@
-import { pool } from '../config/database';
-import { CrearResponsableDTO, ActualizarResponsableDTO } from '../schemas/responsable.schema';
+import { pool } from '../config/database.js';
+import { CrearResponsableDTO, ActualizarResponsableDTO } from '../schemas/responsable.schema.js';
 
 const BASE_QUERY = `
   SELECT * FROM responsable

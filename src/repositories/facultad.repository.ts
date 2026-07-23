@@ -1,5 +1,5 @@
-import { pool } from '../config/database';
-import { CrearFacultadDTO, ActualizarFacultadDTO } from '../schemas/facultad.schema';
+import { pool } from '../config/database.js';
+import { CrearFacultadDTO, ActualizarFacultadDTO } from '../schemas/facultad.schema.js';
 
 const BASE_QUERY = `
   SELECT * FROM facultad

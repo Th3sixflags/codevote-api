@@ -1,5 +1,5 @@
-import { pool } from '../config/database';
-import { CrearDirectorDTO, ActualizarDirectorDTO } from '../schemas/director.schema';
+import { pool } from '../config/database.js';
+import { CrearDirectorDTO, ActualizarDirectorDTO } from '../schemas/director.schema.js';
 
 const BASE_QUERY = `
   SELECT * FROM director

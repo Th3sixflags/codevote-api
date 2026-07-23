@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
-import { crearPlanTrabajoSchema, actualizarPlanTrabajoSchema } from '../schemas/plan_trabajo.schema';
-import * as service from '../services/plan_trabajo.service';
+import { crearPlanTrabajoSchema, actualizarPlanTrabajoSchema } from '../schemas/plan_trabajo.schema.js';
+import * as service from '../services/plan_trabajo.service.js';
 
 export async function listar(_req: Request, res: Response) {
   const registros = await service.listarPlanTrabajo();

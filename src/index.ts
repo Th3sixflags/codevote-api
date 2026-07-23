@@ -1,10 +1,10 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import { requestLogger } from './middleware/requestLogger';
-import { rateLimiter }   from './middleware/rateLimiter';
-import { errorHandler }  from './middleware/errorHandler';
-import { registerRoutes } from './routes';
+import { requestLogger } from './middleware/requestLogger.js';
+import { rateLimiter }   from './middleware/rateLimiter.js';
+import { errorHandler }  from './middleware/errorHandler.js';
+import { registerRoutes } from './routes/index.js';
 
 const app  = express();
 const PORT = Number(process.env.PORT ?? 3000);

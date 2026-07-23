@@ -1,5 +1,5 @@
-import { pool } from '../config/database';
-import { CrearCarreraDTO, ActualizarCarreraDTO } from '../schemas/carrera.schema';
+import { pool } from '../config/database.js';
+import { CrearCarreraDTO, ActualizarCarreraDTO } from '../schemas/carrera.schema.js';
 
 const BASE_QUERY = `
   SELECT
