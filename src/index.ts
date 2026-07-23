@@ -1,10 +1,12 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import swaggerUi from 'swagger-ui-express';
 import { requestLogger } from './middleware/requestLogger.js';
 import { rateLimiter }   from './middleware/rateLimiter.js';
 import { errorHandler }  from './middleware/errorHandler.js';
 import { registerRoutes } from './routes/index.js';
+import { openapiSpec } from './config/swagger.js';
 
 const app  = express();
 const PORT = Number(process.env.PORT ?? 3000);
@@ -21,6 +23,17 @@ app.use(cors({
   origin: origenes && origenes.length > 0 ? origenes : true,
   credentials: true,
 }));
+
+// Documentación interactiva (Swagger UI). Pública y montada antes del
+// rate limiter para que la carga de sus recursos no se vea limitada.
+// Accesible en /api/docs (Nginx enruta /api/ hacia el backend).
+app.use(
+  '/api/docs',
+  swaggerUi.serve,
+  swaggerUi.setup(openapiSpec, { customSiteTitle: 'CodeVote API — Documentación' }),
+);
+// El JSON crudo del OpenAPI, por si se necesita para generar clientes o el MCP.
+app.get('/api/openapi.json', (_req, res) => res.json(openapiSpec));
 
 app.use(express.json());
 app.use(requestLogger);
