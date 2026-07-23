@@ -9,10 +9,10 @@ info:
     requieren un token JWT en la cabecera `Authorization: Bearer <token>`.
     Las operaciones de escritura (POST/PATCH/DELETE) requieren rol `admin`.
 servers:
-  - url: http://localhost:3000/api
-    description: Desarrollo local
   - url: https://codevote.lat/api
     description: Producción
+  - url: http://localhost:3000/api
+    description: Desarrollo local
 tags:
   - name: Autenticación
   - name: Facultades
@@ -1071,6 +1071,21 @@ paths:
         '403': { $ref: '#/components/responses/SinPermiso' }
         '404': { $ref: '#/components/responses/NoEncontrado' }
 
+  /codigos-voto/mis-codigos:
+    get:
+      tags: [Códigos de voto]
+      summary: Comprobantes del usuario autenticado (no requiere admin)
+      description: Devuelve únicamente los códigos de voto emitidos al usuario del token.
+      responses:
+        '200':
+          description: Listado de comprobantes propios
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/CodigoVoto' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+
   /codigos-voto:
     get:
       tags: [Códigos de voto]
@@ -1442,6 +1457,23 @@ paths:
                 type: array
                 items: { $ref: '#/components/schemas/Votacion' }
         '401': { $ref: '#/components/responses/NoAutenticado' }
+    post:
+      tags: [Votaciones]
+      summary: Crea una votación (requiere rol admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VotacionInput' }
+      responses:
+        '201':
+          description: Creada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Votacion' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
 
   /votaciones/proceso/{procesoId}:
     get:
@@ -1463,14 +1495,14 @@ paths:
         '401': { $ref: '#/components/responses/NoAutenticado' }
 
   /votaciones/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
     get:
       tags: [Votaciones]
       summary: Obtiene una votación por su identificador
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema: { type: integer }
       responses:
         '200':
           description: Votación encontrada
@@ -1478,6 +1510,32 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Votacion' }
         '401': { $ref: '#/components/responses/NoAutenticado' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+    patch:
+      tags: [Votaciones]
+      summary: Actualiza una votación (requiere rol admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VotacionInput' }
+      responses:
+        '200':
+          description: Actualizada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Votacion' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
+    delete:
+      tags: [Votaciones]
+      summary: Elimina una votación (requiere rol admin)
+      responses:
+        '204': { description: Eliminada }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
         '404': { $ref: '#/components/responses/NoEncontrado' }
 
   /votos:
@@ -1597,6 +1655,16 @@ components:
         estado:          { type: string, example: abierta }
         id_proceso:      { type: integer }
         nombre_proceso:  { type: string }
+
+    VotacionInput:
+      type: object
+      required: [fk_id_proceso, titulo_papeleta, fecha_apertura, fecha_cierre]
+      properties:
+        fk_id_proceso:   { type: integer }
+        titulo_papeleta: { type: string, maxLength: 120 }
+        fecha_apertura:  { type: string, example: "2026-07-01 08:00:00" }
+        fecha_cierre:    { type: string, example: "2026-07-02 17:00:00" }
+        estado:          { type: string, enum: ["pendiente", "abierta", "cerrada"] }
 
     Voto:
       type: object
