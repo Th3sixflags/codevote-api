@@ -1542,6 +1542,10 @@ paths:
     post:
       tags: [Votos]
       summary: Emite un voto
+      description: >-
+        Registra el voto de forma anónima y genera un comprobante
+        (codigo_voto) para el estudiante autenticado. Cada estudiante solo
+        puede votar una vez por votación.
       requestBody:
         required: true
         content:
@@ -1560,11 +1564,16 @@ paths:
                   enum: ["valido", "blanco", "nulo"]
       responses:
         '201':
-          description: Voto registrado
+          description: Voto registrado. Incluye el hash del comprobante.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Voto' }
         '401': { $ref: '#/components/responses/NoAutenticado' }
+        '409':
+          description: El estudiante ya emitió su voto en esta votación
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
         '422': { $ref: '#/components/responses/ValidacionFallida' }
 
   /votos/resultados/{votacionId}:
@@ -1676,6 +1685,7 @@ components:
         titulo_papeleta: { type: string }
         id_lista:        { type: integer, nullable: true }
         nombre_lista:    { type: string, nullable: true }
+        comprobante:     { type: string, description: Hash del comprobante generado para el estudiante (codigo_voto). }
 
     FacultadInput:
       type: object
