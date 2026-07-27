@@ -12,8 +12,18 @@ export async function votar(req: Request, res: Response) {
     return;
   }
 
-  const voto = await service.registrarVoto(data, cedula);
-  res.status(201).json(voto);
+  try {
+    const voto = await service.registrarVoto(data, cedula);
+    res.status(201).json(voto);
+  } catch (err: any) {
+    // Carrera: dos peticiones simultáneas. La restricción única de codigo_voto
+    // rechaza la segunda; se responde con el mismo 409 que la comprobación previa.
+    if (err?.code === 'ER_DUP_ENTRY' || err?.errno === 1062) {
+      res.status(409).json({ error: 'Ya has emitido tu voto en esta votación.' });
+      return;
+    }
+    throw err;
+  }
 }
 
 export async function resultados(req: Request, res: Response) {

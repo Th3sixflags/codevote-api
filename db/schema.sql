@@ -161,7 +161,10 @@ CREATE TABLE codigo_voto (
   fecha_envio DATETIME,
   fk_cedula_estudiante CHAR(10) NOT NULL,
   CONSTRAINT fk_codigo_votacion FOREIGN KEY (fk_id_votacion) REFERENCES votacion(id_votacion),
-  CONSTRAINT fk_codigo_estudiante FOREIGN KEY (fk_cedula_estudiante) REFERENCES estudiante(cedula)
+  CONSTRAINT fk_codigo_estudiante FOREIGN KEY (fk_cedula_estudiante) REFERENCES estudiante(cedula),
+  -- Un estudiante solo puede tener un comprobante por votación (evita el doble voto,
+  -- incluso ante solicitudes simultáneas).
+  CONSTRAINT uq_codigo_votante UNIQUE (fk_id_votacion, fk_cedula_estudiante)
 );
 
 -- 16. acta_resultados

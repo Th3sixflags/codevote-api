@@ -27,6 +27,15 @@ export async function findByLista(id: number) {
   return rows as any[];
 }
 
+/** Indica si el estudiante ya es candidato en la lista indicada. */
+export async function existeEnLista(cedula: string, listaId: number): Promise<boolean> {
+  const [rows] = await pool.query(
+    'SELECT 1 FROM candidato WHERE fk_cedula_estudiante = ? AND fk_id_lista = ? LIMIT 1',
+    [cedula, listaId]
+  ) as [any[], any];
+  return rows.length > 0;
+}
+
 export async function create(data: CrearCandidatoDTO) {
   const [result] = await pool.query(
     `INSERT INTO candidato (cargo, cumple_requisitos, foto_url, fk_cedula_estudiante, fk_id_lista)
