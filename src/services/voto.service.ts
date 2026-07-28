@@ -9,6 +9,10 @@ export async function registrarVoto(data: CrearVotoDTO, cedula: string) {
   return repo.createConComprobante(data, cedula);
 }
 
+export async function estadoResultados(votacionId: number) {
+  return repo.estadoDeVotacion(votacionId);
+}
+
 export async function obtenerResultados(votacionId: number) {
   return repo.countByVotacion(votacionId);
 }

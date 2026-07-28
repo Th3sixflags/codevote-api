@@ -26,7 +26,26 @@ export async function votar(req: Request, res: Response) {
   }
 }
 
+// Roles que pueden ver resultados en cualquier momento.
+const ROLES_PRIVILEGIADOS = ['admin', 'administrador', 'junta_electoral'];
+
 export async function resultados(req: Request, res: Response) {
-  const resultados = await service.obtenerResultados(Number(req.params.votacionId));
+  const votacionId = Number(req.params.votacionId);
+  const rol = String(req.user?.rol ?? '').toLowerCase();
+
+  // Los estudiantes solo pueden ver resultados si la votación está cerrada
+  // o el proceso ya finalizó (para no revelar quién va ganando antes de tiempo).
+  if (!ROLES_PRIVILEGIADOS.includes(rol)) {
+    const estado = await service.estadoResultados(votacionId);
+    if (estado) {
+      const disponible = estado.votacion === 'cerrada' || estado.proceso === 'finalizado';
+      if (!disponible) {
+        res.status(403).json({ error: 'Los resultados estarán disponibles cuando finalice la votación.' });
+        return;
+      }
+    }
+  }
+
+  const resultados = await service.obtenerResultados(votacionId);
   res.json(resultados);
 }

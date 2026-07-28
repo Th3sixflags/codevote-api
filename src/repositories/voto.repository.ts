@@ -65,6 +65,20 @@ export async function createConComprobante(data: CrearVotoDTO, cedula: string) {
   }
 }
 
+/** Estado de la votación y de su proceso, para decidir si se pueden ver resultados. */
+export async function estadoDeVotacion(
+  votacionId: number
+): Promise<{ votacion: string; proceso: string } | null> {
+  const [rows] = await pool.query(
+    `SELECT v.estado AS votacion, p.estado AS proceso
+     FROM votacion v
+     JOIN proceso_electoral p ON p.id_proceso = v.fk_id_proceso
+     WHERE v.id_votacion = ?`,
+    [votacionId]
+  ) as [any[], any];
+  return rows[0] ?? null;
+}
+
 export async function countByVotacion(votacionId: number) {
   const [rows] = await pool.query(
     `SELECT IFNULL(l.nombre_lista, v.tipo_voto) AS opcion, COUNT(*) AS total_votos

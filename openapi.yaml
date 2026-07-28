@@ -1580,6 +1580,10 @@ paths:
     get:
       tags: [Votos]
       summary: Escrutinio agregado de una votación
+      description: >-
+        Los roles admin, administrador y junta_electoral pueden consultar en
+        cualquier momento. Un estudiante solo puede ver los resultados cuando
+        la votación está cerrada o el proceso ha finalizado.
       parameters:
         - name: votacionId
           in: path
@@ -1598,6 +1602,12 @@ paths:
                     opcion:      { type: string, description: Nombre de la lista, o "blanco"/"nulo" }
                     total_votos: { type: integer }
         '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403':
+          description: La votación sigue abierta y el usuario no tiene rol privilegiado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: 'Los resultados estarán disponibles cuando finalice la votación.' }
 
   /health:
     get:
