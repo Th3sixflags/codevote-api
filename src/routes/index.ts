@@ -18,6 +18,7 @@ import codigoVotoRoutes          from './codigo_voto.routes.js';
 import actaResultadosRoutes      from './acta_resultados.routes.js';
 import veedorRoutes              from './veedor.routes.js';
 import veeduriaRoutes            from './veeduria.routes.js';
+import notificacionRoutes        from './notificacion.routes.js';
 
 export function registerRoutes(app: Express) {
   // Autenticación
@@ -50,4 +51,7 @@ export function registerRoutes(app: Express) {
   // Veeduría
   app.use('/api/veedores',               veedorRoutes);
   app.use('/api/veedurias',              veeduriaRoutes);
+
+  // Portal del estudiante
+  app.use('/api/notificaciones',         notificacionRoutes);
 }

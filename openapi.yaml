@@ -33,6 +33,7 @@ tags:
   - name: Veedurías
   - name: Votaciones
   - name: Votos
+  - name: Notificaciones
   - name: Sistema
 
 paths:
@@ -454,7 +455,18 @@ paths:
   /procesos-electorales:
     get:
       tags: [Procesos electorales]
-      summary: Lista todos los registros
+      summary: Lista los procesos electorales
+      description: >-
+        Sin filtro devuelve todos. Con ?estado=actuales devuelve los activos o
+        próximos (no finalizados ni cancelados). Con ?estado=finalizados
+        devuelve el historial, del más reciente al más antiguo.
+      parameters:
+        - name: estado
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [actuales, finalizados]
       responses:
         '200':
           description: Listado
@@ -1609,6 +1621,43 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
               example: { error: 'Los resultados estarán disponibles cuando finalice la votación.' }
 
+  /notificaciones:
+    get:
+      tags: [Notificaciones]
+      summary: Notificaciones del estudiante autenticado
+      description: Devuelve únicamente las notificaciones del usuario del token, de la más reciente a la más antigua.
+      responses:
+        '200':
+          description: Listado de notificaciones propias
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Notificacion' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+
+  /notificaciones/{id}/leida:
+    patch:
+      tags: [Notificaciones]
+      summary: Marca una notificación propia como leída
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Notificación actualizada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Notificacion' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '404':
+          description: La notificación no existe o no pertenece al usuario
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
   /health:
     get:
       tags: [Sistema]
@@ -1663,6 +1712,17 @@ components:
       type: object
       properties:
         error: { type: string }
+
+    Notificacion:
+      type: object
+      properties:
+        id_notificacion:      { type: integer }
+        fk_cedula_estudiante: { type: string }
+        tipo:                 { type: string, example: voto }
+        titulo:               { type: string }
+        mensaje:              { type: string }
+        leida:                { type: integer, enum: [0, 1] }
+        fecha_creacion:       { type: string, format: date-time }
 
     Votacion:
       type: object

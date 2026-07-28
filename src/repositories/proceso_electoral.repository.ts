@@ -6,6 +6,26 @@ export async function findAll() {
   return rows as any[];
 }
 
+/** Procesos activos o próximos (todo lo que no está finalizado ni cancelado). */
+export async function findActuales() {
+  const [rows] = await pool.query(
+    `SELECT * FROM proceso_electoral
+     WHERE estado NOT IN ('finalizado', 'cancelado')
+     ORDER BY fecha_inicio_votacion ASC`
+  );
+  return rows as any[];
+}
+
+/** Procesos finalizados, del más reciente al más antiguo (historial). */
+export async function findFinalizados() {
+  const [rows] = await pool.query(
+    `SELECT * FROM proceso_electoral
+     WHERE estado = 'finalizado'
+     ORDER BY fecha_fin_votacion DESC`
+  );
+  return rows as any[];
+}
+
 export async function findById(id: number) {
   const [rows] = await pool.query('SELECT * FROM proceso_electoral WHERE id_proceso = ?', [id]) as [any[], any];
   return rows[0] ?? null;

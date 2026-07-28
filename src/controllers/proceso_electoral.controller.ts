@@ -2,8 +2,10 @@ import { Request, Response } from 'express';
 import { crearProcesoSchema, actualizarProcesoSchema } from '../schemas/proceso_electoral.schema.js';
 import * as service from '../services/proceso_electoral.service.js';
 
-export async function listar(_req: Request, res: Response) {
-  const procesos = await service.listarProcesos();
+export async function listar(req: Request, res: Response) {
+  // Filtro opcional: ?estado=actuales | finalizados. Sin filtro devuelve todos.
+  const estado = typeof req.query.estado === 'string' ? req.query.estado : undefined;
+  const procesos = await service.listarProcesos(estado);
   res.json(procesos);
 }
 

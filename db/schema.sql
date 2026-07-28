@@ -199,3 +199,15 @@ CREATE TABLE veeduria (
   CONSTRAINT fk_veeduria_votacion FOREIGN KEY (fk_id_votacion) REFERENCES votacion(id_votacion),
   CONSTRAINT fk_veeduria_veedor FOREIGN KEY (fk_id_veedor) REFERENCES veedor(id_veedor)
 );
+
+-- 19. notificacion (portal del estudiante)
+CREATE TABLE notificacion (
+  id_notificacion INT AUTO_INCREMENT PRIMARY KEY,
+  fk_cedula_estudiante CHAR(10) NOT NULL,
+  tipo VARCHAR(30) NOT NULL,
+  titulo VARCHAR(120) NOT NULL,
+  mensaje VARCHAR(255) NOT NULL,
+  leida TINYINT(1) NOT NULL DEFAULT 0,
+  fecha_creacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_notificacion_estudiante FOREIGN KEY (fk_cedula_estudiante) REFERENCES estudiante(cedula)
+);
