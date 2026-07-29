@@ -2,10 +2,11 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt    from 'jsonwebtoken';
 import { pool } from '../config/database.js';
+import { loginRateLimiter } from '../middleware/rateLimiter.js';
 
 const router = Router();
 
-router.post('/login', async (req, res) => {
+router.post('/login', loginRateLimiter, async (req, res) => {
   const { correo_institucional, password } = req.body as { correo_institucional?: string; password?: string };
   if (!correo_institucional || !password) {
     res.status(400).json({ error: 'Correo institucional y password son requeridos.' });

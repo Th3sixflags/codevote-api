@@ -8,7 +8,16 @@ export async function listar(_req: Request, res: Response) {
 }
 
 export async function obtener(req: Request, res: Response) {
-  const estudiante = await service.obtenerEstudiante(req.params.cedula as string);
+  const cedula = req.params.cedula as string;
+
+  // Datos personales (correo, promedio): solo el admin o el propio estudiante.
+  // Evita que cualquier usuario autenticado consulte el perfil de otro.
+  if (req.user!.rol !== 'admin' && req.user!.sub !== cedula) {
+    res.status(403).json({ error: 'No tienes permiso para ver este perfil.' });
+    return;
+  }
+
+  const estudiante = await service.obtenerEstudiante(cedula);
   if (!estudiante) {
     res.status(404).json({ error: 'Estudiante no encontrado.' });
     return;

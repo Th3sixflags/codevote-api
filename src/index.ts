@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import swaggerUi from 'swagger-ui-express';
 import { requestLogger } from './middleware/requestLogger.js';
 import { rateLimiter }   from './middleware/rateLimiter.js';
@@ -11,6 +12,18 @@ import { openapiSpec } from './config/swagger.js';
 const app  = express();
 const PORT = Number(process.env.PORT ?? 3000);
 const HOST = process.env.HOST ?? '0.0.0.0';
+
+// Detrás de Nginx: confiar en el proxy para que el rate-limit use la IP real
+// del cliente (X-Forwarded-For) y no la del proxy.
+app.set('trust proxy', 1);
+
+// Cabeceras de seguridad HTTP (HSTS, X-Content-Type-Options, X-Frame-Options,
+// Referrer-Policy, etc.). Se desactiva el CSP porque esta API solo sirve JSON
+// (el CSP corresponde al frontend) y así no se rompe la carga de Swagger UI.
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
 
 // Orígenes permitidos para el frontend (separados por coma en CORS_ORIGIN).
 // Si CORS_ORIGIN no está definido, se permite cualquier origen (solo para pruebas).
@@ -27,13 +40,17 @@ app.use(cors({
 // Documentación interactiva (Swagger UI). Pública y montada antes del
 // rate limiter para que la carga de sus recursos no se vea limitada.
 // Accesible en /api/docs (Nginx enruta /api/ hacia el backend).
-app.use(
-  '/api/docs',
-  swaggerUi.serve,
-  swaggerUi.setup(openapiSpec, { customSiteTitle: 'CodeVote API — Documentación' }),
-);
-// El JSON crudo del OpenAPI, por si se necesita para generar clientes o el MCP.
-app.get('/api/openapi.json', (_req, res) => res.json(openapiSpec));
+// Se puede desactivar en producción con DOCS_ENABLED=false para no exponer
+// públicamente la estructura completa de la API.
+if (process.env.DOCS_ENABLED !== 'false') {
+  app.use(
+    '/api/docs',
+    swaggerUi.serve,
+    swaggerUi.setup(openapiSpec, { customSiteTitle: 'CodeVote API — Documentación' }),
+  );
+  // El JSON crudo del OpenAPI, por si se necesita para generar clientes o el MCP.
+  app.get('/api/openapi.json', (_req, res) => res.json(openapiSpec));
+}
 
 app.use(express.json());
 app.use(requestLogger);
