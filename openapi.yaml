@@ -75,6 +75,7 @@ paths:
                       nombres:   { type: string }
                       apellidos: { type: string }
                       rol:       { type: string, enum: ["estudiante", "admin", "candidato"] }
+                      foto_url:  { type: string, nullable: true }
         '400': { $ref: '#/components/responses/SolicitudInvalida' }
         '401': { $ref: '#/components/responses/NoAutenticado' }
 
