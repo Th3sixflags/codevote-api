@@ -14,7 +14,7 @@ router.post('/login', loginRateLimiter, async (req, res) => {
   }
 
   const [rows] = await pool.query(
-    'SELECT cedula, nombres, apellidos, correo_institucional, password, rol, foto_url FROM estudiante WHERE correo_institucional = ?',
+    'SELECT cedula, nombres, apellidos, correo_institucional, password, rol, foto_url, debe_cambiar_password FROM estudiante WHERE correo_institucional = ?',
     [correo_institucional]
   ) as [any[], any];
 
@@ -32,7 +32,15 @@ router.post('/login', loginRateLimiter, async (req, res) => {
 
   res.json({
     token,
-    usuario: { cedula: usuario.cedula, nombres: usuario.nombres, apellidos: usuario.apellidos, rol: usuario.rol, foto_url: usuario.foto_url ?? null },
+    usuario: {
+      cedula: usuario.cedula,
+      nombres: usuario.nombres,
+      apellidos: usuario.apellidos,
+      rol: usuario.rol,
+      foto_url: usuario.foto_url ?? null,
+      // El frontend obliga a cambiar la contraseña temporal antes de continuar.
+      debe_cambiar_password: Number(usuario.debe_cambiar_password) === 1,
+    },
   });
 });
 

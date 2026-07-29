@@ -27,9 +27,11 @@ export async function findByEmail(email: string) {
 
 export async function create(data: CrearEstudianteDTO) {
   const hash = await bcrypt.hash(data.password, 12);
+  // La cuenta nace con una contraseña temporal asignada por el administrador,
+  // así que se marca para que la persona la cambie en su primer ingreso.
   await pool.query(
-    `INSERT INTO estudiante (cedula, nombres, apellidos, correo_institucional, promedio, estado_academico, fk_id_carrera, password, rol)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO estudiante (cedula, nombres, apellidos, correo_institucional, promedio, estado_academico, fk_id_carrera, password, rol, debe_cambiar_password)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
     [data.cedula, data.nombres, data.apellidos, data.correo_institucional, data.promedio ?? null, data.estado_academico ?? 'activo', data.fk_id_carrera ?? null, hash, data.rol ?? 'estudiante']
   );
   return findByCedula(data.cedula);
@@ -44,8 +46,13 @@ export async function update(cedula: string, data: ActualizarEstudianteDTO) {
   }
   
   if (data.password) {
+    // Si el administrador reinicia la contraseña, vuelve a ser temporal: la
+    // persona deberá cambiarla en su siguiente ingreso.
     const hash = await bcrypt.hash(data.password, 12);
-    await pool.query('UPDATE estudiante SET password = ? WHERE cedula = ?', [hash, cedula]);
+    await pool.query(
+      'UPDATE estudiante SET password = ?, debe_cambiar_password = 1 WHERE cedula = ?',
+      [hash, cedula]
+    );
   }
   
   return findByCedula(cedula);
@@ -69,7 +76,13 @@ export async function getPasswordHash(cedula: string): Promise<string | null> {
   return rows[0]?.password ?? null;
 }
 
-/** Reemplaza la contraseña por un nuevo hash. */
+/**
+ * Reemplaza la contraseña por un nuevo hash y limpia la marca de contraseña
+ * temporal: la persona ya eligió una propia.
+ */
 export async function updatePasswordHash(cedula: string, hash: string) {
-  await pool.query('UPDATE estudiante SET password = ? WHERE cedula = ?', [hash, cedula]);
+  await pool.query(
+    'UPDATE estudiante SET password = ?, debe_cambiar_password = 0 WHERE cedula = ?',
+    [hash, cedula]
+  );
 }
