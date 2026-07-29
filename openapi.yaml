@@ -73,7 +73,7 @@ paths:
                       cedula:    { type: string }
                       nombres:   { type: string }
                       apellidos: { type: string }
-                      rol:       { type: string, enum: ["estudiante", "admin"] }
+                      rol:       { type: string, enum: ["estudiante", "admin", "candidato"] }
         '400': { $ref: '#/components/responses/SolicitudInvalida' }
         '401': { $ref: '#/components/responses/NoAutenticado' }
 
@@ -2273,7 +2273,7 @@ components:
           type: integer
         rol:
           type: string
-          enum: ["estudiante", "admin"]
+          enum: ["estudiante", "admin", "candidato"]
 
     Estudiante:
       type: object
@@ -2300,7 +2300,7 @@ components:
           type: integer
         rol:
           type: string
-          enum: ["estudiante", "admin"]
+          enum: ["estudiante", "admin", "candidato"]
 
     ProcesoElectoralInput:
       type: object
