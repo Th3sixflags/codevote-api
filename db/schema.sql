@@ -169,6 +169,11 @@ CREATE TABLE codigo_voto (
   estado_codigo ENUM('generado', 'enviado', 'usado', 'expirado') NOT NULL DEFAULT 'generado',
   fecha_envio DATETIME,
   fk_cedula_estudiante CHAR(10) NOT NULL,
+  -- Identificador público OPACO (UUID v4 aleatorio) que el estudiante usa para
+  -- verificar su participación. No revela la opción votada; `codigo_hash` queda
+  -- reservado a la auditoría administrativa.
+  codigo_verificacion CHAR(36) NOT NULL,
+  CONSTRAINT uq_codigo_verificacion UNIQUE (codigo_verificacion),
   CONSTRAINT fk_codigo_votacion FOREIGN KEY (fk_id_votacion) REFERENCES votacion(id_votacion),
   CONSTRAINT fk_codigo_estudiante FOREIGN KEY (fk_cedula_estudiante) REFERENCES estudiante(cedula),
   -- Un estudiante solo puede tener un comprobante por votación (evita el doble voto,

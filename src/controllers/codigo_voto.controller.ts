@@ -27,6 +27,20 @@ export async function listarMisCodigos(req: Request, res: Response) {
   res.json(registros);
 }
 
+/**
+ * Verifica un comprobante propio. Protegido por propiedad: si el comprobante no
+ * existe o pertenece a otro estudiante se responde 404 por igual, para no
+ * revelar la existencia de comprobantes ajenos.
+ */
+export async function verificarMiCodigo(req: Request, res: Response) {
+  const verificacion = await service.verificarMiComprobante(Number(req.params.id), req.user!.sub);
+  if (!verificacion) {
+    res.status(404).json({ error: 'Comprobante no encontrado.' });
+    return;
+  }
+  res.json(verificacion);
+}
+
 export async function crear(req: Request, res: Response) {
   const data  = crearCodigoVotoSchema.parse(req.body);
   const nuevo = await service.crearCodigoVoto(data);

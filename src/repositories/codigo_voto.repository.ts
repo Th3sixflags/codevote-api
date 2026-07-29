@@ -1,9 +1,12 @@
+import { randomUUID } from 'node:crypto';
 import { pool } from '../config/database.js';
 import { CrearCodigoVotoDTO, ActualizarCodigoVotoDTO } from '../schemas/codigo_voto.schema.js';
 
+// Consulta de AUDITORÍA (solo admin): incluye codigo_hash y el código público
+// de verificación, para poder cotejar el que reporte un estudiante.
 const BASE_QUERY = `
   SELECT
-    cv.id_codigo, cv.codigo_hash, cv.estado_codigo, cv.fecha_envio,
+    cv.id_codigo, cv.codigo_hash, cv.codigo_verificacion, cv.estado_codigo, cv.fecha_envio,
     cv.fk_id_votacion, v.titulo_papeleta, v.fecha_cierre,
     p.id_proceso, p.nombre_proceso,
     cv.fk_cedula_estudiante
@@ -36,7 +39,7 @@ export async function findByVotacion(id: number) {
 export async function findByEstudiante(cedula: string) {
   const [rows] = await pool.query(
     `SELECT
-       cv.id_codigo, cv.estado_codigo, cv.fecha_envio,
+       cv.id_codigo, cv.estado_codigo, cv.fecha_envio, cv.codigo_verificacion,
        cv.fk_id_votacion, v.titulo_papeleta, v.fecha_cierre,
        p.id_proceso, p.nombre_proceso,
        cv.fk_cedula_estudiante
@@ -50,11 +53,32 @@ export async function findByEstudiante(cedula: string) {
   return rows as any[];
 }
 
+/**
+ * Datos de verificación de UN comprobante, solo si pertenece al estudiante.
+ * Devuelve únicamente proceso, papeleta y fecha: nada de hash, cédula, correo
+ * ni la opción votada (que además no está ligada a este registro).
+ */
+export async function findVerificacionDeEstudiante(id: number, cedula: string) {
+  const [rows] = await pool.query(
+    `SELECT
+       cv.codigo_verificacion, cv.estado_codigo, cv.fecha_envio,
+       v.titulo_papeleta, p.nombre_proceso
+     FROM codigo_voto cv
+     JOIN votacion v ON v.id_votacion = cv.fk_id_votacion
+     JOIN proceso_electoral p ON p.id_proceso = v.fk_id_proceso
+     WHERE cv.id_codigo = ? AND cv.fk_cedula_estudiante = ?`,
+    [id, cedula]
+  ) as [any[], any];
+  return rows[0] ?? null;
+}
+
 export async function create(data: CrearCodigoVotoDTO) {
+  // `codigo_verificacion` es obligatorio y opaco: se genera aquí (UUID v4) y no
+  // se acepta desde el body, para que nadie pueda fijar un valor predecible.
   const [result] = await pool.query(
-    `INSERT INTO codigo_voto (fk_id_votacion, codigo_hash, estado_codigo, fecha_envio, fk_cedula_estudiante)
-     VALUES (?, ?, ?, ?, ?)`,
-    [data.fk_id_votacion, data.codigo_hash, data.estado_codigo ?? null, data.fecha_envio ?? null, data.fk_cedula_estudiante]
+    `INSERT INTO codigo_voto (fk_id_votacion, codigo_hash, estado_codigo, fecha_envio, fk_cedula_estudiante, codigo_verificacion)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [data.fk_id_votacion, data.codigo_hash, data.estado_codigo ?? null, data.fecha_envio ?? null, data.fk_cedula_estudiante, randomUUID()]
   ) as [any, any];
   return findById(result.insertId);
 }

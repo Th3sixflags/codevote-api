@@ -1200,7 +1200,10 @@ paths:
     get:
       tags: [Códigos de voto]
       summary: Comprobantes del usuario autenticado (no requiere admin)
-      description: Devuelve únicamente los códigos de voto emitidos al usuario del token.
+      description: >-
+        Devuelve únicamente los comprobantes emitidos al usuario del token, con
+        su `codigo_verificacion` público. Nunca incluye `codigo_hash` ni la
+        opción votada.
       responses:
         '200':
           description: Listado de comprobantes propios
@@ -1210,6 +1213,48 @@ paths:
                 type: array
                 items: { $ref: '#/components/schemas/MiComprobante' }
         '401': { $ref: '#/components/responses/NoAutenticado' }
+
+  /codigos-voto/mis-codigos/{id}/verificar:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+        description: Identificador del comprobante propio (id_codigo).
+    get:
+      tags: [Códigos de voto]
+      summary: Verifica un comprobante propio
+      description: >-
+        Confirma que la participación quedó registrada. Protegido por propiedad:
+        solo el dueño del comprobante puede consultarlo; si el comprobante no
+        existe o es de otro estudiante se responde 404 por igual, para no
+        revelar la existencia de comprobantes ajenos. La respuesta no incluye
+        cédula, correo, hash ni la opción votada.
+      responses:
+        '200':
+          description: Comprobante verificado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  valido:              { type: boolean, example: true }
+                  codigo_verificacion: { type: string, format: uuid }
+                  proceso:             { type: string }
+                  papeleta:            { type: string }
+                  fecha_registro:      { type: string, format: date-time }
+                  estado:              { type: string, example: registrado }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403':
+          description: El token no corresponde a un usuario con acceso a este recurso
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: El comprobante no existe o no pertenece al usuario autenticado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
 
   /codigos-voto:
     get:
@@ -2707,6 +2752,11 @@ components:
         codigo_hash:
           type: string
           maxLength: 255
+          description: Hash interno de auditoría. Nunca se expone al estudiante.
+        codigo_verificacion:
+          type: string
+          format: uuid
+          description: Código público del comprobante (UUID v4), visible también para el estudiante.
         estado_codigo:
           type: string
           enum: ["generado", "enviado", "usado", "expirado"]
@@ -2719,12 +2769,18 @@ components:
           maxLength: 10
 
     # Comprobante tal como lo ve el estudiante en "Mis Recibos": NO incluye
-    # codigo_hash (el hash se reserva a la auditoría administrativa).
+    # codigo_hash (reservado a la auditoría administrativa) ni la opción votada.
     MiComprobante:
       type: object
       properties:
         id_codigo:
           type: integer
+        codigo_verificacion:
+          type: string
+          format: uuid
+          description: >-
+            Identificador público y opaco del comprobante (UUID v4 aleatorio).
+            No codifica cédula, correo, voto ni marca de tiempo.
         estado_codigo:
           type: string
           enum: ["generado", "enviado", "usado", "expirado"]

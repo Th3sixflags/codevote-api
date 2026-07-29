@@ -18,6 +18,27 @@ export async function listarPorEstudiante(cedula: string) {
   return repo.findByEstudiante(cedula);
 }
 
+/**
+ * Verifica un comprobante propio: confirma que la participación quedó
+ * registrada. Devuelve null si el comprobante no existe o no es del estudiante
+ * (el controlador responde 404 en ambos casos, para no filtrar la existencia de
+ * comprobantes ajenos). La respuesta nunca incluye identidad, hash ni la opción
+ * votada, que además no está ligada al comprobante.
+ */
+export async function verificarMiComprobante(id: number, cedula: string) {
+  const registro = await repo.findVerificacionDeEstudiante(id, cedula);
+  if (!registro) return null;
+
+  return {
+    valido: true,
+    codigo_verificacion: registro.codigo_verificacion,
+    proceso: registro.nombre_proceso,
+    papeleta: registro.titulo_papeleta,
+    fecha_registro: registro.fecha_envio,
+    estado: 'registrado',
+  };
+}
+
 export async function crearCodigoVoto(data: CrearCodigoVotoDTO) {
   return repo.create(data);
 }

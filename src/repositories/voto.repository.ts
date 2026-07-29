@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { pool } from '../config/database.js';
 import { CrearVotoDTO } from '../schemas/voto.schema.js';
 
@@ -47,10 +47,16 @@ export async function createConComprobante(data: CrearVotoDTO, cedula: string) {
       .update(`${data.fk_id_votacion}:${cedula}:${Date.now()}:${randomBytes(8).toString('hex')}`)
       .digest('hex');
 
+    // Código público de verificación: UUID v4 criptográficamente aleatorio. No
+    // codifica cédula, correo, voto ni marca de tiempo, así que puede mostrarse
+    // al estudiante sin comprometer el secreto del voto (a diferencia del hash,
+    // que queda solo para la auditoría administrativa).
+    const codigoVerificacion = randomUUID();
+
     await conn.query(
-      `INSERT INTO codigo_voto (fk_id_votacion, codigo_hash, estado_codigo, fecha_envio, fk_cedula_estudiante)
-       VALUES (?, ?, 'usado', NOW(), ?)`,
-      [data.fk_id_votacion, hash, cedula]
+      `INSERT INTO codigo_voto (fk_id_votacion, codigo_hash, estado_codigo, fecha_envio, fk_cedula_estudiante, codigo_verificacion)
+       VALUES (?, ?, 'usado', NOW(), ?, ?)`,
+      [data.fk_id_votacion, hash, cedula, codigoVerificacion]
     );
 
     await conn.commit();

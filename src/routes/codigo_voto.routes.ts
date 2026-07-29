@@ -8,6 +8,8 @@ const router = Router();
 router.get('/',                     requireAuth, requireAdmin, ctrl.listar);
 // Cada estudiante puede consultar únicamente sus propios comprobantes
 router.get('/mis-codigos',          requireAuth,               ctrl.listarMisCodigos);
+// Verificación de un comprobante propio (protegida por propiedad)
+router.get('/mis-codigos/:id/verificar', requireAuth,          ctrl.verificarMiCodigo);
 router.get('/votacion/:votacionId', requireAuth, requireAdmin, ctrl.listarPorVotacion);
 router.get('/:id',                  requireAuth, requireAdmin, ctrl.obtener);
 router.post('/',                    requireAuth, requireAdmin, ctrl.crear);
