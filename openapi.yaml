@@ -35,6 +35,7 @@ tags:
   - name: Votos
   - name: Notificaciones
   - name: Portal candidato
+  - name: Perfil
   - name: Sistema
 
 paths:
@@ -2036,6 +2037,66 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
         '422': { $ref: '#/components/responses/ValidacionFallida' }
 
+  # ---------------------------------------------------------------------------
+  # Perfil propio: cada usuario gestiona su cuenta (identificado por el token).
+  # ---------------------------------------------------------------------------
+  /perfil/foto:
+    patch:
+      tags: [Perfil]
+      summary: Actualiza la foto de perfil del usuario autenticado
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [foto_url]
+              properties:
+                foto_url:
+                  type: string
+                  maxLength: 255
+                  description: URL http(s) de la imagen, o cadena vacía para quitarla.
+      responses:
+        '200':
+          description: Perfil actualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Estudiante' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
+
+  /perfil/password:
+    patch:
+      tags: [Perfil]
+      summary: Cambia la contraseña del usuario autenticado
+      description: Exige la contraseña actual correcta antes de reemplazarla.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password_actual, password_nueva]
+              properties:
+                password_actual: { type: string }
+                password_nueva:  { type: string, minLength: 6 }
+      responses:
+        '200':
+          description: Contraseña actualizada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  mensaje: { type: string }
+        '400':
+          description: La contraseña actual es incorrecta
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
+
   /health:
     get:
       tags: [Sistema]
@@ -2301,6 +2362,11 @@ components:
         rol:
           type: string
           enum: ["estudiante", "admin", "candidato"]
+        foto_url:
+          type: string
+          nullable: true
+          maxLength: 255
+          description: URL de la foto de perfil (o null).
 
     ProcesoElectoralInput:
       type: object

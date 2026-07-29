@@ -41,6 +41,7 @@ CREATE TABLE estudiante (
   fk_id_carrera INT,
   password VARCHAR(255) NOT NULL, -- Added for JWT Auth
   rol ENUM('estudiante', 'admin', 'candidato') NOT NULL DEFAULT 'estudiante', -- Usado por el login y los middlewares de autorización
+  foto_url VARCHAR(255) NULL DEFAULT NULL, -- URL de la foto de perfil (portal del estudiante)
   CONSTRAINT fk_estudiante_carrera FOREIGN KEY (fk_id_carrera) REFERENCES carrera(id_carrera)
 );
 

@@ -20,6 +20,7 @@ import actaResultadosRoutes      from './acta_resultados.routes.js';
 import veedorRoutes              from './veedor.routes.js';
 import veeduriaRoutes            from './veeduria.routes.js';
 import notificacionRoutes        from './notificacion.routes.js';
+import perfilRoutes              from './perfil.routes.js';
 
 export function registerRoutes(app: Express) {
   // Autenticación
@@ -58,4 +59,7 @@ export function registerRoutes(app: Express) {
 
   // Portal del candidato
   app.use('/api/candidato',              candidatoPortalRoutes);
+
+  // Perfil propio (foto, contraseña)
+  app.use('/api/perfil',                 perfilRoutes);
 }

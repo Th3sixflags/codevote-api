@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 
 const BASE_QUERY = `
   SELECT
-    e.cedula, e.nombres, e.apellidos, e.correo_institucional, e.promedio, e.estado_academico, e.rol,
+    e.cedula, e.nombres, e.apellidos, e.correo_institucional, e.promedio, e.estado_academico, e.rol, e.foto_url,
     c.id_carrera, c.nombre_carrera
   FROM estudiante e
   LEFT JOIN carrera c ON c.id_carrera = e.fk_id_carrera
@@ -53,4 +53,23 @@ export async function update(cedula: string, data: ActualizarEstudianteDTO) {
 
 export async function remove(cedula: string) {
   await pool.query('DELETE FROM estudiante WHERE cedula = ?', [cedula]);
+}
+
+// --- Portal del estudiante (self-service) ---------------------------------
+
+/** Actualiza solo la foto de perfil del estudiante. */
+export async function updateFoto(cedula: string, fotoUrl: string | null) {
+  await pool.query('UPDATE estudiante SET foto_url = ? WHERE cedula = ?', [fotoUrl, cedula]);
+  return findByCedula(cedula);
+}
+
+/** Devuelve el hash de la contraseña (para verificar la actual al cambiarla). */
+export async function getPasswordHash(cedula: string): Promise<string | null> {
+  const [rows] = await pool.query('SELECT password FROM estudiante WHERE cedula = ?', [cedula]) as [any[], any];
+  return rows[0]?.password ?? null;
+}
+
+/** Reemplaza la contraseña por un nuevo hash. */
+export async function updatePasswordHash(cedula: string, hash: string) {
+  await pool.query('UPDATE estudiante SET password = ? WHERE cedula = ?', [hash, cedula]);
 }
