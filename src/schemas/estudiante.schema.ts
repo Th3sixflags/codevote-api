@@ -1,7 +1,8 @@
 import { z } from 'zod';
+import { cedulaSchema } from './common.js';
 
 export const crearEstudianteSchema = z.object({
-  cedula:               z.string().length(10),
+  cedula:               cedulaSchema,
   nombres:              z.string().min(1).max(80),
   apellidos:            z.string().min(1).max(80),
   correo_institucional: z.string().email().max(120),

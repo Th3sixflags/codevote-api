@@ -1,10 +1,11 @@
 import { z } from 'zod';
+import { cedulaSchema } from './common.js';
 
 export const crearCandidatoSchema = z.object({
   cargo:                 z.enum(['presidente', 'vicepresidente', 'secretario', 'tesorero', 'vocal']),
   cumple_requisitos:     z.boolean().optional(),
   foto_url:              z.string().max(255).optional(),
-  fk_cedula_estudiante:  z.string().length(10),
+  fk_cedula_estudiante:  cedulaSchema,
   fk_id_lista:           z.number().int().positive(),
 });
 

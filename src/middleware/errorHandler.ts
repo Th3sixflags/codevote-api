@@ -10,14 +10,16 @@ export function errorHandler(
   res: Response,
   _next: NextFunction
 ) {
-  // 1. Errores de validación de Zod
+  // 1. Errores de validación de Zod. El `error` incluye los mensajes concretos
+  //    (no solo un genérico) para que el frontend pueda mostrar qué campo falló.
   if (err instanceof ZodError) {
+    const details = err.errors.map((e) => ({
+      path:    e.path.join('.'),
+      message: e.message,
+    }));
     res.status(422).json({
-      error:   'Datos de entrada inválidos.',
-      details: err.errors.map((e) => ({
-        path:    e.path.join('.'),
-        message: e.message,
-      })),
+      error:   details.map((d) => d.message).join(' '),
+      details,
     });
     return;
   }
