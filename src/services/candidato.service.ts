@@ -2,6 +2,7 @@ import * as repo from '../repositories/candidato.repository.js';
 import * as estudianteRepo from '../repositories/estudiante.repository.js';
 import * as listaRepo from '../repositories/lista_candidata.repository.js';
 import { HttpError } from '../utils/httpError.js';
+import { PROMEDIO_MINIMO_POSTULACION } from '../config/reglas.js';
 import { CrearCandidatoDTO, ActualizarCandidatoDTO } from '../schemas/candidato.schema.js';
 
 export async function listarCandidato() {
@@ -23,6 +24,11 @@ export async function crearCandidato(data: CrearCandidatoDTO) {
   const estudiante = await estudianteRepo.findByCedula(data.fk_cedula_estudiante);
   if (!estudiante) {
     throw new HttpError(404, 'El estudiante con esa cédula no existe.');
+  }
+
+  // Requisito de elegibilidad: promedio mínimo para ser candidato.
+  if (estudiante.promedio == null || Number(estudiante.promedio) < PROMEDIO_MINIMO_POSTULACION) {
+    throw new HttpError(409, `El estudiante no cumple el promedio mínimo de ${PROMEDIO_MINIMO_POSTULACION}/100 requerido para ser candidato.`);
   }
 
   const lista = await listaRepo.findById(data.fk_id_lista);

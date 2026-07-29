@@ -4,15 +4,12 @@ import * as planRepo       from '../repositories/plan_trabajo.repository.js';
 import * as procesoRepo    from '../repositories/proceso_electoral.repository.js';
 import * as estudianteRepo from '../repositories/estudiante.repository.js';
 import { HttpError } from '../utils/httpError.js';
+import { PROMEDIO_MINIMO_POSTULACION } from '../config/reglas.js';
 import {
   CrearListaCandidatoDTO, ActualizarListaCandidatoDTO,
   AgregarCandidatoDTO, ActualizarCandidatoPortalDTO,
   AgregarPlanDTO, ActualizarPlanDTO,
 } from '../schemas/candidato_portal.schema.js';
-
-// Promedio mínimo (sobre 100) que debe tener un estudiante para postularse
-// como candidato en una lista.
-const PROMEDIO_MINIMO_POSTULACION = 85;
 
 // Contexto mínimo (lista o candidato/plan con datos de su lista) para las
 // verificaciones de dueño y de estados.
