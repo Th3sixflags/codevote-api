@@ -65,6 +65,18 @@ export async function createConComprobante(data: CrearVotoDTO, cedula: string) {
   }
 }
 
+/** ¿La lista pertenece al mismo proceso electoral que la votación? */
+export async function listaPerteneceAVotacion(listaId: number, votacionId: number): Promise<boolean> {
+  const [rows] = await pool.query(
+    `SELECT 1
+     FROM lista_candidata l
+     JOIN votacion v ON v.fk_id_proceso = l.fk_id_proceso
+     WHERE l.id_lista = ? AND v.id_votacion = ? LIMIT 1`,
+    [listaId, votacionId]
+  ) as [any[], any];
+  return rows.length > 0;
+}
+
 /** Estado de la votación y de su proceso, para decidir si se pueden ver resultados. */
 export async function estadoDeVotacion(
   votacionId: number

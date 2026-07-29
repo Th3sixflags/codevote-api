@@ -1,5 +1,6 @@
 import * as repo from '../repositories/voto.repository.js';
 import * as notificaciones from './notificacion.service.js';
+import { HttpError } from '../utils/httpError.js';
 import { CrearVotoDTO } from '../schemas/voto.schema.js';
 
 export async function yaVoto(votacionId: number, cedula: string) {
@@ -7,6 +8,24 @@ export async function yaVoto(votacionId: number, cedula: string) {
 }
 
 export async function registrarVoto(data: CrearVotoDTO, cedula: string) {
+  // Integridad electoral: solo se acepta el voto si la votación está ABIERTA y
+  // su proceso está activo. Sin esto, una llamada directa a la API permitiría
+  // votar en votaciones cerradas o pendientes (el frontend ya lo bloquea, pero
+  // el backend debe hacerlo por su cuenta).
+  const estado = await repo.estadoDeVotacion(data.fk_id_votacion);
+  if (!estado) throw new HttpError(404, 'La votación indicada no existe.');
+  if (estado.votacion !== 'abierta') throw new HttpError(409, 'La votación no está abierta.');
+  if (estado.proceso === 'finalizado' || estado.proceso === 'cancelado') {
+    throw new HttpError(409, 'El proceso electoral no está activo.');
+  }
+
+  // Un voto 'valido' debe ser por una lista que pertenezca a esta votación.
+  if (data.tipo_voto === 'valido' && data.fk_id_lista != null) {
+    if (!(await repo.listaPerteneceAVotacion(data.fk_id_lista, data.fk_id_votacion))) {
+      throw new HttpError(400, 'La lista seleccionada no pertenece a esta votación.');
+    }
+  }
+
   // El hash del comprobante NUNCA se expone al estudiante (mantiene el voto
   // anónimo y evita relacionarlo con la opción elegida): se descarta aquí y
   // solo queda almacenado en codigo_voto para la auditoría administrativa.
