@@ -27,10 +27,24 @@ export async function findByVotacion(id: number) {
   return rows as any[];
 }
 
-/** Comprobantes emitidos a un estudiante (usado por "Mis Recibos"). */
+/**
+ * Comprobantes emitidos a un estudiante (usado por "Mis Recibos").
+ * NO se incluye `codigo_hash`: el comprobante prueba la participación, pero el
+ * hash se reserva a la auditoría administrativa para no revelar/relacionar nada
+ * del voto. Los endpoints de admin (findAll/findById/findByVotacion) sí lo traen.
+ */
 export async function findByEstudiante(cedula: string) {
   const [rows] = await pool.query(
-    BASE_QUERY + ' WHERE cv.fk_cedula_estudiante = ? ORDER BY cv.fecha_envio DESC, cv.id_codigo DESC',
+    `SELECT
+       cv.id_codigo, cv.estado_codigo, cv.fecha_envio,
+       cv.fk_id_votacion, v.titulo_papeleta, v.fecha_cierre,
+       p.id_proceso, p.nombre_proceso,
+       cv.fk_cedula_estudiante
+     FROM codigo_voto cv
+     JOIN votacion v ON v.id_votacion = cv.fk_id_votacion
+     JOIN proceso_electoral p ON p.id_proceso = v.fk_id_proceso
+     WHERE cv.fk_cedula_estudiante = ?
+     ORDER BY cv.fecha_envio DESC, cv.id_codigo DESC`,
     [cedula]
   );
   return rows as any[];

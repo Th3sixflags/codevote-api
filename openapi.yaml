@@ -1095,7 +1095,7 @@ paths:
             application/json:
               schema:
                 type: array
-                items: { $ref: '#/components/schemas/CodigoVoto' }
+                items: { $ref: '#/components/schemas/MiComprobante' }
         '401': { $ref: '#/components/responses/NoAutenticado' }
 
   /codigos-voto:
@@ -1557,7 +1557,8 @@ paths:
       description: >-
         Registra el voto de forma anónima y genera un comprobante
         (codigo_voto) para el estudiante autenticado. Cada estudiante solo
-        puede votar una vez por votación.
+        puede votar una vez por votación. El hash del comprobante NO se
+        devuelve al estudiante (el voto es secreto); queda solo para auditoría.
       requestBody:
         required: true
         content:
@@ -1576,7 +1577,7 @@ paths:
                   enum: ["valido", "blanco", "nulo"]
       responses:
         '201':
-          description: Voto registrado. Incluye el hash del comprobante.
+          description: Voto registrado (sin exponer el hash del comprobante).
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Voto' }
@@ -1755,7 +1756,6 @@ components:
         titulo_papeleta: { type: string }
         id_lista:        { type: integer, nullable: true }
         nombre_lista:    { type: string, nullable: true }
-        comprobante:     { type: string, description: Hash del comprobante generado para el estudiante (codigo_voto). }
 
     FacultadInput:
       type: object
@@ -2224,6 +2224,35 @@ components:
         fecha_envio:
           type: string
           example: "2026-07-01 08:00:00"
+        fk_cedula_estudiante:
+          type: string
+          minLength: 10
+          maxLength: 10
+
+    # Comprobante tal como lo ve el estudiante en "Mis Recibos": NO incluye
+    # codigo_hash (el hash se reserva a la auditoría administrativa).
+    MiComprobante:
+      type: object
+      properties:
+        id_codigo:
+          type: integer
+        estado_codigo:
+          type: string
+          enum: ["generado", "enviado", "usado", "expirado"]
+        fecha_envio:
+          type: string
+          example: "2026-07-01 08:00:00"
+        fk_id_votacion:
+          type: integer
+        titulo_papeleta:
+          type: string
+        fecha_cierre:
+          type: string
+          format: date-time
+        id_proceso:
+          type: integer
+        nombre_proceso:
+          type: string
         fk_cedula_estudiante:
           type: string
           minLength: 10

@@ -7,18 +7,21 @@ export async function yaVoto(votacionId: number, cedula: string) {
 }
 
 export async function registrarVoto(data: CrearVotoDTO, cedula: string) {
-  const resultado = await repo.createConComprobante(data, cedula);
+  // El hash del comprobante NUNCA se expone al estudiante (mantiene el voto
+  // anónimo y evita relacionarlo con la opción elegida): se descarta aquí y
+  // solo queda almacenado en codigo_voto para la auditoría administrativa.
+  const { comprobante, ...voto } = await repo.createConComprobante(data, cedula);
 
-  // Notifica al estudiante que su voto y comprobante fueron registrados.
+  // Se notifica al estudiante SOLO después de confirmar la transacción del
+  // voto y el comprobante (best-effort: si falla, no rompe el voto).
   await notificaciones.notificar(
     cedula,
     'voto',
     'Voto registrado',
-    `Tu voto en "${resultado.titulo_papeleta}" fue registrado correctamente. `
-      + `Comprobante: ${String(resultado.comprobante).slice(0, 12)}…`
+    'Tu voto fue registrado correctamente. Puedes consultar tu participación en Mis recibos.'
   );
 
-  return resultado;
+  return voto;
 }
 
 export async function estadoResultados(votacionId: number) {
