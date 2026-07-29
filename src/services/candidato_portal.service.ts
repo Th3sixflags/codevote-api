@@ -67,7 +67,9 @@ export async function crearLista(cedula: string, data: CrearListaCandidatoDTO) {
     throw new HttpError(409, 'Ya tienes una lista registrada en este proceso.');
   }
   // La lista nace en 'pendiente' (borrador editable) hasta que se envía a revisión.
-  return listaRepo.createDeCandidato(data.fk_id_proceso, data.nombre_lista, data.lema ?? null, 'pendiente', cedula);
+  return listaRepo.createDeCandidato(
+    data.fk_id_proceso, data.nombre_lista, data.lema ?? null, 'pendiente', cedula, data.foto_url ?? null
+  );
 }
 
 export async function actualizarLista(cedula: string, listaId: number, data: ActualizarListaCandidatoDTO) {
@@ -76,7 +78,11 @@ export async function actualizarLista(cedula: string, listaId: number, data: Act
   verificarDueno(lista, cedula);
   verificarInscripcion(lista);
   verificarEditable(lista);
-  return listaRepo.updateDatos(listaId, { nombre_lista: data.nombre_lista, lema: data.lema });
+  return listaRepo.updateDatos(listaId, {
+    nombre_lista: data.nombre_lista,
+    lema: data.lema,
+    foto_url: data.foto_url,
+  });
 }
 
 export async function agregarCandidato(cedula: string, listaId: number, data: AgregarCandidatoDTO) {

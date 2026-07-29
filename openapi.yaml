@@ -1808,6 +1808,11 @@ paths:
                 fk_id_proceso: { type: integer }
                 nombre_lista:  { type: string, maxLength: 80 }
                 lema:          { type: string, maxLength: 120 }
+                foto_url:
+                  type: string
+                  nullable: true
+                  maxLength: 255
+                  description: Imagen principal de la lista; debe iniciar con https://.
       responses:
         '201':
           description: Lista creada (estado pendiente)
@@ -1832,7 +1837,7 @@ paths:
         schema: { type: integer }
     patch:
       tags: [Portal candidato]
-      summary: Edita nombre/lema de la lista propia (no aprobada)
+      summary: Edita nombre/lema/foto de la lista propia (no aprobada)
       requestBody:
         required: true
         content:
@@ -1842,6 +1847,11 @@ paths:
               properties:
                 nombre_lista: { type: string, maxLength: 80 }
                 lema:         { type: string, maxLength: 120 }
+                foto_url:
+                  type: string
+                  nullable: true
+                  maxLength: 255
+                  description: Imagen principal de la lista; https:// o vacío para quitarla.
       responses:
         '200':
           description: Lista actualizada
@@ -2485,6 +2495,14 @@ components:
         fecha_inscripcion:
           type: string
           format: "date"
+        foto_url:
+          type: string
+          nullable: true
+          maxLength: 255
+          description: >-
+            Imagen principal de la lista. Debe ser una URL que inicie con
+            https:// (se rechaza http u otra cosa con 422). Cadena vacía o null
+            para quitarla.
 
     ListaCandidata:
       type: object
@@ -2512,6 +2530,11 @@ components:
           type: string
           nullable: true
           description: Cédula del candidato dueño de la lista (portal candidato).
+        foto_url:
+          type: string
+          nullable: true
+          maxLength: 255
+          description: Imagen principal de la lista (URL https) o null.
         id_proceso:
           type: integer
         nombre_proceso:

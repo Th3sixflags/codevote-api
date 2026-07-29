@@ -103,6 +103,7 @@ CREATE TABLE lista_candidata (
   fecha_inscripcion DATE NOT NULL,
   motivo_rechazo VARCHAR(250) NULL DEFAULT NULL,       -- Observación del admin al rechazar
   fk_cedula_responsable CHAR(10) NULL DEFAULT NULL,    -- Candidato dueño de la lista (portal candidato)
+  foto_url VARCHAR(255) NULL DEFAULT NULL,             -- Imagen principal de la lista (URL https)
   CONSTRAINT fk_lista_proceso FOREIGN KEY (fk_id_proceso) REFERENCES proceso_electoral(id_proceso),
   CONSTRAINT fk_lista_responsable FOREIGN KEY (fk_cedula_responsable) REFERENCES estudiante(cedula)
 );

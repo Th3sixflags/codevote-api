@@ -4,7 +4,7 @@ import { CrearListaDTO, ActualizarListaDTO } from '../schemas/lista_candidata.sc
 const BASE_QUERY = `
   SELECT
     l.id_lista, l.nombre_lista, l.lema, l.estado_revision, l.fecha_inscripcion,
-    l.motivo_rechazo, l.fk_cedula_responsable,
+    l.motivo_rechazo, l.fk_cedula_responsable, l.foto_url,
     p.id_proceso, p.nombre_proceso, p.estado AS estado_proceso
   FROM lista_candidata l
   JOIN proceso_electoral p ON p.id_proceso = l.fk_id_proceso
@@ -27,9 +27,9 @@ export async function findByProceso(procesoId: number) {
 
 export async function create(data: CrearListaDTO) {
   const [result] = await pool.query(
-    `INSERT INTO lista_candidata (fk_id_proceso, nombre_lista, lema, estado_revision, fecha_inscripcion)
-     VALUES (?, ?, ?, ?, ?)`,
-    [data.fk_id_proceso, data.nombre_lista, data.lema ?? null, data.estado_revision ?? 'en_revision', data.fecha_inscripcion]
+    `INSERT INTO lista_candidata (fk_id_proceso, nombre_lista, lema, estado_revision, fecha_inscripcion, foto_url)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [data.fk_id_proceso, data.nombre_lista, data.lema ?? null, data.estado_revision ?? 'en_revision', data.fecha_inscripcion, data.foto_url ?? null]
   ) as [any, any];
   return findById(result.insertId);
 }
@@ -80,18 +80,19 @@ export async function existeResponsableEnProceso(cedula: string, procesoId: numb
 
 /** Crea una lista con dueño (portal candidato). */
 export async function createDeCandidato(
-  procesoId: number, nombre: string, lema: string | null, estado: string, cedulaResponsable: string
+  procesoId: number, nombre: string, lema: string | null, estado: string, cedulaResponsable: string,
+  fotoUrl: string | null = null
 ) {
   const [result] = await pool.query(
-    `INSERT INTO lista_candidata (fk_id_proceso, nombre_lista, lema, estado_revision, fecha_inscripcion, fk_cedula_responsable)
-     VALUES (?, ?, ?, ?, CURDATE(), ?)`,
-    [procesoId, nombre, lema, estado, cedulaResponsable]
+    `INSERT INTO lista_candidata (fk_id_proceso, nombre_lista, lema, estado_revision, fecha_inscripcion, fk_cedula_responsable, foto_url)
+     VALUES (?, ?, ?, ?, CURDATE(), ?, ?)`,
+    [procesoId, nombre, lema, estado, cedulaResponsable, fotoUrl]
   ) as [any, any];
   return findById(result.insertId);
 }
 
-/** Actualiza solo los campos editables por el candidato (nombre, lema). */
-export async function updateDatos(id: number, campos: { nombre_lista?: string; lema?: string | null }) {
+/** Actualiza solo los campos editables por el candidato (nombre, lema, foto). */
+export async function updateDatos(id: number, campos: { nombre_lista?: string; lema?: string | null; foto_url?: string | null }) {
   const entradas = Object.entries(campos).filter(([, v]) => v !== undefined);
   if (entradas.length === 0) return findById(id);
   const sets    = entradas.map(([k]) => `${k} = ?`).join(', ');
