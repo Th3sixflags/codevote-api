@@ -6,7 +6,7 @@ export const crearEstudianteSchema = z.object({
   nombres:              z.string().min(1).max(80),
   apellidos:            z.string().min(1).max(80),
   correo_institucional: z.string().email().max(120),
-  promedio:             z.number().min(0).max(10).optional(),
+  promedio:             z.number().min(0).max(100).optional(),
   estado_academico:     z.enum(['activo', 'inactivo', 'egresado', 'graduado']).optional(),
   fk_id_carrera:        z.number().int().positive().optional(),
   password:             z.string().min(6),

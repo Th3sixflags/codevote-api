@@ -10,6 +10,10 @@ import {
   AgregarPlanDTO, ActualizarPlanDTO,
 } from '../schemas/candidato_portal.schema.js';
 
+// Promedio mínimo (sobre 100) que debe tener un estudiante para postularse
+// como candidato en una lista.
+const PROMEDIO_MINIMO_POSTULACION = 85;
+
 // Contexto mínimo (lista o candidato/plan con datos de su lista) para las
 // verificaciones de dueño y de estados.
 interface Contexto {
@@ -85,8 +89,13 @@ export async function agregarCandidato(cedula: string, listaId: number, data: Ag
   verificarInscripcion(lista);
   verificarEditable(lista);
 
-  if (!(await estudianteRepo.findByCedula(data.fk_cedula_estudiante))) {
+  const estudiante = await estudianteRepo.findByCedula(data.fk_cedula_estudiante);
+  if (!estudiante) {
     throw new HttpError(404, 'El estudiante indicado no existe.');
+  }
+  // Requisito de elegibilidad: promedio mínimo para postularse.
+  if (estudiante.promedio == null || Number(estudiante.promedio) < PROMEDIO_MINIMO_POSTULACION) {
+    throw new HttpError(409, `El estudiante no cumple el promedio mínimo de ${PROMEDIO_MINIMO_POSTULACION}/100 requerido para postularse.`);
   }
   if (await candidatoRepo.existeCargoEnLista(listaId, data.cargo)) {
     throw new HttpError(409, `Ya existe un candidato con el cargo "${data.cargo}" en esta lista.`);

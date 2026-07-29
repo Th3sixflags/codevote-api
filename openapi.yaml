@@ -2328,6 +2328,9 @@ components:
           minLength: 6
         promedio:
           type: number
+          minimum: 0
+          maximum: 100
+          description: Promedio sobre 100 (escala de la universidad).
         estado_academico:
           type: string
           enum: ["activo", "inactivo", "egresado", "graduado"]
