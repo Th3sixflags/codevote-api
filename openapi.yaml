@@ -2369,6 +2369,10 @@ components:
           type: string
           minLength: 10
           maxLength: 10
+          description: >-
+            Cédula ecuatoriana válida: 10 dígitos, provincia 01-24 o 30, tercer
+            dígito menor que 6 y dígito verificador correcto (módulo 10). Un
+            número que no cumpla devuelve 422.
         nombres:
           type: string
           maxLength: 80
@@ -2402,6 +2406,10 @@ components:
           type: string
           minLength: 10
           maxLength: 10
+          description: >-
+            Cédula ecuatoriana válida: 10 dígitos, provincia 01-24 o 30, tercer
+            dígito menor que 6 y dígito verificador correcto (módulo 10). Un
+            número que no cumpla devuelve 422.
         nombres:
           type: string
           maxLength: 80

@@ -1,0 +1,72 @@
+-- =============================================================================
+-- Migración de datos: cédulas de prueba → cédulas ecuatorianas VÁLIDAS
+-- Fecha: 2026-07-29
+-- =============================================================================
+-- El backend ahora exige el dígito verificador del Registro Civil. Las cédulas
+-- cargadas originalmente (17000000XX) eran secuenciales y 20 de 22 NO pasan el
+-- algoritmo, así que se reemplazan por cédulas válidas equivalentes.
+--
+-- `estudiante.cedula` es clave primaria referenciada por 4 tablas
+-- (candidato, codigo_voto, notificacion, lista_candidata), por eso se
+-- desactivan temporalmente las comprobaciones de clave foránea y se actualizan
+-- padre e hijas dentro de UNA transacción.
+--
+-- IDEMPOTENTE: el mapeo se aplica buscando las cédulas VIEJAS. Tras la primera
+-- ejecución ya no existen, y ninguna cédula nueva coincide con una vieja, así
+-- que volver a ejecutarla no cambia nada.
+--
+-- ⚠️ Las sesiones abiertas quedan inválidas (el JWT lleva la cédula anterior):
+--    hay que volver a iniciar sesión. El correo y la contraseña NO cambian.
+--
+--   sudo docker exec -i codevote-mysql mysql -u root -p codevote_db < 2026-07-29_cedulas_validas.sql
+-- =============================================================================
+
+SET NAMES utf8mb4;
+USE codevote_db;
+
+CREATE TEMPORARY TABLE mapa_cedula (
+  vieja CHAR(10) PRIMARY KEY,
+  nueva CHAR(10) NOT NULL UNIQUE
+);
+
+INSERT INTO mapa_cedula (vieja, nueva) VALUES
+  ('1700000001','1710000009'),
+  ('1700000002','1710000017'),
+  ('1700000003','1710000025'),
+  ('1700000004','1710000033'),
+  ('1700000005','1710000041'),
+  ('1700000006','1710000058'),
+  ('1700000007','1710000066'),
+  ('1700000008','1710000074'),
+  ('1700000009','1710000082'),
+  ('1700000010','1710000090'),
+  ('1700000011','1710000108'),
+  ('1700000012','1710000116'),
+  ('1700000013','1710000124'),
+  ('1700000014','1710000132'),
+  ('1700000015','1710000140'),
+  ('1700000016','1710000157'),
+  ('1700000017','1710000165'),
+  ('1700000018','1710000173'),
+  ('1700000019','1710000181'),
+  ('1700000020','1710000199'),
+  ('1700000021','1710000207'),
+  ('1700000022','1710000215');
+
+SET FOREIGN_KEY_CHECKS = 0;
+START TRANSACTION;
+
+UPDATE candidato       c JOIN mapa_cedula m ON m.vieja = c.fk_cedula_estudiante  SET c.fk_cedula_estudiante  = m.nueva;
+UPDATE codigo_voto    cv JOIN mapa_cedula m ON m.vieja = cv.fk_cedula_estudiante SET cv.fk_cedula_estudiante = m.nueva;
+UPDATE notificacion    n JOIN mapa_cedula m ON m.vieja = n.fk_cedula_estudiante  SET n.fk_cedula_estudiante  = m.nueva;
+UPDATE lista_candidata l JOIN mapa_cedula m ON m.vieja = l.fk_cedula_responsable SET l.fk_cedula_responsable = m.nueva;
+UPDATE estudiante      e JOIN mapa_cedula m ON m.vieja = e.cedula                SET e.cedula                = m.nueva;
+
+COMMIT;
+SET FOREIGN_KEY_CHECKS = 1;
+
+-- Verificación: no deben quedar referencias huérfanas (todo debe dar 0).
+SELECT 'candidato huérfanos'  AS chequeo, COUNT(*) AS filas FROM candidato       c LEFT JOIN estudiante e ON e.cedula = c.fk_cedula_estudiante  WHERE e.cedula IS NULL
+UNION ALL SELECT 'codigo_voto huérfanos',  COUNT(*) FROM codigo_voto            cv LEFT JOIN estudiante e ON e.cedula = cv.fk_cedula_estudiante WHERE e.cedula IS NULL
+UNION ALL SELECT 'notificacion huérfanas', COUNT(*) FROM notificacion            n LEFT JOIN estudiante e ON e.cedula = n.fk_cedula_estudiante  WHERE e.cedula IS NULL
+UNION ALL SELECT 'listas sin responsable', COUNT(*) FROM lista_candidata         l LEFT JOIN estudiante e ON e.cedula = l.fk_cedula_responsable WHERE l.fk_cedula_responsable IS NOT NULL AND e.cedula IS NULL;
