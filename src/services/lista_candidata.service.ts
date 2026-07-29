@@ -30,3 +30,27 @@ export async function eliminarLista(id: number) {
   await repo.remove(id);
   return true;
 }
+
+// --- Revisión administrativa ----------------------------------------------
+// Una lista relacionada (candidatos, planes, votos, auditoría) nunca se borra
+// físicamente: se retira (soft-delete) para conservar el historial. El DELETE
+// físico solo prospera para listas nuevas sin relaciones (si tiene relaciones,
+// el errorHandler traduce la FK a 409).
+
+export async function aprobarLista(id: number) {
+  const existente = await repo.findById(id);
+  if (!existente) return null;
+  return repo.setEstadoRevision(id, 'aprobada', null);
+}
+
+export async function rechazarLista(id: number, motivo: string) {
+  const existente = await repo.findById(id);
+  if (!existente) return null;
+  return repo.setEstadoRevision(id, 'rechazada', motivo);
+}
+
+export async function retirarLista(id: number) {
+  const existente = await repo.findById(id);
+  if (!existente) return null;
+  return repo.setEstadoRevision(id, 'retirada', existente.motivo_rechazo ?? null);
+}

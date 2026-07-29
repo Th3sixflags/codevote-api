@@ -1,10 +1,15 @@
 import * as repo from '../repositories/proceso_electoral.repository.js';
 import * as notificaciones from './notificacion.service.js';
+import { HttpError } from '../utils/httpError.js';
 import { CrearProcesoDTO, ActualizarProcesoDTO } from '../schemas/proceso_electoral.schema.js';
+
+// Un proceso solo puede archivarse cuando ya no está activo.
+const ARCHIVABLES = ['finalizado', 'cancelado'];
 
 export async function listarProcesos(estado?: string) {
   if (estado === 'actuales') return repo.findActuales();
   if (estado === 'finalizados') return repo.findFinalizados();
+  if (estado === 'archivados') return repo.findArchivados();
   return repo.findAll();
 }
 
@@ -37,4 +42,23 @@ export async function eliminarProceso(id: number) {
   if (!existente) return false;
   await repo.remove(id);
   return true;
+}
+
+/**
+ * Archiva un proceso (soft): solo si está finalizado o cancelado. No borra
+ * votos, comprobantes, actas, candidatos ni auditorías; solo lo saca de las
+ * consultas activas dejándolo disponible para historial.
+ */
+export async function archivarProceso(id: number) {
+  const existente = await repo.findById(id);
+  if (!existente) return null;
+
+  if (existente.archivado_at) {
+    throw new HttpError(409, 'El proceso ya está archivado.');
+  }
+  if (!ARCHIVABLES.includes(existente.estado)) {
+    throw new HttpError(409, 'Solo se pueden archivar procesos finalizados o cancelados. No se permite archivar un proceso activo.');
+  }
+
+  return repo.archivar(id);
 }

@@ -59,3 +59,40 @@ export async function update(id: number, data: ActualizarCandidatoDTO) {
 export async function remove(id: number) {
   await pool.query('DELETE FROM candidato WHERE id_candidato = ?', [id]);
 }
+
+// --- Soporte del portal del candidato -------------------------------------
+
+/** Candidato con datos de su lista y proceso (para verificar dueño y estados). */
+export async function findByIdConLista(id: number) {
+  const [rows] = await pool.query(
+    `SELECT c.id_candidato, c.cargo, c.fk_cedula_estudiante, c.fk_id_lista,
+            l.fk_cedula_responsable, l.estado_revision, l.fk_id_proceso,
+            p.estado AS estado_proceso
+     FROM candidato c
+     JOIN lista_candidata l ON l.id_lista = c.fk_id_lista
+     JOIN proceso_electoral p ON p.id_proceso = l.fk_id_proceso
+     WHERE c.id_candidato = ?`,
+    [id]
+  ) as [any[], any];
+  return rows[0] ?? null;
+}
+
+/** ¿Ya existe ese cargo en la lista? (excluye opcionalmente un candidato). */
+export async function existeCargoEnLista(listaId: number, cargo: string, exceptId = 0): Promise<boolean> {
+  const [rows] = await pool.query(
+    'SELECT 1 FROM candidato WHERE fk_id_lista = ? AND cargo = ? AND id_candidato <> ? LIMIT 1',
+    [listaId, cargo, exceptId]
+  ) as [any[], any];
+  return rows.length > 0;
+}
+
+/** ¿El estudiante ya es candidato en alguna lista de ese proceso? (listas incompatibles). */
+export async function participaEnProceso(cedula: string, procesoId: number, exceptId = 0): Promise<boolean> {
+  const [rows] = await pool.query(
+    `SELECT 1 FROM candidato c
+     JOIN lista_candidata l ON l.id_lista = c.fk_id_lista
+     WHERE c.fk_cedula_estudiante = ? AND l.fk_id_proceso = ? AND c.id_candidato <> ? LIMIT 1`,
+    [cedula, procesoId, exceptId]
+  ) as [any[], any];
+  return rows.length > 0;
+}

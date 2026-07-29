@@ -47,3 +47,18 @@ export async function update(id: number, data: ActualizarPlanTrabajoDTO) {
 export async function remove(id: number) {
   await pool.query('DELETE FROM plan_trabajo WHERE id_plan = ?', [id]);
 }
+
+/** Plan con datos de su lista y proceso (para verificar dueño y estados). */
+export async function findByIdConLista(id: number) {
+  const [rows] = await pool.query(
+    `SELECT pl.id_plan, pl.fk_id_lista,
+            l.fk_cedula_responsable, l.estado_revision, l.fk_id_proceso,
+            p.estado AS estado_proceso
+     FROM plan_trabajo pl
+     JOIN lista_candidata l ON l.id_lista = pl.fk_id_lista
+     JOIN proceso_electoral p ON p.id_proceso = l.fk_id_proceso
+     WHERE pl.id_plan = ?`,
+    [id]
+  ) as [any[], any];
+  return rows[0] ?? null;
+}

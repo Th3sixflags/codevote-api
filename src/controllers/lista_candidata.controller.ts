@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { crearListaSchema, actualizarListaSchema } from '../schemas/lista_candidata.schema.js';
+import { crearListaSchema, actualizarListaSchema, rechazarListaSchema } from '../schemas/lista_candidata.schema.js';
 import * as service from '../services/lista_candidata.service.js';
 
 export async function listar(_req: Request, res: Response) {
@@ -44,4 +44,32 @@ export async function eliminar(req: Request, res: Response) {
     return;
   }
   res.status(204).send();
+}
+
+export async function aprobar(req: Request, res: Response) {
+  const lista = await service.aprobarLista(Number(req.params.id));
+  if (!lista) {
+    res.status(404).json({ error: 'Lista no encontrada.' });
+    return;
+  }
+  res.json(lista);
+}
+
+export async function rechazar(req: Request, res: Response) {
+  const { motivo } = rechazarListaSchema.parse(req.body);
+  const lista = await service.rechazarLista(Number(req.params.id), motivo);
+  if (!lista) {
+    res.status(404).json({ error: 'Lista no encontrada.' });
+    return;
+  }
+  res.json(lista);
+}
+
+export async function retirar(req: Request, res: Response) {
+  const lista = await service.retirarLista(Number(req.params.id));
+  if (!lista) {
+    res.status(404).json({ error: 'Lista no encontrada.' });
+    return;
+  }
+  res.json(lista);
 }

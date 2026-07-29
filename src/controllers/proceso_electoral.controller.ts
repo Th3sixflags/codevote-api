@@ -42,3 +42,12 @@ export async function eliminar(req: Request, res: Response) {
   }
   res.status(204).send();
 }
+
+export async function archivar(req: Request, res: Response) {
+  const archivado = await service.archivarProceso(Number(req.params.id));
+  if (!archivado) {
+    res.status(404).json({ error: 'Proceso electoral no encontrado.' });
+    return;
+  }
+  res.json(archivado);
+}

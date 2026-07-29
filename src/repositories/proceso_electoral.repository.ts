@@ -1,29 +1,48 @@
 import { pool } from '../config/database.js';
 import { CrearProcesoDTO, ActualizarProcesoDTO } from '../schemas/proceso_electoral.schema.js';
 
+/** Listado general: excluye los archivados (que solo se ven en el historial). */
 export async function findAll() {
-  const [rows] = await pool.query('SELECT * FROM proceso_electoral ORDER BY fecha_inicio_votacion DESC');
+  const [rows] = await pool.query(
+    'SELECT * FROM proceso_electoral WHERE archivado_at IS NULL ORDER BY fecha_inicio_votacion DESC'
+  );
   return rows as any[];
 }
 
-/** Procesos activos o próximos (todo lo que no está finalizado ni cancelado). */
+/** Procesos activos o próximos (todo lo que no está finalizado, cancelado ni archivado). */
 export async function findActuales() {
   const [rows] = await pool.query(
     `SELECT * FROM proceso_electoral
-     WHERE estado NOT IN ('finalizado', 'cancelado')
+     WHERE estado NOT IN ('finalizado', 'cancelado') AND archivado_at IS NULL
      ORDER BY fecha_inicio_votacion ASC`
   );
   return rows as any[];
 }
 
-/** Procesos finalizados, del más reciente al más antiguo (historial). */
+/** Procesos finalizados NO archivados, del más reciente al más antiguo (historial). */
 export async function findFinalizados() {
   const [rows] = await pool.query(
     `SELECT * FROM proceso_electoral
-     WHERE estado = 'finalizado'
+     WHERE estado = 'finalizado' AND archivado_at IS NULL
      ORDER BY fecha_fin_votacion DESC`
   );
   return rows as any[];
+}
+
+/** Procesos archivados (conservados solo para historial y auditoría). */
+export async function findArchivados() {
+  const [rows] = await pool.query(
+    `SELECT * FROM proceso_electoral
+     WHERE archivado_at IS NOT NULL
+     ORDER BY archivado_at DESC`
+  );
+  return rows as any[];
+}
+
+/** Marca el proceso como archivado (sin borrar nada). */
+export async function archivar(id: number) {
+  await pool.query('UPDATE proceso_electoral SET archivado_at = NOW() WHERE id_proceso = ?', [id]);
+  return findById(id);
 }
 
 export async function findById(id: number) {

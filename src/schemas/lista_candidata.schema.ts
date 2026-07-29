@@ -10,5 +10,12 @@ export const crearListaSchema = z.object({
 
 export const actualizarListaSchema = crearListaSchema.partial();
 
+// Al rechazar una lista, el administrador debe indicar el motivo (se conserva
+// para auditoría y para que el candidato sepa qué corregir).
+export const rechazarListaSchema = z.object({
+  motivo: z.string().min(1, 'Debe indicar el motivo del rechazo.').max(250),
+});
+
 export type CrearListaDTO      = z.infer<typeof crearListaSchema>;
 export type ActualizarListaDTO = z.infer<typeof actualizarListaSchema>;
+export type RechazarListaDTO   = z.infer<typeof rechazarListaSchema>;

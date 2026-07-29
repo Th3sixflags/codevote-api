@@ -34,6 +34,7 @@ tags:
   - name: Votaciones
   - name: Votos
   - name: Notificaciones
+  - name: Portal candidato
   - name: Sistema
 
 paths:
@@ -457,16 +458,17 @@ paths:
       tags: [Procesos electorales]
       summary: Lista los procesos electorales
       description: >-
-        Sin filtro devuelve todos. Con ?estado=actuales devuelve los activos o
-        próximos (no finalizados ni cancelados). Con ?estado=finalizados
-        devuelve el historial, del más reciente al más antiguo.
+        Sin filtro devuelve todos los NO archivados. Con ?estado=actuales
+        devuelve los activos o próximos (no finalizados ni cancelados). Con
+        ?estado=finalizados devuelve el historial (finalizados no archivados).
+        Con ?estado=archivados devuelve solo los archivados.
       parameters:
         - name: estado
           in: query
           required: false
           schema:
             type: string
-            enum: [actuales, finalizados]
+            enum: [actuales, finalizados, archivados]
       responses:
         '200':
           description: Listado
@@ -537,6 +539,35 @@ paths:
         '401': { $ref: '#/components/responses/NoAutenticado' }
         '403': { $ref: '#/components/responses/SinPermiso' }
         '404': { $ref: '#/components/responses/NoEncontrado' }
+
+  /procesos-electorales/{id}/archivar:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    patch:
+      tags: [Procesos electorales]
+      summary: Archiva un proceso (requiere rol admin)
+      description: >-
+        Archiva (soft) un proceso finalizado o cancelado: deja de aparecer en
+        las consultas activas pero conserva votos, comprobantes, actas,
+        candidatos y auditorías para el historial. No se puede archivar un
+        proceso activo ni uno ya archivado.
+      responses:
+        '200':
+          description: Proceso archivado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProcesoElectoral' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409':
+          description: El proceso está activo o ya estaba archivado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
 
   /cronogramas:
     get:
@@ -720,8 +751,88 @@ paths:
     delete:
       tags: [Listas candidatas]
       summary: Elimina un registro (requiere rol admin)
+      description: >-
+        Solo prospera para listas nuevas sin relaciones. Una lista con
+        candidatos, planes, votos o auditoría no se borra físicamente (responde
+        409); en ese caso, usar retirar para conservarla como historial.
       responses:
         '204': { description: Eliminado }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409':
+          description: La lista tiene información relacionada y no puede borrarse
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /listas-candidatas/{id}/aprobar:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    patch:
+      tags: [Listas candidatas]
+      summary: Aprueba una lista (requiere rol admin)
+      responses:
+        '200':
+          description: Lista aprobada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ListaCandidata' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+
+  /listas-candidatas/{id}/rechazar:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    patch:
+      tags: [Listas candidatas]
+      summary: Rechaza una lista con un motivo (requiere rol admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [motivo]
+              properties:
+                motivo: { type: string, minLength: 1, maxLength: 250 }
+      responses:
+        '200':
+          description: Lista rechazada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ListaCandidata' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
+
+  /listas-candidatas/{id}/retirar:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    patch:
+      tags: [Listas candidatas]
+      summary: Retira una lista (soft-delete, requiere rol admin)
+      description: >-
+        Marca la lista como retirada sin borrarla, conservándola para
+        auditoría. Alternativa al borrado físico cuando la lista tiene
+        relaciones (candidatos, planes, votos).
+      responses:
+        '200':
+          description: Lista retirada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ListaCandidata' }
         '401': { $ref: '#/components/responses/NoAutenticado' }
         '403': { $ref: '#/components/responses/SinPermiso' }
         '404': { $ref: '#/components/responses/NoEncontrado' }
@@ -1659,6 +1770,272 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
 
+  # ---------------------------------------------------------------------------
+  # Portal del candidato: todas requieren rol 'candidato'. El backend valida
+  # además que la lista/candidato/plan pertenezca al candidato autenticado,
+  # que el proceso esté en inscripción y que la lista no esté aprobada.
+  # ---------------------------------------------------------------------------
+  /candidato/mi-lista:
+    get:
+      tags: [Portal candidato]
+      summary: Lista del candidato autenticado (con candidatos y planes)
+      description: Devuelve la lista de la que el candidato es responsable, o null si aún no tiene.
+      responses:
+        '200':
+          description: Lista propia o null
+          content:
+            application/json:
+              schema:
+                nullable: true
+                allOf: [{ $ref: '#/components/schemas/ListaCandidata' }]
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+
+  /candidato/listas:
+    post:
+      tags: [Portal candidato]
+      summary: Crea la lista del candidato (proceso en inscripción)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fk_id_proceso, nombre_lista]
+              properties:
+                fk_id_proceso: { type: integer }
+                nombre_lista:  { type: string, maxLength: 80 }
+                lema:          { type: string, maxLength: 120 }
+      responses:
+        '201':
+          description: Lista creada (estado pendiente)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ListaCandidata' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409':
+          description: Proceso no está en inscripción, o ya tienes una lista en él
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
+
+  /candidato/listas/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    patch:
+      tags: [Portal candidato]
+      summary: Edita nombre/lema de la lista propia (no aprobada)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nombre_lista: { type: string, maxLength: 80 }
+                lema:         { type: string, maxLength: 120 }
+      responses:
+        '200':
+          description: Lista actualizada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ListaCandidata' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409':
+          description: Proceso fuera de inscripción o lista ya aprobada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
+
+  /candidato/listas/{id}/candidatos:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    post:
+      tags: [Portal candidato]
+      summary: Agrega un candidato a la lista propia
+      description: Valida que el estudiante exista, el cargo no se repita y la persona no esté en otra lista del mismo proceso.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [cargo, fk_cedula_estudiante]
+              properties:
+                cargo:                { type: string, enum: ["presidente", "vicepresidente", "secretario", "tesorero", "vocal"] }
+                fk_cedula_estudiante: { type: string, minLength: 10, maxLength: 10 }
+                foto_url:             { type: string, maxLength: 255 }
+      responses:
+        '201':
+          description: Candidato agregado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Candidato' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409':
+          description: Cargo duplicado, persona en lista incompatible, o lista no editable
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
+
+  /candidato/listas/{id}/planes:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    post:
+      tags: [Portal candidato]
+      summary: Agrega un plan de trabajo a la lista propia
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [area, propuesta]
+              properties:
+                area:        { type: string, enum: ["academico", "deportivo", "cultural", "infraestructura", "social"] }
+                propuesta:   { type: string }
+                archivo_url: { type: string, maxLength: 255 }
+      responses:
+        '201':
+          description: Plan agregado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PlanTrabajo' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409':
+          description: Lista no editable o proceso fuera de inscripción
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
+
+  /candidato/listas/{id}/enviar-revision:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    post:
+      tags: [Portal candidato]
+      summary: Envía la lista propia a revisión administrativa
+      description: Pasa la lista a estado en_revision. Requiere al menos un candidato y proceso en inscripción.
+      responses:
+        '200':
+          description: Lista enviada a revisión
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ListaCandidata' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409':
+          description: Sin candidatos, lista aprobada/retirada o proceso fuera de inscripción
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /candidato/candidatos/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    patch:
+      tags: [Portal candidato]
+      summary: Edita un candidato de la lista propia
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cargo:    { type: string, enum: ["presidente", "vicepresidente", "secretario", "tesorero", "vocal"] }
+                foto_url: { type: string, maxLength: 255 }
+      responses:
+        '200':
+          description: Candidato actualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Candidato' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409':
+          description: Cargo duplicado o lista no editable
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
+    delete:
+      tags: [Portal candidato]
+      summary: Quita un candidato de la lista propia
+      responses:
+        '204': { description: Candidato eliminado }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409':
+          description: Lista no editable o proceso fuera de inscripción
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /candidato/planes/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    patch:
+      tags: [Portal candidato]
+      summary: Edita un plan de trabajo de la lista propia
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                area:        { type: string, enum: ["academico", "deportivo", "cultural", "infraestructura", "social"] }
+                propuesta:   { type: string }
+                archivo_url: { type: string, maxLength: 255 }
+      responses:
+        '200':
+          description: Plan actualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PlanTrabajo' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409':
+          description: Lista no editable o proceso fuera de inscripción
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
+
   /health:
     get:
       tags: [Sistema]
@@ -1977,6 +2354,11 @@ components:
         descripcion:
           type: string
           maxLength: 250
+        archivado_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Fecha de archivado; null si el proceso no está archivado.
 
     CronogramaInput:
       type: object
@@ -2029,7 +2411,7 @@ components:
           maxLength: 120
         estado_revision:
           type: string
-          enum: ["en_revision", "aprobada", "rechazada"]
+          enum: ["pendiente", "en_revision", "aprobada", "rechazada", "retirada"]
         fecha_inscripcion:
           type: string
           format: "date"
@@ -2039,8 +2421,6 @@ components:
       properties:
         id_lista:
           type: integer
-        fk_id_proceso:
-          type: integer
         nombre_lista:
           type: string
           maxLength: 80
@@ -2049,10 +2429,26 @@ components:
           maxLength: 120
         estado_revision:
           type: string
-          enum: ["en_revision", "aprobada", "rechazada"]
+          enum: ["pendiente", "en_revision", "aprobada", "rechazada", "retirada"]
         fecha_inscripcion:
           type: string
           format: "date"
+        motivo_rechazo:
+          type: string
+          nullable: true
+          maxLength: 250
+          description: Observación del administrador al rechazar (o null).
+        fk_cedula_responsable:
+          type: string
+          nullable: true
+          description: Cédula del candidato dueño de la lista (portal candidato).
+        id_proceso:
+          type: integer
+        nombre_proceso:
+          type: string
+        estado_proceso:
+          type: string
+          description: Estado del proceso al que pertenece la lista.
 
     CandidatoInput:
       type: object

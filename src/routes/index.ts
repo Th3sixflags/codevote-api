@@ -10,6 +10,7 @@ import cronogramaRoutes          from './cronograma.routes.js';
 import votacionRoutes            from './votacion.routes.js';
 import listaCandidataRoutes      from './lista_candidata.routes.js';
 import candidatoRoutes           from './candidato.routes.js';
+import candidatoPortalRoutes     from './candidato_portal.routes.js';
 import requisitoRoutes           from './requisito.routes.js';
 import validacionRequisitoRoutes from './validacion_requisito.routes.js';
 import planTrabajoRoutes         from './plan_trabajo.routes.js';
@@ -54,4 +55,7 @@ export function registerRoutes(app: Express) {
 
   // Portal del estudiante
   app.use('/api/notificaciones',         notificacionRoutes);
+
+  // Portal del candidato
+  app.use('/api/candidato',              candidatoPortalRoutes);
 }

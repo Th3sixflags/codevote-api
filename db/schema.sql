@@ -40,7 +40,7 @@ CREATE TABLE estudiante (
   estado_academico ENUM('activo', 'inactivo', 'egresado', 'graduado') NOT NULL DEFAULT 'activo',
   fk_id_carrera INT,
   password VARCHAR(255) NOT NULL, -- Added for JWT Auth
-  rol ENUM('estudiante', 'admin') NOT NULL DEFAULT 'estudiante', -- Usado por el login y los middlewares de autorización
+  rol ENUM('estudiante', 'admin', 'candidato') NOT NULL DEFAULT 'estudiante', -- Usado por el login y los middlewares de autorización
   CONSTRAINT fk_estudiante_carrera FOREIGN KEY (fk_id_carrera) REFERENCES carrera(id_carrera)
 );
 
@@ -62,7 +62,10 @@ CREATE TABLE proceso_electoral (
   fecha_inicio_votacion DATETIME NOT NULL,
   fecha_fin_votacion DATETIME NOT NULL,
   estado ENUM('planificado', 'convocado', 'inscripcion', 'campaña', 'votacion', 'escrutinio', 'finalizado', 'cancelado') NOT NULL DEFAULT 'planificado',
-  descripcion VARCHAR(250)
+  descripcion VARCHAR(250),
+  -- Marca de archivado: un proceso finalizado/cancelado se archiva (deja de
+  -- aparecer en consultas activas) sin borrar su información histórica.
+  archivado_at DATETIME NULL DEFAULT NULL
 );
 
 -- 7. cronograma
@@ -89,6 +92,7 @@ CREATE TABLE votacion (
 );
 
 -- 9. lista_candidata
+-- estado_revision: pendiente | en_revision | aprobada | rechazada | retirada
 CREATE TABLE lista_candidata (
   id_lista INT AUTO_INCREMENT PRIMARY KEY,
   fk_id_proceso INT NOT NULL,
@@ -96,7 +100,10 @@ CREATE TABLE lista_candidata (
   lema VARCHAR(120),
   estado_revision VARCHAR(30) NOT NULL DEFAULT 'en_revision',
   fecha_inscripcion DATE NOT NULL,
-  CONSTRAINT fk_lista_proceso FOREIGN KEY (fk_id_proceso) REFERENCES proceso_electoral(id_proceso)
+  motivo_rechazo VARCHAR(250) NULL DEFAULT NULL,       -- Observación del admin al rechazar
+  fk_cedula_responsable CHAR(10) NULL DEFAULT NULL,    -- Candidato dueño de la lista (portal candidato)
+  CONSTRAINT fk_lista_proceso FOREIGN KEY (fk_id_proceso) REFERENCES proceso_electoral(id_proceso),
+  CONSTRAINT fk_lista_responsable FOREIGN KEY (fk_cedula_responsable) REFERENCES estudiante(cedula)
 );
 
 -- 10. candidato
