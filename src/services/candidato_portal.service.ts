@@ -114,6 +114,15 @@ export async function agregarCandidato(cedula: string, listaId: number, data: Ag
   if (!estudiante) {
     throw new HttpError(404, 'El estudiante indicado no existe.');
   }
+  // La papeleta define la carrera exigida: en una papeleta de carrera, todos los
+  // integrantes deben pertenecer a esa misma carrera.
+  const votacionLista = await votacionRepo.findById(lista.fk_id_votacion);
+  if (votacionLista?.fk_id_carrera != null) {
+    const carreraIntegrante = estudiante.id_carrera == null ? null : Number(estudiante.id_carrera);
+    if (carreraIntegrante !== Number(votacionLista.fk_id_carrera)) {
+      throw new HttpError(409, `Esta papeleta corresponde a la carrera "${votacionLista.nombre_carrera}" y esa persona no pertenece a ella.`);
+    }
+  }
   // Requisito de elegibilidad: promedio mínimo para postularse.
   if (estudiante.promedio == null || Number(estudiante.promedio) < PROMEDIO_MINIMO_POSTULACION) {
     throw new HttpError(409, `El estudiante no cumple el promedio mínimo de ${PROMEDIO_MINIMO_POSTULACION}/100 requerido para postularse.`);
@@ -195,4 +204,53 @@ export async function enviarARevision(cedula: string, listaId: number) {
     throw new HttpError(409, 'Agrega al menos un candidato antes de enviar la lista a revisión.');
   }
   return listaRepo.setEstadoRevision(listaId, 'en_revision', null);
+}
+
+/**
+ * Posibles integrantes para la lista del candidato: solo estudiantes
+ * compatibles con la carrera de su papeleta asignada y sin candidatura activa.
+ * Devuelve únicamente cédula, nombres, apellidos y carrera.
+ */
+export async function buscarIntegrantes(cedula: string, texto: string) {
+  const asignacion = await asignacionRepo.findActivaDeEstudiante(cedula);
+  if (!asignacion) {
+    throw new HttpError(409, 'Todavía no tienes una papeleta asignada, así que no puedes buscar integrantes.');
+  }
+  const carreraCompatible = asignacion.carrera_votacion == null ? null : Number(asignacion.carrera_votacion);
+  return estudianteRepo.buscarPosiblesIntegrantes(carreraCompatible, texto);
+}
+
+/**
+ * Guarda la URL del PDF subido en el plan de trabajo indicado.
+ * Valida que la lista sea del candidato, que siga editable y que el plan
+ * pertenezca a esa lista. Si no se indica plan y la lista tiene exactamente uno,
+ * se usa ese; con varios se exige indicar cuál.
+ */
+export async function guardarArchivoDePlan(
+  cedula: string, listaId: number, archivoUrl: string, planId?: number
+) {
+  const lista = await listaRepo.findById(listaId);
+  if (!lista) throw new HttpError(404, 'Lista no encontrada.');
+  verificarDueno(lista, cedula);
+  verificarInscripcion(lista);
+  verificarEditable(lista);
+
+  const planes = await planRepo.findByLista(listaId);
+  if (planes.length === 0) {
+    throw new HttpError(409, 'Primero crea un plan de trabajo y luego adjunta su PDF.');
+  }
+
+  let destino = planId
+    ? planes.find((p: any) => Number(p.id_plan) === Number(planId))
+    : (planes.length === 1 ? planes[0] : undefined);
+
+  if (planId && !destino) {
+    throw new HttpError(404, 'El plan de trabajo indicado no pertenece a esta lista.');
+  }
+  if (!destino) {
+    throw new HttpError(422, 'La lista tiene varios planes de trabajo: indica id_plan para saber a cuál adjuntar el PDF.');
+  }
+
+  const actualizado = await planRepo.update(destino.id_plan, { archivo_url: archivoUrl });
+  return { archivo_url: archivoUrl, plan: actualizado };
 }

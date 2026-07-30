@@ -2024,6 +2024,118 @@ paths:
         '401': { $ref: '#/components/responses/NoAutenticado' }
         '403': { $ref: '#/components/responses/SinPermiso' }
 
+  /candidato/estudiantes:
+    get:
+      tags: [Portal candidato]
+      summary: Busca posibles integrantes para la lista
+      description: >-
+        Devuelve únicamente cédula, nombres, apellidos y carrera (nunca correo,
+        contraseña ni promedio). Solo incluye estudiantes compatibles con la
+        carrera de la papeleta asignada al candidato y excluye a quienes ya
+        tienen una candidatura activa. Sin papeleta asignada responde 409.
+      parameters:
+        - name: buscar
+          in: query
+          required: true
+          schema: { type: string, minLength: 2 }
+          description: Texto a buscar en nombres, apellidos o cédula (mínimo 2 caracteres).
+      responses:
+        '200':
+          description: Coincidencias (máximo 20)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    cedula:         { type: string }
+                    nombres:        { type: string }
+                    apellidos:      { type: string }
+                    nombre_carrera: { type: string, nullable: true }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '409':
+          description: El candidato no tiene papeleta asignada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422': { description: Falta el parámetro buscar o tiene menos de 2 caracteres }
+
+  /candidato/listas/{listaId}/planes/archivo:
+    parameters:
+      - name: listaId
+        in: path
+        required: true
+        schema: { type: integer }
+    post:
+      tags: [Portal candidato]
+      summary: Adjunta el PDF del plan de trabajo
+      description: >-
+        Sube el documento del plan de trabajo de la lista propia. Solo el
+        candidato dueño de la lista puede subirlo, mientras la lista siga
+        editable y el proceso en inscripción.
+
+
+        Se admite únicamente application/pdf, con un máximo de 10 MB. El archivo
+        se guarda en un volumen persistente del servidor y se publica en
+        /api/uploads/planes/... La URL resultante queda en
+        plan_trabajo.archivo_url.
+
+
+        Si la lista tiene varios planes de trabajo hay que indicar id_plan; con
+        uno solo se usa ese automáticamente.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [archivo]
+              properties:
+                archivo:
+                  type: string
+                  format: binary
+                  description: PDF del plan de trabajo (máximo 10 MB).
+                id_plan:
+                  type: integer
+                  description: Plan al que se adjunta; obligatorio si la lista tiene varios.
+      responses:
+        '201':
+          description: Archivo guardado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  archivo_url: { type: string, example: /api/uploads/planes/8a1a82f8-....pdf }
+                  plan:        { $ref: '#/components/schemas/PlanTrabajo' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403':
+          description: La lista no pertenece al candidato
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: La lista no existe, o el id_plan indicado no es de esa lista
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: >-
+            La lista aún no tiene plan de trabajo, no es editable, o el proceso
+            no está en inscripción
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422':
+          description: >-
+            El archivo no es PDF, supera los 10 MB, falta el campo "archivo", o
+            la lista tiene varios planes y no se indicó id_plan
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
   /candidato/mi-lista:
     get:
       tags: [Portal candidato]

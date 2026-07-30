@@ -8,6 +8,7 @@ import { rateLimiter }   from './middleware/rateLimiter.js';
 import { errorHandler }  from './middleware/errorHandler.js';
 import { registerRoutes } from './routes/index.js';
 import { openapiSpec } from './config/swagger.js';
+import { DIRECTORIO_UPLOADS, prepararDirectorios } from './config/uploads.js';
 
 const app  = express();
 const PORT = Number(process.env.PORT ?? 3000);
@@ -51,6 +52,19 @@ if (process.env.DOCS_ENABLED !== 'false') {
   // El JSON crudo del OpenAPI, por si se necesita para generar clientes o el MCP.
   app.get('/api/openapi.json', (_req, res) => res.json(openapiSpec));
 }
+
+// Archivos subidos (planes de trabajo en PDF). Se sirven bajo /api/ porque
+// Nginx enruta /api/ hacia el backend y el resto hacia el frontend: así no hace
+// falta tocar la configuración del servidor. El directorio debe ser un volumen
+// persistente (ver UPLOADS_DIR en .env.example).
+prepararDirectorios();
+app.use(
+  '/api/uploads',
+  express.static(DIRECTORIO_UPLOADS, {
+    // Los PDF se descargan/abren, no se ejecutan.
+    setHeaders: (res) => res.setHeader('X-Content-Type-Options', 'nosniff'),
+  }),
+);
 
 app.use(express.json());
 app.use(requestLogger);

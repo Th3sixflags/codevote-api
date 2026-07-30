@@ -126,3 +126,46 @@ export async function updatePasswordHash(cedula: string, hash: string) {
     [hash, cedula]
   );
 }
+
+/**
+ * Búsqueda de posibles integrantes para una lista (portal del candidato).
+ * Devuelve SOLO datos mínimos: cédula, nombres, apellidos y carrera. Nunca
+ * contraseñas, correos ni promedios.
+ *
+ * @param carreraCompatible carrera exigida por la papeleta (null = papeleta
+ *        global: cualquier carrera sirve).
+ * @param texto             búsqueda por nombres, apellidos o cédula.
+ */
+export async function buscarPosiblesIntegrantes(
+  carreraCompatible: number | null,
+  texto: string,
+  limite = 20
+) {
+  const patron = `%${texto}%`;
+  const filtroCarrera = carreraCompatible == null ? '' : ' AND e.fk_id_carrera = ?';
+  const params: any[] = [patron, patron, patron];
+  if (carreraCompatible != null) params.push(carreraCompatible);
+  params.push(limite);
+
+  const [rows] = await pool.query(
+    `SELECT e.cedula, e.nombres, e.apellidos, c.nombre_carrera
+     FROM estudiante e
+     LEFT JOIN carrera c ON c.id_carrera = e.fk_id_carrera
+     WHERE (e.nombres LIKE ? OR e.apellidos LIKE ? OR e.cedula LIKE ?)
+       ${filtroCarrera}
+       -- Excluye a quienes ya tienen una candidatura activa.
+       AND NOT EXISTS (
+         SELECT 1 FROM candidato ca
+         JOIN lista_candidata l ON l.id_lista = ca.fk_id_lista
+         JOIN proceso_electoral p ON p.id_proceso = l.fk_id_proceso
+         WHERE ca.fk_cedula_estudiante = e.cedula
+           AND l.estado_revision NOT IN ('rechazada', 'retirada')
+           AND p.estado NOT IN ('finalizado', 'cancelado')
+           AND p.archivado_at IS NULL
+       )
+     ORDER BY e.apellidos, e.nombres
+     LIMIT ?`,
+    params
+  );
+  return rows as any[];
+}
