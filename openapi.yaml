@@ -1425,15 +1425,23 @@ paths:
   /codigos-voto:
     get:
       tags: [Códigos de voto]
-      summary: Lista todos los registros
+      summary: Lista todos los registros (anónimo, requiere rol admin)
+      description: >-
+        Listado de comprobantes emitidos sin ningún dato de identidad: no
+        incluye la cédula ni el nombre del estudiante, ni siquiera para un
+        administrador, y tampoco la opción votada. Sirve para auditar cuántos
+        comprobantes se emitieron, para qué papeleta y en qué estado están, sin
+        permitir reconstruir quién participó. Para ver a qué estudiante
+        pertenece un comprobante concreto están GET /codigos-voto/{id} y
+        GET /codigos-voto/votacion/{votacionId}.
       responses:
         '200':
-          description: Listado
+          description: Listado anónimo
           content:
             application/json:
               schema:
                 type: array
-                items: { $ref: '#/components/schemas/CodigoVoto' }
+                items: { $ref: '#/components/schemas/CodigoVotoAnonimo' }
         '401': { $ref: '#/components/responses/NoAutenticado' }
         '403': { $ref: '#/components/responses/SinPermiso' }
     post:
@@ -1446,10 +1454,10 @@ paths:
             schema: { $ref: '#/components/schemas/CodigoVotoInput' }
       responses:
         '201':
-          description: Creado
+          description: Creado. La respuesta es anónima, aunque la cédula viaje en la petición.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/CodigoVoto' }
+              schema: { $ref: '#/components/schemas/CodigoVotoAnonimo' }
         '401': { $ref: '#/components/responses/NoAutenticado' }
         '403': { $ref: '#/components/responses/SinPermiso' }
         '422': { $ref: '#/components/responses/ValidacionFallida' }
@@ -1457,7 +1465,11 @@ paths:
   /codigos-voto/votacion/{votacionId}:
     get:
       tags: [Códigos de voto]
-      summary: Lista los códigos de una votación
+      summary: Lista los códigos de una votación (anónimo, requiere rol admin)
+      description: >-
+        Comprobantes emitidos en una votación, sin ningún dato de identidad ni
+        la opción votada. Ver la lista permite auditar la participación, no
+        reconstruir quién votó ni qué eligió.
       parameters:
         - name: votacionId
           in: path
@@ -1465,12 +1477,12 @@ paths:
           schema: { type: integer }
       responses:
         '200':
-          description: Listado
+          description: Listado anónimo
           content:
             application/json:
               schema:
                 type: array
-                items: { $ref: '#/components/schemas/CodigoVoto' }
+                items: { $ref: '#/components/schemas/CodigoVotoAnonimo' }
         '401': { $ref: '#/components/responses/NoAutenticado' }
 
   /codigos-voto/{id}:
@@ -1481,13 +1493,17 @@ paths:
         schema: { type: integer }
     get:
       tags: [Códigos de voto]
-      summary: Obtiene un registro por su identificador
+      summary: Obtiene un registro por su identificador (anónimo, requiere rol admin)
+      description: >-
+        Comprobante puntual, sin identidad ni opción votada. Para cotejar el que
+        reporte un estudiante se usan codigo_hash o codigo_verificacion, que son
+        identificadores opacos.
       responses:
         '200':
-          description: Registro encontrado
+          description: Registro encontrado (anónimo)
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/CodigoVoto' }
+              schema: { $ref: '#/components/schemas/CodigoVotoAnonimo' }
         '401': { $ref: '#/components/responses/NoAutenticado' }
         '404': { $ref: '#/components/responses/NoEncontrado' }
     patch:
@@ -1500,10 +1516,10 @@ paths:
             schema: { $ref: '#/components/schemas/CodigoVotoInput' }
       responses:
         '200':
-          description: Actualizado
+          description: Actualizado. La respuesta es anónima.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/CodigoVoto' }
+              schema: { $ref: '#/components/schemas/CodigoVotoAnonimo' }
         '401': { $ref: '#/components/responses/NoAutenticado' }
         '403': { $ref: '#/components/responses/SinPermiso' }
         '404': { $ref: '#/components/responses/NoEncontrado' }
@@ -3240,31 +3256,33 @@ components:
           minLength: 10
           maxLength: 10
 
-    CodigoVoto:
+    # Comprobante tal como lo devuelven TODOS los endpoints de administración
+    # (listado, puntual, por votación, creación y actualización): sin cédula,
+    # sin nombre, sin correo, sin lista ni candidato y sin la opción votada, ni
+    # siquiera para un administrador.
+    CodigoVotoAnonimo:
       type: object
       properties:
         id_codigo:
           type: integer
-        fk_id_votacion:
-          type: integer
+        titulo_papeleta:
+          type: string
+          description: Papeleta a la que corresponde el comprobante.
         codigo_hash:
           type: string
           maxLength: 255
-          description: Hash interno de auditoría. Nunca se expone al estudiante.
+          description: Hash interno de auditoría, opaco. Por sí solo no identifica a nadie.
         codigo_verificacion:
           type: string
           format: uuid
-          description: Código público del comprobante (UUID v4), visible también para el estudiante.
+          description: Código público del comprobante (UUID v4), para cotejar el que reporte un estudiante.
         estado_codigo:
           type: string
           enum: ["generado", "enviado", "usado", "expirado"]
         fecha_envio:
           type: string
+          description: Fecha de emisión del comprobante.
           example: "2026-07-01 08:00:00"
-        fk_cedula_estudiante:
-          type: string
-          minLength: 10
-          maxLength: 10
 
     # Comprobante tal como lo ve el estudiante en "Mis Recibos": NO incluye
     # codigo_hash (reservado a la auditoría administrativa) ni la opción votada.

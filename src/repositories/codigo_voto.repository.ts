@@ -2,31 +2,40 @@ import { randomUUID } from 'node:crypto';
 import { pool } from '../config/database.js';
 import { CrearCodigoVotoDTO, ActualizarCodigoVotoDTO } from '../schemas/codigo_voto.schema.js';
 
-// Consulta de AUDITORÍA (solo admin): incluye codigo_hash y el código público
-// de verificación, para poder cotejar el que reporte un estudiante.
-const BASE_QUERY = `
+/**
+ * Consulta ANÓNIMA de comprobantes, usada por las tres vistas de administración
+ * (listado general, comprobante puntual y comprobantes de una votación).
+ *
+ * Ningún endpoint de admin devuelve identidad: no se selecciona
+ * `fk_cedula_estudiante`, ni se une con `estudiante` (nombres, apellidos,
+ * correo), ni con `voto`, `lista_candidata` o `candidato`. Un administrador
+ * puede auditar cuántos comprobantes se emitieron, para qué papeleta y en qué
+ * estado están, pero no reconstruir quién participó ni qué eligió.
+ *
+ * Se conservan `codigo_hash` y `codigo_verificacion` porque son identificadores
+ * opacos: sirven para cotejar el comprobante que reporte un estudiante y por sí
+ * solos no revelan identidad ni elección.
+ */
+const CONSULTA_ANONIMA = `
   SELECT
-    cv.id_codigo, cv.codigo_hash, cv.codigo_verificacion, cv.estado_codigo, cv.fecha_envio,
-    cv.fk_id_votacion, v.titulo_papeleta, v.fecha_cierre,
-    p.id_proceso, p.nombre_proceso,
-    cv.fk_cedula_estudiante
+    cv.id_codigo, v.titulo_papeleta, cv.codigo_hash, cv.codigo_verificacion,
+    cv.estado_codigo, cv.fecha_envio
   FROM codigo_voto cv
   JOIN votacion v ON v.id_votacion = cv.fk_id_votacion
-  JOIN proceso_electoral p ON p.id_proceso = v.fk_id_proceso
 `;
 
 export async function findAll() {
-  const [rows] = await pool.query(BASE_QUERY + ' ORDER BY cv.id_codigo');
+  const [rows] = await pool.query(CONSULTA_ANONIMA + ' ORDER BY cv.id_codigo');
   return rows as any[];
 }
 
 export async function findById(id: number) {
-  const [rows] = await pool.query(BASE_QUERY + ' WHERE cv.id_codigo = ?', [id]) as [any[], any];
+  const [rows] = await pool.query(CONSULTA_ANONIMA + ' WHERE cv.id_codigo = ?', [id]) as [any[], any];
   return rows[0] ?? null;
 }
 
 export async function findByVotacion(id: number) {
-  const [rows] = await pool.query(BASE_QUERY + ' WHERE cv.fk_id_votacion = ?', [id]);
+  const [rows] = await pool.query(CONSULTA_ANONIMA + ' WHERE cv.fk_id_votacion = ?', [id]);
   return rows as any[];
 }
 
