@@ -466,10 +466,12 @@ paths:
         Con ?estado=archivados devuelve solo los archivados.
 
 
-        Segmentación por carrera: la administración ve todos los procesos; el
-        estudiante ve únicamente los globales (sin carrera) y los de su propia
-        carrera. Un proceso de otra carrera se responde como 404 al pedirlo por
-        identificador, para no revelar su existencia.
+        Segmentación por carrera: el proceso es general y la carrera se define en
+        cada votación (papeleta) que contiene. La administración ve todos los
+        procesos; el estudiante ve solo aquellos que tengan al menos una papeleta
+        global o de su propia carrera (un proceso sin votaciones también se
+        muestra, porque aún se está preparando). Un proceso que no le
+        corresponde responde 404 al pedirlo por identificador.
       parameters:
         - name: estado
           in: query
@@ -743,6 +745,28 @@ paths:
       summary: Lista las listas candidatas de un proceso
       parameters:
         - name: procesoId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Listado
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ListaCandidata' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+
+  /listas-candidatas/votacion/{votacionId}:
+    get:
+      tags: [Listas candidatas]
+      summary: Listas que compiten en una papeleta
+      description: >-
+        Devuelve las listas de esa votación. El estudiante solo recibe las de
+        papeletas globales o de su propia carrera; la administración ve todas.
+      parameters:
+        - name: votacionId
           in: path
           required: true
           schema: { type: integer }
@@ -1690,7 +1714,11 @@ paths:
   /votaciones/proceso/{procesoId}:
     get:
       tags: [Votaciones]
-      summary: Lista las votaciones de un proceso electoral
+      summary: Lista las votaciones (papeletas) de un proceso electoral
+      description: >-
+        Cada votación es una papeleta/categoría del proceso. El estudiante recibe
+        solo las papeletas globales y la de su carrera; la administración ve
+        todas.
       parameters:
         - name: procesoId
           in: path
@@ -1761,9 +1789,10 @@ paths:
         devuelve al estudiante (el voto es secreto); queda solo para auditoría.
 
 
-        Segmentación por carrera: en una votación de un proceso de representante
-        de carrera solo pueden votar los estudiantes de esa carrera (403 en caso
-        contrario). Se valida en el backend, sin depender del frontend.
+        Segmentación por carrera: cada papeleta puede ser global o de una carrera;
+        solo los estudiantes de esa carrera pueden votarla (403 en caso
+        contrario). Además la lista elegida debe competir en esa misma papeleta
+        (400 si no). Todo se valida en el backend, sin depender del frontend.
       requestBody:
         required: true
         content:
@@ -2282,6 +2311,13 @@ components:
         motivo_bloqueo:
           type: string
           nullable: true
+        fk_id_carrera:
+          type: integer
+          nullable: true
+          description: Carrera de la papeleta (null si es global).
+        nombre_carrera:
+          type: string
+          nullable: true
         id_votacion:     { type: integer }
         titulo_papeleta: { type: string }
         fecha_apertura:  { type: string, format: date-time }
@@ -2299,6 +2335,14 @@ components:
         fecha_apertura:  { type: string, example: "2026-07-01 08:00:00" }
         fecha_cierre:    { type: string, example: "2026-07-02 17:00:00" }
         estado:          { type: string, enum: ["pendiente", "abierta", "cerrada"] }
+        fk_id_carrera:
+          type: integer
+          nullable: true
+          description: >-
+            Categoría de la papeleta. null = global (votan todos); con valor =
+            solo los estudiantes de esa carrera (p. ej. "Representante TICs").
+            No puede haber dos papeletas de la misma carrera en un mismo proceso
+            (409).
 
     Voto:
       type: object
@@ -2542,9 +2586,8 @@ components:
           type: integer
           nullable: true
           description: >-
-            Carrera del proceso. OBLIGATORIA cuando tipo_proceso es
-            representante_carrera; debe ser null en los procesos globales
-            (consejo_estudiantil y referendum). Incumplirlo devuelve 422.
+            SIN USO (deprecado). La carrera se define en cada votación/papeleta
+            del proceso. Debe enviarse null; cualquier otro valor devuelve 422.
         fecha_inicio_inscripcion:
           type: string
           nullable: true
@@ -2603,11 +2646,7 @@ components:
         fk_id_carrera:
           type: integer
           nullable: true
-          description: Carrera del proceso; null en los procesos globales.
-        nombre_carrera:
-          type: string
-          nullable: true
-          description: Nombre de la carrera del proceso (null en los globales).
+          description: SIN USO (deprecado); siempre null. La carrera vive en cada votación.
         fecha_inicio_inscripcion:
           type: string
           nullable: true
@@ -2660,10 +2699,13 @@ components:
 
     ListaCandidataInput:
       type: object
-      required: [fk_id_proceso, nombre_lista, fecha_inscripcion]
+      required: [fk_id_votacion, nombre_lista, fecha_inscripcion]
       properties:
-        fk_id_proceso:
+        fk_id_votacion:
           type: integer
+          description: >-
+            Papeleta en la que compite la lista. El proceso y la carrera se
+            derivan de ella, así que NO se envían.
         nombre_lista:
           type: string
           maxLength: 80
@@ -2722,12 +2764,19 @@ components:
           nullable: true
           maxLength: 255
           description: Imagen principal de la lista (URL https) o null.
-        carrera_proceso:
+        fk_id_votacion:
+          type: integer
+          nullable: true
+          description: Papeleta en la que compite la lista.
+        titulo_papeleta:
+          type: string
+          nullable: true
+        carrera_votacion:
           type: integer
           nullable: true
           description: >-
-            Carrera del proceso al que pertenece la lista (no se guarda en la
-            lista: se obtiene del proceso electoral). Las listas de un proceso de
+            Carrera de la papeleta en la que compite la lista (no se guarda en la
+            lista: se obtiene de la votación). Las listas de una papeleta de
             carrera solo se devuelven a estudiantes de esa carrera.
         nombre_carrera:
           type: string

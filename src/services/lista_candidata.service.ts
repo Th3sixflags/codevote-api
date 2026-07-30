@@ -1,4 +1,5 @@
 import * as repo from '../repositories/lista_candidata.repository.js';
+import * as votacionRepo from '../repositories/votacion.repository.js';
 import * as borradoRepo from '../repositories/borrado.repository.js';
 import type { FiltroCarrera } from '../repositories/lista_candidata.repository.js';
 import { procesoVisible } from '../utils/accesoCarrera.js';
@@ -22,8 +23,19 @@ export async function listarPorProceso(procesoId: number, filtro: FiltroCarrera 
   return repo.findByProceso(procesoId, filtro);
 }
 
+/**
+ * Crea una lista dentro de una papeleta. El proceso se deriva de la votación,
+ * así la lista nunca queda asociada a un proceso que no corresponde.
+ */
 export async function crearLista(data: CrearListaDTO) {
-  return repo.create(data);
+  const votacion = await votacionRepo.findById(data.fk_id_votacion);
+  if (!votacion) throw new HttpError(404, 'La votación indicada no existe.');
+  return repo.create(data, votacion.id_proceso);
+}
+
+/** Listas que compiten en una papeleta (filtradas por carrera de quien consulta). */
+export async function listarPorVotacion(votacionId: number, filtro: FiltroCarrera = undefined) {
+  return repo.findByVotacion(votacionId, filtro);
 }
 
 export async function actualizarLista(id: number, data: ActualizarListaDTO) {

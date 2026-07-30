@@ -69,8 +69,9 @@ CREATE TABLE proceso_electoral (
   -- Marca de archivado: un proceso finalizado/cancelado se archiva (deja de
   -- aparecer en consultas activas) sin borrar su información histórica.
   archivado_at DATETIME NULL DEFAULT NULL,
-  -- Segmentación por carrera: NULL en procesos globales (consejo estudiantil,
-  -- referéndum) y obligatoria en los de representante de carrera.
+  -- SIN USO desde 2026-07-30: la segmentación por carrera vive en votacion
+  -- (cada papeleta representa una categoría/carrera). Se conserva la columna
+  -- por compatibilidad, pero debe permanecer NULL.
   fk_id_carrera INT NULL DEFAULT NULL,
   -- Periodo de inscripción de listas y posesión de los electos.
   fecha_inicio_inscripcion DATETIME NULL DEFAULT NULL,
@@ -92,6 +93,9 @@ CREATE TABLE cronograma (
 );
 
 -- 8. votacion
+-- Cada votación es una papeleta/categoría del proceso. fk_id_carrera define a
+-- quién le corresponde: NULL = papeleta global (todos votan); con valor = solo
+-- los estudiantes de esa carrera (p. ej. "Representante TICs").
 CREATE TABLE votacion (
   id_votacion INT AUTO_INCREMENT PRIMARY KEY,
   fk_id_proceso INT NOT NULL,
@@ -99,7 +103,12 @@ CREATE TABLE votacion (
   fecha_apertura DATETIME NOT NULL,
   fecha_cierre DATETIME NOT NULL,
   estado VARCHAR(20) NOT NULL DEFAULT 'pendiente',
-  CONSTRAINT fk_votacion_proceso FOREIGN KEY (fk_id_proceso) REFERENCES proceso_electoral(id_proceso)
+  fk_id_carrera INT NULL DEFAULT NULL,
+  CONSTRAINT fk_votacion_proceso FOREIGN KEY (fk_id_proceso) REFERENCES proceso_electoral(id_proceso),
+  CONSTRAINT fk_votacion_carrera FOREIGN KEY (fk_id_carrera) REFERENCES carrera(id_carrera),
+  -- No puede haber dos papeletas de la misma carrera en un mismo proceso.
+  -- (MySQL admite varios NULL, así que las globales no se restringen.)
+  CONSTRAINT uq_votacion_proceso_carrera UNIQUE (fk_id_proceso, fk_id_carrera)
 );
 
 -- 9. lista_candidata
@@ -114,7 +123,11 @@ CREATE TABLE lista_candidata (
   motivo_rechazo VARCHAR(250) NULL DEFAULT NULL,       -- Observación del admin al rechazar
   fk_cedula_responsable CHAR(10) NULL DEFAULT NULL,    -- Candidato dueño de la lista (portal candidato)
   foto_url VARCHAR(255) NULL DEFAULT NULL,             -- Imagen principal de la lista (URL https)
+  -- Papeleta en la que compite la lista. De aquí se deriva su carrera; por eso
+  -- la carrera NO se duplica en esta tabla.
+  fk_id_votacion INT NULL DEFAULT NULL,
   CONSTRAINT fk_lista_proceso FOREIGN KEY (fk_id_proceso) REFERENCES proceso_electoral(id_proceso),
+  CONSTRAINT fk_lista_votacion FOREIGN KEY (fk_id_votacion) REFERENCES votacion(id_votacion),
   CONSTRAINT fk_lista_responsable FOREIGN KEY (fk_cedula_responsable) REFERENCES estudiante(cedula)
 );
 

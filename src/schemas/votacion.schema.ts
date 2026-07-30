@@ -6,6 +6,9 @@ const votacionBase = z.object({
   fecha_apertura:  z.string().regex(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/, 'Formato: YYYY-MM-DD HH:MM:SS'),
   fecha_cierre:    z.string().regex(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/, 'Formato: YYYY-MM-DD HH:MM:SS'),
   estado:          z.enum(['pendiente', 'abierta', 'cerrada']).optional(),
+  // Categoría de la papeleta: null = global (votan todos); con valor = solo los
+  // estudiantes de esa carrera (p. ej. "Representante TICs").
+  fk_id_carrera:   z.union([z.number().int().positive(), z.null()]).optional(),
 });
 
 // El cierre debe ser posterior a la apertura (formato fijo => comparar como texto sirve).

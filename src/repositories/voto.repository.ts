@@ -71,13 +71,14 @@ export async function createConComprobante(data: CrearVotoDTO, cedula: string) {
   }
 }
 
-/** ¿La lista pertenece al mismo proceso electoral que la votación? */
+/**
+ * ¿La lista compite exactamente en esa papeleta? Ahora cada lista pertenece a
+ * una votación concreta, así que la comprobación es directa (antes se deducía
+ * por el proceso, lo que permitía votar por una lista de otra categoría).
+ */
 export async function listaPerteneceAVotacion(listaId: number, votacionId: number): Promise<boolean> {
   const [rows] = await pool.query(
-    `SELECT 1
-     FROM lista_candidata l
-     JOIN votacion v ON v.fk_id_proceso = l.fk_id_proceso
-     WHERE l.id_lista = ? AND v.id_votacion = ? LIMIT 1`,
+    'SELECT 1 FROM lista_candidata WHERE id_lista = ? AND fk_id_votacion = ? LIMIT 1',
     [listaId, votacionId]
   ) as [any[], any];
   return rows.length > 0;
@@ -89,9 +90,9 @@ export async function listaPerteneceAVotacion(listaId: number, votacionId: numbe
  */
 export async function estadoDeVotacion(
   votacionId: number
-): Promise<{ votacion: string; proceso: string; carrera_proceso: number | null } | null> {
+): Promise<{ votacion: string; proceso: string; carrera_votacion: number | null } | null> {
   const [rows] = await pool.query(
-    `SELECT v.estado AS votacion, p.estado AS proceso, p.fk_id_carrera AS carrera_proceso
+    `SELECT v.estado AS votacion, p.estado AS proceso, v.fk_id_carrera AS carrera_votacion
      FROM votacion v
      JOIN proceso_electoral p ON p.id_proceso = v.fk_id_proceso
      WHERE v.id_votacion = ?`,

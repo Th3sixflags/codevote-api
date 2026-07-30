@@ -7,6 +7,7 @@ const router = Router();
 router.get('/',                    requireAuth,              ctrl.listar);
 router.get('/:id',                 requireAuth,              ctrl.obtener);
 router.get('/proceso/:procesoId',  requireAuth,              ctrl.listarPorProceso);
+router.get('/votacion/:votacionId', requireAuth,             ctrl.listarPorVotacion);
 router.post('/',                   requireAuth, requireAdmin, ctrl.crear);
 // Revisión administrativa (rutas específicas antes de la genérica /:id)
 router.patch('/:id/aprobar',       requireAuth, requireAdmin, ctrl.aprobar);

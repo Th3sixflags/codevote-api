@@ -11,9 +11,9 @@ const procesoBase = z.object({
   fecha_fin_votacion:    z.string().regex(FECHA_HORA, 'Formato: YYYY-MM-DD HH:MM:SS'),
   estado:                z.enum(['planificado', 'convocado', 'inscripcion', 'campaña', 'votacion', 'escrutinio', 'finalizado', 'cancelado']).optional(),
   descripcion:           z.string().max(250).optional(),
-  // Segmentación por carrera: null en procesos globales, obligatoria en los de
-  // representante de carrera.
-  fk_id_carrera:            z.union([z.number().int().positive(), z.null()]).optional(),
+  // SIN USO: la carrera vive en cada votación (papeleta) del proceso. Se acepta
+  // solo como null para no romper clientes antiguos.
+  fk_id_carrera:            z.null().optional(),
   // Periodo de inscripción de listas y posesión de los electos.
   fecha_inicio_inscripcion: z.union([z.string().regex(FECHA_HORA, 'Formato: YYYY-MM-DD HH:MM:SS'), z.null()]).optional(),
   fecha_fin_inscripcion:    z.union([z.string().regex(FECHA_HORA, 'Formato: YYYY-MM-DD HH:MM:SS'), z.null()]).optional(),
@@ -27,25 +27,17 @@ type ProcesoParcial = z.infer<typeof procesoBase> extends infer T ? Partial<T> :
  * actualizar; en la actualización solo se comprueban los campos presentes.
  */
 function reglas(v: ProcesoParcial, ctx: z.RefinementCtx) {
-  // 1. Carrera según el tipo de proceso.
-  if (v.tipo_proceso === 'representante_carrera') {
-    if (v.fk_id_carrera === null || v.fk_id_carrera === undefined) {
-      // En una actualización parcial solo se exige si se envía el tipo.
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['fk_id_carrera'],
-        message: 'Un proceso de representante de carrera requiere indicar la carrera.',
-      });
-    }
-  } else if (v.tipo_proceso && v.fk_id_carrera != null) {
+  // El proceso NO lleva carrera: un proceso de representantes es general y su
+  // segmentación se define en cada votación (papeleta) que contiene.
+  if (v.fk_id_carrera != null) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ['fk_id_carrera'],
-      message: 'Un proceso global (consejo estudiantil o referéndum) no debe tener carrera.',
+      message: 'El proceso no lleva carrera: la carrera se define en cada votación (papeleta) del proceso.',
     });
   }
 
-  // 2. Secuencia de fechas: convocatoria → inscripción → votación → posesión.
+  // Secuencia de fechas: convocatoria → inscripción → votación → posesión.
   //    El formato es fijo, así que comparar como texto respeta el orden.
   const convocatoria = v.fecha_convocatoria ? `${v.fecha_convocatoria} 00:00:00` : undefined;
   const secuencia: Array<[string, string | undefined | null]> = [

@@ -9,10 +9,12 @@ const CARGO = z.enum(['presidente', 'vicepresidente', 'secretario', 'tesorero', 
 const AREA  = z.enum(['academico', 'deportivo', 'cultural', 'infraestructura', 'social']);
 
 export const crearListaCandidatoSchema = z.object({
-  fk_id_proceso: z.number().int().positive(),
-  nombre_lista:  z.string().min(1).max(80),
-  lema:          z.string().max(120).optional(),
-  foto_url:      urlImagenHttpsSchema.optional(),
+  // El candidato elige la papeleta (categoría) en la que compite. El proceso y
+  // la carrera se derivan de ella: no se vuelven a pedir.
+  fk_id_votacion: z.number().int().positive(),
+  nombre_lista:   z.string().min(1).max(80),
+  lema:           z.string().max(120).optional(),
+  foto_url:       urlImagenHttpsSchema.optional(),
 });
 
 export const actualizarListaCandidatoSchema = z.object({

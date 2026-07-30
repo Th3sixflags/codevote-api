@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { crearVotacionSchema, actualizarVotacionSchema } from '../schemas/votacion.schema.js';
 import * as service from '../services/votacion.service.js';
+import { filtroCarreraDe } from '../utils/accesoCarrera.js';
 
 export async function listar(_req: Request, res: Response) {
   const votaciones = await service.listarVotaciones();
@@ -8,7 +9,8 @@ export async function listar(_req: Request, res: Response) {
 }
 
 export async function obtener(req: Request, res: Response) {
-  const votacion = await service.obtenerVotacion(Number(req.params.id));
+  // Una papeleta de otra carrera se responde como no encontrada.
+  const votacion = await service.obtenerVotacion(Number(req.params.id), await filtroCarreraDe(req));
   if (!votacion) {
     res.status(404).json({ error: 'Votación no encontrada.' });
     return;
@@ -17,7 +19,8 @@ export async function obtener(req: Request, res: Response) {
 }
 
 export async function listarPorProceso(req: Request, res: Response) {
-  const votaciones = await service.listarPorProceso(Number(req.params.procesoId));
+  // El estudiante recibe solo las papeletas globales y la de su carrera.
+  const votaciones = await service.listarPorProceso(Number(req.params.procesoId), await filtroCarreraDe(req));
   res.json(votaciones);
 }
 

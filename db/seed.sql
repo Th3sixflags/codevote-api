@@ -76,10 +76,12 @@ INSERT INTO votacion (fk_id_proceso, titulo_papeleta, fecha_apertura, fecha_cier
 (2, 'Papeleta Referéndum', '2025-06-01 08:00:00', '2025-06-02 17:00:00', 'cerrada');
 
 -- 9. lista_candidata
-INSERT INTO lista_candidata (fk_id_proceso, nombre_lista, lema, estado_revision, fecha_inscripcion) VALUES 
-(1, 'Innovación UIDE', 'Hacia el futuro', 'aprobada', '2026-06-06'),
-(1, 'Unidad Estudiantil', 'Juntos somos más', 'aprobada', '2026-06-08'),
-(2, 'Opción SÍ', 'Mejores estatutos', 'aprobada', '2025-05-06');
+-- Cada lista compite en una papeleta concreta (fk_id_votacion); su carrera se
+-- deriva de esa votación.
+INSERT INTO lista_candidata (fk_id_proceso, fk_id_votacion, nombre_lista, lema, estado_revision, fecha_inscripcion) VALUES
+(1, 1, 'Innovación UIDE', 'Hacia el futuro', 'aprobada', '2026-06-06'),
+(1, 1, 'Unidad Estudiantil', 'Juntos somos más', 'aprobada', '2026-06-08'),
+(2, 2, 'Opción SÍ', 'Mejores estatutos', 'aprobada', '2025-05-06');
 
 -- 10. candidato
 INSERT INTO candidato (cargo, cumple_requisitos, foto_url, fk_cedula_estudiante, fk_id_lista) VALUES 

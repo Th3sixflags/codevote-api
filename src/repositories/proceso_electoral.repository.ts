@@ -44,10 +44,28 @@ function conBloqueo(row: any) {
   };
 }
 
+/**
+ * El proceso es visible para un estudiante si contiene al menos una papeleta que
+ * le corresponda: una global (sin carrera) o la de su carrera. Un proceso sin
+ * votaciones todavía se muestra, porque aún se está preparando.
+ */
 function condicionCarrera(filtro: FiltroCarrera): { sql: string; params: any[] } {
   if (filtro === undefined) return { sql: '', params: [] };
-  if (filtro === null) return { sql: ' AND p.fk_id_carrera IS NULL', params: [] };
-  return { sql: ' AND (p.fk_id_carrera IS NULL OR p.fk_id_carrera = ?)', params: [filtro] };
+
+  const sinVotaciones = 'NOT EXISTS(SELECT 1 FROM votacion vv WHERE vv.fk_id_proceso = p.id_proceso)';
+  if (filtro === null) {
+    return {
+      sql: ` AND (${sinVotaciones} OR EXISTS(SELECT 1 FROM votacion vv
+              WHERE vv.fk_id_proceso = p.id_proceso AND vv.fk_id_carrera IS NULL))`,
+      params: [],
+    };
+  }
+  return {
+    sql: ` AND (${sinVotaciones} OR EXISTS(SELECT 1 FROM votacion vv
+            WHERE vv.fk_id_proceso = p.id_proceso
+              AND (vv.fk_id_carrera IS NULL OR vv.fk_id_carrera = ?)))`,
+    params: [filtro],
+  };
 }
 
 /** Listado general: excluye los archivados (que solo se ven en el historial). */
@@ -109,6 +127,31 @@ export async function archivar(id: number) {
 export async function findById(id: number) {
   const [rows] = await pool.query(`${BASE_QUERY} WHERE p.id_proceso = ?`, [id]) as [any[], any];
   return conBloqueo(rows[0] ?? null);
+}
+
+/**
+ * ¿El proceso contiene alguna papeleta que corresponda a ese filtro de carrera?
+ * La administración (undefined) siempre puede verlo; un proceso sin votaciones
+ * también, porque todavía se está preparando.
+ */
+export async function tieneVotacionVisible(procesoId: number, filtro: FiltroCarrera): Promise<boolean> {
+  if (filtro === undefined) return true;
+
+  const [total] = await pool.query(
+    'SELECT COUNT(*) AS n FROM votacion WHERE fk_id_proceso = ?',
+    [procesoId]
+  ) as [any[], any];
+  if (Number(total[0]?.n ?? 0) === 0) return true;
+
+  const condicion = filtro === null
+    ? 'fk_id_carrera IS NULL'
+    : '(fk_id_carrera IS NULL OR fk_id_carrera = ?)';
+  const params = filtro === null ? [procesoId] : [procesoId, filtro];
+  const [rows] = await pool.query(
+    `SELECT 1 FROM votacion WHERE fk_id_proceso = ? AND ${condicion} LIMIT 1`,
+    params
+  ) as [any[], any];
+  return rows.length > 0;
 }
 
 export async function create(data: CrearProcesoDTO) {

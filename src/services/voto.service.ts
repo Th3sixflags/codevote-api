@@ -21,10 +21,10 @@ export async function registrarVoto(data: CrearVotoDTO, cedula: string, filtro: 
     throw new HttpError(409, 'El proceso electoral no está activo.');
   }
 
-  // Segmentación por carrera: en un proceso de representante de carrera solo
-  // pueden votar los estudiantes de esa carrera. Se comprueba en el backend y
-  // no se delega al frontend.
-  if (!procesoVisible(estado.carrera_proceso, filtro)) {
+  // Segmentación por carrera: cada papeleta puede ser global o de una carrera.
+  // Solo los estudiantes de esa carrera pueden votarla. Se comprueba en el
+  // backend y no se delega al frontend.
+  if (!procesoVisible(estado.carrera_votacion, filtro)) {
     throw new HttpError(403, 'Esta votación corresponde a otra carrera.');
   }
 

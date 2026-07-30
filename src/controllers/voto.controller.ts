@@ -41,7 +41,7 @@ export async function resultados(req: Request, res: Response) {
   if (!ROLES_PRIVILEGIADOS.includes(rol)) {
     const estado = await service.estadoResultados(votacionId);
     if (estado) {
-      if (!procesoVisible(estado.carrera_proceso, await filtroCarreraDe(req))) {
+      if (!procesoVisible(estado.carrera_votacion, await filtroCarreraDe(req))) {
         res.status(403).json({ error: 'Esta votación corresponde a otra carrera.' });
         return;
       }

@@ -20,11 +20,14 @@ export async function listarProcesos(estado?: string, filtro: FiltroCarrera = un
   return repo.findAll(filtro);
 }
 
-/** Devuelve el proceso solo si es visible para quien consulta. */
+/**
+ * Devuelve el proceso solo si es visible para quien consulta: debe contener al
+ * menos una papeleta global o de su carrera.
+ */
 export async function obtenerProceso(id: number, filtro: FiltroCarrera = undefined) {
   const proceso = await repo.findById(id);
   if (!proceso) return null;
-  if (!procesoVisible(proceso.fk_id_carrera, filtro)) return null;
+  if (!(await repo.tieneVotacionVisible(id, filtro))) return null;
   return proceso;
 }
 
@@ -35,19 +38,6 @@ export async function crearProceso(data: CrearProcesoDTO) {
 export async function actualizarProceso(id: number, data: ActualizarProcesoDTO) {
   const existente = await repo.findById(id);
   if (!existente) return null;
-
-  // El esquema valida la regla de carrera cuando el body trae `tipo_proceso`.
-  // En una actualización parcial hay que comprobarla contra el estado real:
-  // p. ej. asignar carrera a un proceso de consejo, o quitársela a uno de
-  // representante de carrera.
-  const tipoFinal = data.tipo_proceso ?? existente.tipo_proceso;
-  const carreraFinal = data.fk_id_carrera !== undefined ? data.fk_id_carrera : existente.fk_id_carrera;
-  if (tipoFinal === 'representante_carrera' && carreraFinal == null) {
-    throw new HttpError(422, 'Un proceso de representante de carrera requiere indicar la carrera.');
-  }
-  if (tipoFinal !== 'representante_carrera' && carreraFinal != null) {
-    throw new HttpError(422, 'Un proceso global (consejo estudiantil o referéndum) no debe tener carrera.');
-  }
 
   const actualizado = await repo.update(id, data);
 

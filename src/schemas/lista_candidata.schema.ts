@@ -2,7 +2,8 @@ import { z } from 'zod';
 import { urlImagenHttpsSchema } from './common.js';
 
 export const crearListaSchema = z.object({
-  fk_id_proceso:     z.number().int().positive(),
+  // La lista compite en una papeleta concreta; el proceso se deriva de ella.
+  fk_id_votacion:    z.number().int().positive(),
   nombre_lista:      z.string().min(1).max(80),
   lema:              z.string().max(120).optional(),
   estado_revision:   z.string().max(30).optional(),

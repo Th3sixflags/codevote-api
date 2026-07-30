@@ -23,6 +23,12 @@ export async function listarPorProceso(req: Request, res: Response) {
   res.json(listas);
 }
 
+/** Listas que compiten en una papeleta concreta. */
+export async function listarPorVotacion(req: Request, res: Response) {
+  const listas = await service.listarPorVotacion(Number(req.params.votacionId), await filtroCarreraDe(req));
+  res.json(listas);
+}
+
 export async function crear(req: Request, res: Response) {
   const data  = crearListaSchema.parse(req.body);
   const nueva = await service.crearLista(data);
