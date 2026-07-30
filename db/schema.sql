@@ -68,7 +68,15 @@ CREATE TABLE proceso_electoral (
   descripcion VARCHAR(250),
   -- Marca de archivado: un proceso finalizado/cancelado se archiva (deja de
   -- aparecer en consultas activas) sin borrar su información histórica.
-  archivado_at DATETIME NULL DEFAULT NULL
+  archivado_at DATETIME NULL DEFAULT NULL,
+  -- Segmentación por carrera: NULL en procesos globales (consejo estudiantil,
+  -- referéndum) y obligatoria en los de representante de carrera.
+  fk_id_carrera INT NULL DEFAULT NULL,
+  -- Periodo de inscripción de listas y posesión de los electos.
+  fecha_inicio_inscripcion DATETIME NULL DEFAULT NULL,
+  fecha_fin_inscripcion DATETIME NULL DEFAULT NULL,
+  fecha_posesion DATETIME NULL DEFAULT NULL,
+  CONSTRAINT fk_proceso_carrera FOREIGN KEY (fk_id_carrera) REFERENCES carrera(id_carrera)
 );
 
 -- 7. cronograma

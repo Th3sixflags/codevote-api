@@ -1,16 +1,21 @@
 import { Request, Response } from 'express';
 import { crearProcesoSchema, actualizarProcesoSchema } from '../schemas/proceso_electoral.schema.js';
 import * as service from '../services/proceso_electoral.service.js';
+import { filtroCarreraDe } from '../utils/accesoCarrera.js';
 
 export async function listar(req: Request, res: Response) {
-  // Filtro opcional: ?estado=actuales | finalizados. Sin filtro devuelve todos.
+  // Filtro opcional: ?estado=actuales | finalizados | archivados.
+  // Además se filtra por carrera: el estudiante solo ve los procesos globales y
+  // los de su propia carrera; la administración ve todos.
   const estado = typeof req.query.estado === 'string' ? req.query.estado : undefined;
-  const procesos = await service.listarProcesos(estado);
+  const procesos = await service.listarProcesos(estado, await filtroCarreraDe(req));
   res.json(procesos);
 }
 
 export async function obtener(req: Request, res: Response) {
-  const proceso = await service.obtenerProceso(Number(req.params.id));
+  // Un proceso de otra carrera se responde como no encontrado, para no revelar
+  // su existencia a quien no puede participar en él.
+  const proceso = await service.obtenerProceso(Number(req.params.id), await filtroCarreraDe(req));
   if (!proceso) {
     res.status(404).json({ error: 'Proceso electoral no encontrado.' });
     return;

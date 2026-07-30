@@ -83,12 +83,15 @@ export async function listaPerteneceAVotacion(listaId: number, votacionId: numbe
   return rows.length > 0;
 }
 
-/** Estado de la votación y de su proceso, para decidir si se pueden ver resultados. */
+/**
+ * Estado de la votación y de su proceso, más la carrera del proceso, para
+ * decidir si se puede votar y si se pueden ver los resultados.
+ */
 export async function estadoDeVotacion(
   votacionId: number
-): Promise<{ votacion: string; proceso: string } | null> {
+): Promise<{ votacion: string; proceso: string; carrera_proceso: number | null } | null> {
   const [rows] = await pool.query(
-    `SELECT v.estado AS votacion, p.estado AS proceso
+    `SELECT v.estado AS votacion, p.estado AS proceso, p.fk_id_carrera AS carrera_proceso
      FROM votacion v
      JOIN proceso_electoral p ON p.id_proceso = v.fk_id_proceso
      WHERE v.id_votacion = ?`,

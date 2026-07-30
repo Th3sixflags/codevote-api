@@ -40,6 +40,13 @@ export async function crearCandidato(data: CrearCandidatoDTO) {
     throw new HttpError(409, 'Este estudiante ya es candidato en esta lista.');
   }
 
+  // Una sola candidatura activa a la vez (no puede estar en Consejo y en
+  // representante de carrera simultáneamente). Misma regla que en el portal.
+  const activa = await repo.candidaturaActiva(data.fk_cedula_estudiante);
+  if (activa) {
+    throw new HttpError(409, `Este estudiante ya tiene una candidatura activa en "${activa.nombre_proceso}" (lista "${activa.nombre_lista}"). Solo se permite una candidatura a la vez.`);
+  }
+
   return repo.create(data);
 }
 

@@ -1,21 +1,30 @@
 import * as repo from '../repositories/proceso_electoral.repository.js';
+import type { FiltroCarrera } from '../repositories/proceso_electoral.repository.js';
 import * as notificaciones from './notificacion.service.js';
 import { HttpError } from '../utils/httpError.js';
+import { procesoVisible } from '../utils/accesoCarrera.js';
 import { CrearProcesoDTO, ActualizarProcesoDTO } from '../schemas/proceso_electoral.schema.js';
 
 // Un proceso solo puede archivarse cuando ya no está activo.
 const ARCHIVABLES = ['finalizado', 'cancelado'];
 
-export async function listarProcesos(estado?: string) {
-  if (estado === 'actuales') return repo.findActuales();
-  if (estado === 'finalizados') return repo.findFinalizados();
-  if (estado === 'archivados') return repo.findArchivados();
-  return repo.findAll();
+/**
+ * Lista los procesos visibles para quien consulta: la administración ve todos y
+ * el estudiante solo los globales y los de su propia carrera (ver FiltroCarrera).
+ */
+export async function listarProcesos(estado?: string, filtro: FiltroCarrera = undefined) {
+  if (estado === 'actuales') return repo.findActuales(filtro);
+  if (estado === 'finalizados') return repo.findFinalizados(filtro);
+  if (estado === 'archivados') return repo.findArchivados(filtro);
+  return repo.findAll(filtro);
 }
 
-export async function obtenerProceso(id: number) {
+/** Devuelve el proceso solo si es visible para quien consulta. */
+export async function obtenerProceso(id: number, filtro: FiltroCarrera = undefined) {
   const proceso = await repo.findById(id);
-  return proceso ?? null;
+  if (!proceso) return null;
+  if (!procesoVisible(proceso.fk_id_carrera, filtro)) return null;
+  return proceso;
 }
 
 export async function crearProceso(data: CrearProcesoDTO) {
@@ -25,6 +34,19 @@ export async function crearProceso(data: CrearProcesoDTO) {
 export async function actualizarProceso(id: number, data: ActualizarProcesoDTO) {
   const existente = await repo.findById(id);
   if (!existente) return null;
+
+  // El esquema valida la regla de carrera cuando el body trae `tipo_proceso`.
+  // En una actualización parcial hay que comprobarla contra el estado real:
+  // p. ej. asignar carrera a un proceso de consejo, o quitársela a uno de
+  // representante de carrera.
+  const tipoFinal = data.tipo_proceso ?? existente.tipo_proceso;
+  const carreraFinal = data.fk_id_carrera !== undefined ? data.fk_id_carrera : existente.fk_id_carrera;
+  if (tipoFinal === 'representante_carrera' && carreraFinal == null) {
+    throw new HttpError(422, 'Un proceso de representante de carrera requiere indicar la carrera.');
+  }
+  if (tipoFinal !== 'representante_carrera' && carreraFinal != null) {
+    throw new HttpError(422, 'Un proceso global (consejo estudiantil o referéndum) no debe tener carrera.');
+  }
 
   const actualizado = await repo.update(id, data);
 

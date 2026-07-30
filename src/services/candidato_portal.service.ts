@@ -106,6 +106,12 @@ export async function agregarCandidato(cedula: string, listaId: number, data: Ag
   if (await candidatoRepo.participaEnProceso(data.fk_cedula_estudiante, lista.id_proceso)) {
     throw new HttpError(409, 'Esa persona ya participa en otra lista de este proceso.');
   }
+  // Una sola candidatura activa a la vez: no puede estar a la par en Consejo
+  // Estudiantil y en representante de carrera.
+  const activa = await candidatoRepo.candidaturaActiva(data.fk_cedula_estudiante);
+  if (activa) {
+    throw new HttpError(409, `Esa persona ya tiene una candidatura activa en "${activa.nombre_proceso}" (lista "${activa.nombre_lista}"). Solo se permite una candidatura a la vez.`);
+  }
   return candidatoRepo.create({
     cargo: data.cargo,
     fk_cedula_estudiante: data.fk_cedula_estudiante,

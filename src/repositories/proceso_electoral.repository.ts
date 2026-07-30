@@ -1,40 +1,66 @@
 import { pool } from '../config/database.js';
 import { CrearProcesoDTO, ActualizarProcesoDTO } from '../schemas/proceso_electoral.schema.js';
 
+const BASE_QUERY = `
+  SELECT p.*, c.nombre_carrera
+  FROM proceso_electoral p
+  LEFT JOIN carrera c ON c.id_carrera = p.fk_id_carrera
+`;
+
+/**
+ * Filtro de visibilidad por carrera:
+ *  - undefined -> sin filtro (administración: ve todo).
+ *  - null      -> estudiante sin carrera asignada: solo procesos globales.
+ *  - number    -> estudiante: procesos globales + los de su carrera.
+ */
+export type FiltroCarrera = number | null | undefined;
+
+function condicionCarrera(filtro: FiltroCarrera): { sql: string; params: any[] } {
+  if (filtro === undefined) return { sql: '', params: [] };
+  if (filtro === null) return { sql: ' AND p.fk_id_carrera IS NULL', params: [] };
+  return { sql: ' AND (p.fk_id_carrera IS NULL OR p.fk_id_carrera = ?)', params: [filtro] };
+}
+
 /** Listado general: excluye los archivados (que solo se ven en el historial). */
-export async function findAll() {
+export async function findAll(filtro: FiltroCarrera = undefined) {
+  const { sql, params } = condicionCarrera(filtro);
   const [rows] = await pool.query(
-    'SELECT * FROM proceso_electoral WHERE archivado_at IS NULL ORDER BY fecha_inicio_votacion DESC'
+    `${BASE_QUERY} WHERE p.archivado_at IS NULL${sql} ORDER BY p.fecha_inicio_votacion DESC`,
+    params
   );
   return rows as any[];
 }
 
 /** Procesos activos o próximos (todo lo que no está finalizado, cancelado ni archivado). */
-export async function findActuales() {
+export async function findActuales(filtro: FiltroCarrera = undefined) {
+  const { sql, params } = condicionCarrera(filtro);
   const [rows] = await pool.query(
-    `SELECT * FROM proceso_electoral
-     WHERE estado NOT IN ('finalizado', 'cancelado') AND archivado_at IS NULL
-     ORDER BY fecha_inicio_votacion ASC`
+    `${BASE_QUERY}
+     WHERE p.estado NOT IN ('finalizado', 'cancelado') AND p.archivado_at IS NULL${sql}
+     ORDER BY p.fecha_inicio_votacion ASC`,
+    params
   );
   return rows as any[];
 }
 
 /** Procesos finalizados NO archivados, del más reciente al más antiguo (historial). */
-export async function findFinalizados() {
+export async function findFinalizados(filtro: FiltroCarrera = undefined) {
+  const { sql, params } = condicionCarrera(filtro);
   const [rows] = await pool.query(
-    `SELECT * FROM proceso_electoral
-     WHERE estado = 'finalizado' AND archivado_at IS NULL
-     ORDER BY fecha_fin_votacion DESC`
+    `${BASE_QUERY}
+     WHERE p.estado = 'finalizado' AND p.archivado_at IS NULL${sql}
+     ORDER BY p.fecha_fin_votacion DESC`,
+    params
   );
   return rows as any[];
 }
 
 /** Procesos archivados (conservados solo para historial y auditoría). */
-export async function findArchivados() {
+export async function findArchivados(filtro: FiltroCarrera = undefined) {
+  const { sql, params } = condicionCarrera(filtro);
   const [rows] = await pool.query(
-    `SELECT * FROM proceso_electoral
-     WHERE archivado_at IS NOT NULL
-     ORDER BY archivado_at DESC`
+    `${BASE_QUERY} WHERE p.archivado_at IS NOT NULL${sql} ORDER BY p.archivado_at DESC`,
+    params
   );
   return rows as any[];
 }
@@ -46,15 +72,25 @@ export async function archivar(id: number) {
 }
 
 export async function findById(id: number) {
-  const [rows] = await pool.query('SELECT * FROM proceso_electoral WHERE id_proceso = ?', [id]) as [any[], any];
+  const [rows] = await pool.query(`${BASE_QUERY} WHERE p.id_proceso = ?`, [id]) as [any[], any];
   return rows[0] ?? null;
 }
 
 export async function create(data: CrearProcesoDTO) {
   const [result] = await pool.query(
-    `INSERT INTO proceso_electoral (nombre_proceso, tipo_proceso, fecha_convocatoria, fecha_inicio_votacion, fecha_fin_votacion, estado, descripcion)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [data.nombre_proceso, data.tipo_proceso, data.fecha_convocatoria, data.fecha_inicio_votacion, data.fecha_fin_votacion, data.estado ?? 'planificado', data.descripcion ?? null]
+    `INSERT INTO proceso_electoral
+       (nombre_proceso, tipo_proceso, fecha_convocatoria, fecha_inicio_votacion, fecha_fin_votacion,
+        estado, descripcion, fk_id_carrera, fecha_inicio_inscripcion, fecha_fin_inscripcion, fecha_posesion)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      data.nombre_proceso, data.tipo_proceso, data.fecha_convocatoria,
+      data.fecha_inicio_votacion, data.fecha_fin_votacion,
+      data.estado ?? 'planificado', data.descripcion ?? null,
+      data.fk_id_carrera ?? null,
+      data.fecha_inicio_inscripcion ?? null,
+      data.fecha_fin_inscripcion ?? null,
+      data.fecha_posesion ?? null,
+    ]
   ) as [any, any];
   return findById(result.insertId);
 }

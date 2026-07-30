@@ -20,6 +20,16 @@ export async function findByCedula(cedula: string) {
   return rows[0] ?? null;
 }
 
+/** Carrera del estudiante (o null si no tiene ninguna asignada). */
+export async function findCarreraId(cedula: string): Promise<number | null> {
+  const [rows] = await pool.query(
+    'SELECT fk_id_carrera FROM estudiante WHERE cedula = ?',
+    [cedula]
+  ) as [any[], any];
+  const valor = rows[0]?.fk_id_carrera;
+  return valor == null ? null : Number(valor);
+}
+
 export async function findByEmail(email: string) {
   const [rows] = await pool.query('SELECT * FROM estudiante WHERE correo_institucional = ?', [email]) as [any[], any];
   return rows[0] ?? null;

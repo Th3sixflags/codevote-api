@@ -1,13 +1,15 @@
 import * as repo from '../repositories/voto.repository.js';
 import * as notificaciones from './notificacion.service.js';
 import { HttpError } from '../utils/httpError.js';
+import { procesoVisible } from '../utils/accesoCarrera.js';
+import type { FiltroCarrera } from '../repositories/proceso_electoral.repository.js';
 import { CrearVotoDTO } from '../schemas/voto.schema.js';
 
 export async function yaVoto(votacionId: number, cedula: string) {
   return repo.yaVotoEstudiante(votacionId, cedula);
 }
 
-export async function registrarVoto(data: CrearVotoDTO, cedula: string) {
+export async function registrarVoto(data: CrearVotoDTO, cedula: string, filtro: FiltroCarrera = undefined) {
   // Integridad electoral: solo se acepta el voto si la votación está ABIERTA y
   // su proceso está activo. Sin esto, una llamada directa a la API permitiría
   // votar en votaciones cerradas o pendientes (el frontend ya lo bloquea, pero
@@ -17,6 +19,13 @@ export async function registrarVoto(data: CrearVotoDTO, cedula: string) {
   if (estado.votacion !== 'abierta') throw new HttpError(409, 'La votación no está abierta.');
   if (estado.proceso === 'finalizado' || estado.proceso === 'cancelado') {
     throw new HttpError(409, 'El proceso electoral no está activo.');
+  }
+
+  // Segmentación por carrera: en un proceso de representante de carrera solo
+  // pueden votar los estudiantes de esa carrera. Se comprueba en el backend y
+  // no se delega al frontend.
+  if (!procesoVisible(estado.carrera_proceso, filtro)) {
+    throw new HttpError(403, 'Esta votación corresponde a otra carrera.');
   }
 
   // Un voto 'valido' debe ser por una lista que pertenezca a esta votación.

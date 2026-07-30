@@ -1,14 +1,16 @@
 import { Request, Response } from 'express';
 import { crearListaSchema, actualizarListaSchema, rechazarListaSchema } from '../schemas/lista_candidata.schema.js';
 import * as service from '../services/lista_candidata.service.js';
+import { filtroCarreraDe } from '../utils/accesoCarrera.js';
 
-export async function listar(_req: Request, res: Response) {
-  const listas = await service.listarListas();
+export async function listar(req: Request, res: Response) {
+  const listas = await service.listarListas(await filtroCarreraDe(req));
   res.json(listas);
 }
 
 export async function obtener(req: Request, res: Response) {
-  const lista = await service.obtenerLista(Number(req.params.id));
+  // Una lista de un proceso de otra carrera se responde como no encontrada.
+  const lista = await service.obtenerLista(Number(req.params.id), await filtroCarreraDe(req));
   if (!lista) {
     res.status(404).json({ error: 'Lista no encontrada.' });
     return;
@@ -17,7 +19,7 @@ export async function obtener(req: Request, res: Response) {
 }
 
 export async function listarPorProceso(req: Request, res: Response) {
-  const listas = await service.listarPorProceso(Number(req.params.procesoId));
+  const listas = await service.listarPorProceso(Number(req.params.procesoId), await filtroCarreraDe(req));
   res.json(listas);
 }
 

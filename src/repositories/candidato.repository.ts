@@ -96,3 +96,28 @@ export async function participaEnProceso(cedula: string, procesoId: number, exce
   ) as [any[], any];
   return rows.length > 0;
 }
+
+/**
+ * Candidatura ACTIVA del estudiante en cualquier proceso electoral vigente.
+ * Una persona no puede postularse a Consejo Estudiantil y a representante de
+ * carrera al mismo tiempo: solo una candidatura activa a la vez.
+ *
+ * Se consideran activas las listas que no fueron rechazadas ni retiradas, en
+ * procesos que no estén finalizados, cancelados ni archivados.
+ */
+export async function candidaturaActiva(cedula: string, exceptId = 0) {
+  const [rows] = await pool.query(
+    `SELECT c.id_candidato, l.id_lista, l.nombre_lista, p.id_proceso, p.nombre_proceso, p.tipo_proceso
+     FROM candidato c
+     JOIN lista_candidata l ON l.id_lista = c.fk_id_lista
+     JOIN proceso_electoral p ON p.id_proceso = l.fk_id_proceso
+     WHERE c.fk_cedula_estudiante = ?
+       AND c.id_candidato <> ?
+       AND l.estado_revision NOT IN ('rechazada', 'retirada')
+       AND p.estado NOT IN ('finalizado', 'cancelado')
+       AND p.archivado_at IS NULL
+     LIMIT 1`,
+    [cedula, exceptId]
+  ) as [any[], any];
+  return rows[0] ?? null;
+}

@@ -464,6 +464,12 @@ paths:
         devuelve los activos o próximos (no finalizados ni cancelados). Con
         ?estado=finalizados devuelve el historial (finalizados no archivados).
         Con ?estado=archivados devuelve solo los archivados.
+
+
+        Segmentación por carrera: la administración ve todos los procesos; el
+        estudiante ve únicamente los globales (sin carrera) y los de su propia
+        carrera. Un proceso de otra carrera se responde como 404 al pedirlo por
+        identificador, para no revelar su existencia.
       parameters:
         - name: estado
           in: query
@@ -1717,6 +1723,11 @@ paths:
         (codigo_voto) para el estudiante autenticado. Cada estudiante solo
         puede votar una vez por votación. El hash del comprobante NO se
         devuelve al estudiante (el voto es secreto); queda solo para auditoría.
+
+
+        Segmentación por carrera: en una votación de un proceso de representante
+        de carrera solo pueden votar los estudiantes de esa carrera (403 en caso
+        contrario). Se valida en el backend, sin depender del frontend.
       requestBody:
         required: true
         content:
@@ -1740,8 +1751,15 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Voto' }
         '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403':
+          description: La votación corresponde a otra carrera
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
         '409':
-          description: El estudiante ya emitió su voto en esta votación
+          description: >-
+            El estudiante ya emitió su voto en esta votación, la votación no está
+            abierta, o el proceso no está activo
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -2460,6 +2478,30 @@ components:
         descripcion:
           type: string
           maxLength: 250
+        fk_id_carrera:
+          type: integer
+          nullable: true
+          description: >-
+            Carrera del proceso. OBLIGATORIA cuando tipo_proceso es
+            representante_carrera; debe ser null en los procesos globales
+            (consejo_estudiantil y referendum). Incumplirlo devuelve 422.
+        fecha_inicio_inscripcion:
+          type: string
+          nullable: true
+          example: "2026-08-05 08:00:00"
+          description: Apertura del periodo de inscripción de listas.
+        fecha_fin_inscripcion:
+          type: string
+          nullable: true
+          example: "2026-08-10 17:00:00"
+          description: Cierre del periodo de inscripción de listas.
+        fecha_posesion:
+          type: string
+          nullable: true
+          example: "2026-09-15 10:00:00"
+          description: >-
+            Posesión de los electos. Las fechas deben respetar la secuencia
+            convocatoria → inscripción → votación → posesión (422 si no).
 
     ProcesoElectoral:
       type: object
@@ -2492,6 +2534,26 @@ components:
           format: date-time
           nullable: true
           description: Fecha de archivado; null si el proceso no está archivado.
+        fk_id_carrera:
+          type: integer
+          nullable: true
+          description: Carrera del proceso; null en los procesos globales.
+        nombre_carrera:
+          type: string
+          nullable: true
+          description: Nombre de la carrera del proceso (null en los globales).
+        fecha_inicio_inscripcion:
+          type: string
+          nullable: true
+          example: "2026-08-05 08:00:00"
+        fecha_fin_inscripcion:
+          type: string
+          nullable: true
+          example: "2026-08-10 17:00:00"
+        fecha_posesion:
+          type: string
+          nullable: true
+          example: "2026-09-15 10:00:00"
 
     CronogramaInput:
       type: object
@@ -2588,6 +2650,17 @@ components:
           nullable: true
           maxLength: 255
           description: Imagen principal de la lista (URL https) o null.
+        carrera_proceso:
+          type: integer
+          nullable: true
+          description: >-
+            Carrera del proceso al que pertenece la lista (no se guarda en la
+            lista: se obtiene del proceso electoral). Las listas de un proceso de
+            carrera solo se devuelven a estudiantes de esa carrera.
+        nombre_carrera:
+          type: string
+          nullable: true
+          description: Nombre de la carrera del proceso (null si es global).
         id_proceso:
           type: integer
         nombre_proceso:

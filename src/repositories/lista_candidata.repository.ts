@@ -1,27 +1,51 @@
 import { pool } from '../config/database.js';
 import { CrearListaDTO, ActualizarListaDTO } from '../schemas/lista_candidata.schema.js';
 
+// La carrera NO se guarda en lista_candidata: se toma del proceso electoral.
 const BASE_QUERY = `
   SELECT
     l.id_lista, l.nombre_lista, l.lema, l.estado_revision, l.fecha_inscripcion,
     l.motivo_rechazo, l.fk_cedula_responsable, l.foto_url,
-    p.id_proceso, p.nombre_proceso, p.estado AS estado_proceso
+    p.id_proceso, p.nombre_proceso, p.estado AS estado_proceso,
+    p.fk_id_carrera AS carrera_proceso, c.nombre_carrera
   FROM lista_candidata l
   JOIN proceso_electoral p ON p.id_proceso = l.fk_id_proceso
+  LEFT JOIN carrera c ON c.id_carrera = p.fk_id_carrera
 `;
 
-export async function findAll() {
-  const [rows] = await pool.query(BASE_QUERY + ' ORDER BY l.fecha_inscripcion DESC');
+/**
+ * Filtro por carrera del proceso al que pertenece la lista:
+ *  - undefined -> sin filtro (administración).
+ *  - null      -> solo listas de procesos globales.
+ *  - number    -> listas de procesos globales + los de esa carrera.
+ */
+export type FiltroCarrera = number | null | undefined;
+
+function condicionCarrera(filtro: FiltroCarrera): { sql: string; params: any[] } {
+  if (filtro === undefined) return { sql: '', params: [] };
+  if (filtro === null) return { sql: ' AND p.fk_id_carrera IS NULL', params: [] };
+  return { sql: ' AND (p.fk_id_carrera IS NULL OR p.fk_id_carrera = ?)', params: [filtro] };
+}
+
+export async function findAll(filtro: FiltroCarrera = undefined) {
+  const { sql, params } = condicionCarrera(filtro);
+  const where = sql ? ` WHERE 1=1${sql}` : '';
+  const [rows] = await pool.query(`${BASE_QUERY}${where} ORDER BY l.fecha_inscripcion DESC`, params);
   return rows as any[];
 }
 
+/** Sin filtro de carrera: uso interno (portal del candidato, acciones de admin). */
 export async function findById(id: number) {
   const [rows] = await pool.query(BASE_QUERY + ' WHERE l.id_lista = ?', [id]) as [any[], any];
   return rows[0] ?? null;
 }
 
-export async function findByProceso(procesoId: number) {
-  const [rows] = await pool.query(BASE_QUERY + ' WHERE l.fk_id_proceso = ? ORDER BY l.nombre_lista', [procesoId]);
+export async function findByProceso(procesoId: number, filtro: FiltroCarrera = undefined) {
+  const { sql, params } = condicionCarrera(filtro);
+  const [rows] = await pool.query(
+    `${BASE_QUERY} WHERE l.fk_id_proceso = ?${sql} ORDER BY l.nombre_lista`,
+    [procesoId, ...params]
+  );
   return rows as any[];
 }
 

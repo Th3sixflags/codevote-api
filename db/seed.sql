@@ -14,10 +14,17 @@ INSERT INTO director (nombres, apellidos, correo) VALUES
 ('Ana', 'Suárez', 'asuarez@uide.edu.ec');
 
 -- 3. carrera
-INSERT INTO carrera (nombre_carrera, fk_id_director, fk_id_facultad) VALUES 
-('Ingeniería de Software', 1, 1), 
-('Ingeniería Civil', 1, 1), 
-('Medicina', 2, 2);
+INSERT INTO carrera (nombre_carrera, fk_id_director, fk_id_facultad) VALUES
+('Ingeniería de Software', 1, 1),
+('Ingeniería Civil', 1, 1),
+('Medicina', 2, 2),
+-- Carreras de la facultad usadas por los procesos de representante de carrera.
+('Arquitectura', 1, 1),
+('Administración de Empresas', 1, 1),
+('Marketing e Inteligencia de Mercados', 1, 1),
+('Psicología Clínica', 2, 2),
+('TICs', 1, 1),
+('Derecho', 1, 1);
 
 -- 4. estudiante (20 registros con bcrypt password123)
 -- Hash: $2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e
