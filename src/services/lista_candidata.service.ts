@@ -1,6 +1,8 @@
 import * as repo from '../repositories/lista_candidata.repository.js';
+import * as borradoRepo from '../repositories/borrado.repository.js';
 import type { FiltroCarrera } from '../repositories/lista_candidata.repository.js';
 import { procesoVisible } from '../utils/accesoCarrera.js';
+import { HttpError } from '../utils/httpError.js';
 import { CrearListaDTO, ActualizarListaDTO } from '../schemas/lista_candidata.schema.js';
 
 // Las listas de un proceso de carrera solo se devuelven a estudiantes de esa
@@ -30,10 +32,21 @@ export async function actualizarLista(id: number, data: ActualizarListaDTO) {
   return repo.update(id, data);
 }
 
+/**
+ * Elimina la lista definitivamente, pero SOLO si es un borrador sin votos.
+ * Si ya recibió votos se rechaza con 409: es evidencia electoral y corresponde
+ * retirarla. Si es borrador, se limpian en una transacción sus dependencias de
+ * preparación: validaciones de requisitos, candidatos y planes de trabajo.
+ */
 export async function eliminarLista(id: number) {
   const existente = await repo.findById(id);
   if (!existente) return false;
-  await repo.remove(id);
+
+  if (!existente.puede_eliminar) {
+    throw new HttpError(409, `No se puede eliminar la lista. ${existente.motivo_bloqueo}`);
+  }
+
+  await borradoRepo.eliminarListaEnCascada(id);
   return true;
 }
 

@@ -1,17 +1,28 @@
 import { pool } from '../config/database.js';
+import { calcularBloqueo, bandera } from '../utils/bloqueoEliminacion.js';
 import { CrearListaDTO, ActualizarListaDTO } from '../schemas/lista_candidata.schema.js';
 
 // La carrera NO se guarda en lista_candidata: se toma del proceso electoral.
+// `tiene_votos` indica si la lista ya recibió votos: en ese caso no se puede
+// eliminar (solo retirar), porque son evidencia electoral.
 const BASE_QUERY = `
   SELECT
     l.id_lista, l.nombre_lista, l.lema, l.estado_revision, l.fecha_inscripcion,
     l.motivo_rechazo, l.fk_cedula_responsable, l.foto_url,
     p.id_proceso, p.nombre_proceso, p.estado AS estado_proceso,
-    p.fk_id_carrera AS carrera_proceso, c.nombre_carrera
+    p.fk_id_carrera AS carrera_proceso, c.nombre_carrera,
+    EXISTS(SELECT 1 FROM voto v WHERE v.fk_id_lista = l.id_lista) AS tiene_votos
   FROM lista_candidata l
   JOIN proceso_electoral p ON p.id_proceso = l.fk_id_proceso
   LEFT JOIN carrera c ON c.id_carrera = p.fk_id_carrera
 `;
+
+/** Añade puede_eliminar / motivo_bloqueo y quita la bandera cruda. */
+function conBloqueo(row: any) {
+  if (!row) return row;
+  const { tiene_votos, ...lista } = row;
+  return { ...lista, ...calcularBloqueo({ votos: bandera(tiene_votos) }) };
+}
 
 /**
  * Filtro por carrera del proceso al que pertenece la lista:
@@ -31,13 +42,13 @@ export async function findAll(filtro: FiltroCarrera = undefined) {
   const { sql, params } = condicionCarrera(filtro);
   const where = sql ? ` WHERE 1=1${sql}` : '';
   const [rows] = await pool.query(`${BASE_QUERY}${where} ORDER BY l.fecha_inscripcion DESC`, params);
-  return rows as any[];
+  return (rows as any[]).map(conBloqueo);
 }
 
 /** Sin filtro de carrera: uso interno (portal del candidato, acciones de admin). */
 export async function findById(id: number) {
   const [rows] = await pool.query(BASE_QUERY + ' WHERE l.id_lista = ?', [id]) as [any[], any];
-  return rows[0] ?? null;
+  return conBloqueo(rows[0] ?? null);
 }
 
 export async function findByProceso(procesoId: number, filtro: FiltroCarrera = undefined) {
@@ -46,7 +57,7 @@ export async function findByProceso(procesoId: number, filtro: FiltroCarrera = u
     `${BASE_QUERY} WHERE l.fk_id_proceso = ?${sql} ORDER BY l.nombre_lista`,
     [procesoId, ...params]
   );
-  return rows as any[];
+  return (rows as any[]).map(conBloqueo);
 }
 
 export async function create(data: CrearListaDTO) {
@@ -90,7 +101,7 @@ export async function findByResponsable(cedula: string) {
     BASE_QUERY + ' WHERE l.fk_cedula_responsable = ? LIMIT 1',
     [cedula]
   ) as [any[], any];
-  return rows[0] ?? null;
+  return conBloqueo(rows[0] ?? null);
 }
 
 /** ¿El estudiante ya es responsable de una lista en ese proceso? */

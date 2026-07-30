@@ -7,6 +7,7 @@ const router = Router();
 router.get('/',               requireAuth,              ctrl.listar);
 router.get('/:id',            requireAuth,              ctrl.obtener);
 router.post('/',              requireAuth, requireAdmin, ctrl.crear);
+router.patch('/:id/cancelar', requireAuth, requireAdmin, ctrl.cancelar);
 router.patch('/:id/archivar', requireAuth, requireAdmin, ctrl.archivar);
 router.patch('/:id',          requireAuth, requireAdmin, ctrl.actualizar);
 router.delete('/:id',         requireAuth, requireAdmin, ctrl.eliminar);

@@ -1,4 +1,5 @@
 import * as repo from '../repositories/proceso_electoral.repository.js';
+import * as borradoRepo from '../repositories/borrado.repository.js';
 import type { FiltroCarrera } from '../repositories/proceso_electoral.repository.js';
 import * as notificaciones from './notificacion.service.js';
 import { HttpError } from '../utils/httpError.js';
@@ -59,11 +60,41 @@ export async function actualizarProceso(id: number, data: ActualizarProcesoDTO) 
   return actualizado;
 }
 
+/**
+ * Elimina un proceso definitivamente, pero SOLO si sigue siendo un borrador.
+ * Si ya tiene actividad electoral (votos, comprobantes, actas o veedurías) se
+ * rechaza con 409 y el motivo, porque es evidencia que debe conservarse: en ese
+ * caso corresponde cancelar o archivar.
+ *
+ * Si es borrador, se limpian en una transacción sus dependencias de
+ * preparación: validaciones, candidatos, planes, listas, votaciones y
+ * cronogramas.
+ */
 export async function eliminarProceso(id: number) {
   const existente = await repo.findById(id);
   if (!existente) return false;
-  await repo.remove(id);
+
+  if (!existente.puede_eliminar) {
+    throw new HttpError(409, `No se puede eliminar el proceso. ${existente.motivo_bloqueo}`);
+  }
+
+  await borradoRepo.eliminarProcesoEnCascada(id);
   return true;
+}
+
+/** Marca el proceso como cancelado (no borra nada). */
+export async function cancelarProceso(id: number) {
+  const existente = await repo.findById(id);
+  if (!existente) return null;
+
+  if (existente.estado === 'cancelado') {
+    throw new HttpError(409, 'El proceso ya está cancelado.');
+  }
+  if (existente.estado === 'finalizado') {
+    throw new HttpError(409, 'Un proceso finalizado no puede cancelarse; puede archivarse.');
+  }
+
+  return repo.cancelar(id);
 }
 
 /**

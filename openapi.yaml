@@ -541,12 +541,47 @@ paths:
         '422': { $ref: '#/components/responses/ValidacionFallida' }
     delete:
       tags: [Procesos electorales]
-      summary: Elimina un registro (requiere rol admin)
+      summary: Elimina un proceso en borrador (requiere rol admin)
+      description: >-
+        Solo elimina procesos SIN actividad electoral. En ese caso limpia en una
+        transacción sus dependencias de preparación (validaciones, candidatos,
+        planes, listas, votaciones y cronogramas). Si ya tiene votos,
+        comprobantes, actas o veedurías responde 409 con el motivo: hay que
+        cancelar o archivar. No se usa ON DELETE CASCADE en el esquema para que
+        la evidencia electoral quede siempre protegida por las claves foráneas.
       responses:
-        '204': { description: Eliminado }
+        '204': { description: Eliminado junto con sus dependencias de borrador }
         '401': { $ref: '#/components/responses/NoAutenticado' }
         '403': { $ref: '#/components/responses/SinPermiso' }
         '404': { $ref: '#/components/responses/NoEncontrado' }
+
+  /procesos-electorales/{id}/cancelar:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    patch:
+      tags: [Procesos electorales]
+      summary: Cancela un proceso (requiere rol admin)
+      description: >-
+        Marca el proceso como cancelado sin borrar nada. Es la alternativa a
+        eliminar cuando el proceso ya tiene actividad electoral. Un proceso
+        finalizado no se cancela (se archiva), y uno ya cancelado responde 409.
+      responses:
+        '200':
+          description: Proceso cancelado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProcesoElectoral' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409':
+          description: El proceso ya está cancelado, o está finalizado (archívalo)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
 
   /procesos-electorales/{id}/archivar:
     parameters:
@@ -758,11 +793,12 @@ paths:
         '422': { $ref: '#/components/responses/ValidacionFallida' }
     delete:
       tags: [Listas candidatas]
-      summary: Elimina un registro (requiere rol admin)
+      summary: Elimina una lista en borrador (requiere rol admin)
       description: >-
-        Solo prospera para listas nuevas sin relaciones. Una lista con
-        candidatos, planes, votos o auditoría no se borra físicamente (responde
-        409); en ese caso, usar retirar para conservarla como historial.
+        Solo elimina listas SIN votos. En ese caso limpia en una transacción sus
+        dependencias de preparación (validaciones de requisitos, candidatos y
+        planes de trabajo). Si la lista ya recibió votos responde 409 con el
+        motivo: hay que retirarla para conservarla como historial.
       responses:
         '204': { description: Eliminado }
         '401': { $ref: '#/components/responses/NoAutenticado' }
@@ -2239,7 +2275,13 @@ components:
 
     Votacion:
       type: object
+      description: Incluye además puede_eliminar y motivo_bloqueo (ver EstadoEliminacion).
       properties:
+        puede_eliminar:
+          type: boolean
+        motivo_bloqueo:
+          type: string
+          nullable: true
         id_votacion:     { type: integer }
         titulo_papeleta: { type: string }
         fecha_apertura:  { type: string, format: date-time }
@@ -2453,6 +2495,24 @@ components:
           maxLength: 255
           description: URL de la foto de perfil (o null).
 
+    EstadoEliminacion:
+      type: object
+      description: >-
+        Indica si el registro puede eliminarse definitivamente. Un registro es
+        borrable mientras siga siendo BORRADOR; en cuanto tiene actividad
+        electoral (votos, comprobantes, actas o veedurías) deja de serlo y solo
+        puede cancelarse, archivarse o retirarse. El frontend puede usar estos
+        campos para decidir qué acción ofrecer antes de que el admin pulse
+        Eliminar.
+      properties:
+        puede_eliminar:
+          type: boolean
+          example: false
+        motivo_bloqueo:
+          type: string
+          nullable: true
+          example: "Ya registra votos y comprobantes. Solo se puede cancelar o archivar."
+
     ProcesoElectoralInput:
       type: object
       required: [nombre_proceso, tipo_proceso, fecha_convocatoria, fecha_inicio_votacion, fecha_fin_votacion]
@@ -2505,7 +2565,13 @@ components:
 
     ProcesoElectoral:
       type: object
+      description: Incluye además puede_eliminar y motivo_bloqueo (ver EstadoEliminacion).
       properties:
+        puede_eliminar:
+          type: boolean
+        motivo_bloqueo:
+          type: string
+          nullable: true
         id_proceso:
           type: integer
         nombre_proceso:
@@ -2621,7 +2687,13 @@ components:
 
     ListaCandidata:
       type: object
+      description: Incluye además puede_eliminar y motivo_bloqueo (ver EstadoEliminacion).
       properties:
+        puede_eliminar:
+          type: boolean
+        motivo_bloqueo:
+          type: string
+          nullable: true
         id_lista:
           type: integer
         nombre_lista:
