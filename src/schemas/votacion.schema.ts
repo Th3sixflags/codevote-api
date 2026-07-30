@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { urlImagenHttpsSchema } from './common.js';
 
 const votacionBase = z.object({
   fk_id_proceso:   z.number().int().positive(),
@@ -6,6 +7,8 @@ const votacionBase = z.object({
   fecha_apertura:  z.string().regex(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/, 'Formato: YYYY-MM-DD HH:MM:SS'),
   fecha_cierre:    z.string().regex(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/, 'Formato: YYYY-MM-DD HH:MM:SS'),
   estado:          z.enum(['pendiente', 'abierta', 'cerrada']).optional(),
+  // Imagen de la papeleta (URL https; vacío o null para quitarla).
+  foto_url:        urlImagenHttpsSchema.optional(),
   // Categoría de la papeleta: null = global (votan todos); con valor = solo los
   // estudiantes de esa carrera (p. ej. "Representante TICs").
   fk_id_carrera:   z.union([z.number().int().positive(), z.null()]).optional(),

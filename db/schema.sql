@@ -77,6 +77,7 @@ CREATE TABLE proceso_electoral (
   fecha_inicio_inscripcion DATETIME NULL DEFAULT NULL,
   fecha_fin_inscripcion DATETIME NULL DEFAULT NULL,
   fecha_posesion DATETIME NULL DEFAULT NULL,
+  foto_url VARCHAR(255) NULL DEFAULT NULL,            -- Imagen del proceso (URL https)
   CONSTRAINT fk_proceso_carrera FOREIGN KEY (fk_id_carrera) REFERENCES carrera(id_carrera)
 );
 
@@ -104,6 +105,7 @@ CREATE TABLE votacion (
   fecha_cierre DATETIME NOT NULL,
   estado VARCHAR(20) NOT NULL DEFAULT 'pendiente',
   fk_id_carrera INT NULL DEFAULT NULL,
+  foto_url VARCHAR(255) NULL DEFAULT NULL,            -- Imagen de la papeleta (URL https)
   CONSTRAINT fk_votacion_proceso FOREIGN KEY (fk_id_proceso) REFERENCES proceso_electoral(id_proceso),
   CONSTRAINT fk_votacion_carrera FOREIGN KEY (fk_id_carrera) REFERENCES carrera(id_carrera),
   -- No puede haber dos papeletas de la misma carrera en un mismo proceso.

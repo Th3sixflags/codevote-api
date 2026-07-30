@@ -20,7 +20,7 @@ function condicionCarrera(filtro: FiltroCarrera): { sql: string; params: any[] }
 
 const BASE_QUERY = `
   SELECT
-    v.id_votacion, v.titulo_papeleta, v.fecha_apertura, v.fecha_cierre, v.estado,
+    v.id_votacion, v.titulo_papeleta, v.fecha_apertura, v.fecha_cierre, v.estado, v.foto_url,
     v.fk_id_carrera, c.nombre_carrera,
     p.id_proceso, p.nombre_proceso,
     EXISTS(SELECT 1 FROM voto x WHERE x.fk_id_votacion = v.id_votacion) AS tiene_votos,
@@ -83,9 +83,9 @@ export async function existeCarreraEnProceso(procesoId: number, carreraId: numbe
 
 export async function create(data: CrearVotacionDTO) {
   const [result] = await pool.query(
-    `INSERT INTO votacion (fk_id_proceso, titulo_papeleta, fecha_apertura, fecha_cierre, estado, fk_id_carrera)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [data.fk_id_proceso, data.titulo_papeleta, data.fecha_apertura, data.fecha_cierre, data.estado ?? 'pendiente', data.fk_id_carrera ?? null]
+    `INSERT INTO votacion (fk_id_proceso, titulo_papeleta, fecha_apertura, fecha_cierre, estado, fk_id_carrera, foto_url)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [data.fk_id_proceso, data.titulo_papeleta, data.fecha_apertura, data.fecha_cierre, data.estado ?? 'pendiente', data.fk_id_carrera ?? null, data.foto_url ?? null]
   ) as [any, any];
   return findById(result.insertId);
 }

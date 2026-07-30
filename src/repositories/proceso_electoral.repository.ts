@@ -158,8 +158,8 @@ export async function create(data: CrearProcesoDTO) {
   const [result] = await pool.query(
     `INSERT INTO proceso_electoral
        (nombre_proceso, tipo_proceso, fecha_convocatoria, fecha_inicio_votacion, fecha_fin_votacion,
-        estado, descripcion, fk_id_carrera, fecha_inicio_inscripcion, fecha_fin_inscripcion, fecha_posesion)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        estado, descripcion, fk_id_carrera, fecha_inicio_inscripcion, fecha_fin_inscripcion, fecha_posesion, foto_url)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       data.nombre_proceso, data.tipo_proceso, data.fecha_convocatoria,
       data.fecha_inicio_votacion, data.fecha_fin_votacion,
@@ -168,6 +168,7 @@ export async function create(data: CrearProcesoDTO) {
       data.fecha_inicio_inscripcion ?? null,
       data.fecha_fin_inscripcion ?? null,
       data.fecha_posesion ?? null,
+      data.foto_url ?? null,
     ]
   ) as [any, any];
   return findById(result.insertId);

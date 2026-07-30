@@ -2449,6 +2449,14 @@ components:
         estado:          { type: string, example: abierta }
         id_proceso:      { type: integer }
         nombre_proceso:  { type: string }
+        foto_url:
+          type: string
+          nullable: true
+          maxLength: 255
+          description: >-
+            Imagen opcional de la papeleta. Debe ser una URL que inicie con
+            https:// (http u otra cosa devuelve 422). Cadena vacía o null para
+            quitarla.
 
     VotacionInput:
       type: object
@@ -2467,6 +2475,14 @@ components:
             solo los estudiantes de esa carrera (p. ej. "Representante TICs").
             No puede haber dos papeletas de la misma carrera en un mismo proceso
             (409).
+        foto_url:
+          type: string
+          nullable: true
+          maxLength: 255
+          description: >-
+            Imagen opcional de la papeleta. Debe ser una URL que inicie con
+            https:// (http u otra cosa devuelve 422). Cadena vacía o null para
+            quitarla.
 
     Voto:
       type: object
@@ -2759,6 +2775,13 @@ components:
           description: >-
             Posesión de los electos. Las fechas deben respetar la secuencia
             convocatoria → inscripción → votación → posesión (422 si no).
+        foto_url:
+          type: string
+          nullable: true
+          maxLength: 255
+          description: >-
+            Imagen opcional. Debe ser una URL que inicie con https:// (http u
+            otra cosa devuelve 422). Cadena vacía o null para quitarla.
 
     ProcesoElectoral:
       type: object
@@ -2813,6 +2836,13 @@ components:
           type: string
           nullable: true
           example: "2026-09-15 10:00:00"
+        foto_url:
+          type: string
+          nullable: true
+          maxLength: 255
+          description: >-
+            Imagen opcional. Debe ser una URL que inicie con https:// (http u
+            otra cosa devuelve 422). Cadena vacía o null para quitarla.
 
     CronogramaInput:
       type: object

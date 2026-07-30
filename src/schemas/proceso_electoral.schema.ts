@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { urlImagenHttpsSchema } from './common.js';
 
 const FECHA      = /^\d{4}-\d{2}-\d{2}$/;
 const FECHA_HORA = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
@@ -18,6 +19,8 @@ const procesoBase = z.object({
   fecha_inicio_inscripcion: z.union([z.string().regex(FECHA_HORA, 'Formato: YYYY-MM-DD HH:MM:SS'), z.null()]).optional(),
   fecha_fin_inscripcion:    z.union([z.string().regex(FECHA_HORA, 'Formato: YYYY-MM-DD HH:MM:SS'), z.null()]).optional(),
   fecha_posesion:           z.union([z.string().regex(FECHA_HORA, 'Formato: YYYY-MM-DD HH:MM:SS'), z.null()]).optional(),
+  // Imagen general del proceso (URL https; vacío o null para quitarla).
+  foto_url:                 urlImagenHttpsSchema.optional(),
 });
 
 type ProcesoParcial = z.infer<typeof procesoBase> extends infer T ? Partial<T> : never;
