@@ -2,22 +2,52 @@ import { pool } from '../config/database.js';
 import { CrearEstudianteDTO, ActualizarEstudianteDTO } from '../schemas/estudiante.schema.js';
 import bcrypt from 'bcryptjs';
 
+// Se incluye la asignación de candidatura (cuando existe) para que el panel
+// administrativo sepa en qué papeleta compite cada candidato.
 const BASE_QUERY = `
   SELECT
     e.cedula, e.nombres, e.apellidos, e.correo_institucional, e.promedio, e.estado_academico, e.rol, e.foto_url,
-    c.id_carrera, c.nombre_carrera
+    c.id_carrera, c.nombre_carrera,
+    a.fk_id_votacion AS asig_votacion, a.estado AS asig_estado, a.fecha_asignacion AS asig_fecha,
+    v.titulo_papeleta AS asig_papeleta, ac.nombre_carrera AS asig_carrera,
+    p.id_proceso AS asig_proceso, p.nombre_proceso AS asig_nombre_proceso
   FROM estudiante e
   LEFT JOIN carrera c ON c.id_carrera = e.fk_id_carrera
+  LEFT JOIN asignacion_candidatura a ON a.fk_cedula_estudiante = e.cedula
+  LEFT JOIN votacion v ON v.id_votacion = a.fk_id_votacion
+  LEFT JOIN carrera ac ON ac.id_carrera = v.fk_id_carrera
+  LEFT JOIN proceso_electoral p ON p.id_proceso = v.fk_id_proceso
 `;
+
+/** Agrupa los campos de la asignación en un objeto (o null si no tiene). */
+function conAsignacion(row: any) {
+  if (!row) return row;
+  const {
+    asig_votacion, asig_estado, asig_fecha, asig_papeleta, asig_carrera,
+    asig_proceso, asig_nombre_proceso, ...estudiante
+  } = row;
+  return {
+    ...estudiante,
+    asignacion: asig_votacion == null ? null : {
+      fk_id_votacion:   asig_votacion,
+      titulo_papeleta:  asig_papeleta,
+      nombre_carrera:   asig_carrera,
+      id_proceso:       asig_proceso,
+      nombre_proceso:   asig_nombre_proceso,
+      estado:           asig_estado,
+      fecha_asignacion: asig_fecha,
+    },
+  };
+}
 
 export async function findAll() {
   const [rows] = await pool.query(BASE_QUERY + ' ORDER BY e.apellidos, e.nombres');
-  return rows as any[];
+  return (rows as any[]).map(conAsignacion);
 }
 
 export async function findByCedula(cedula: string) {
   const [rows] = await pool.query(BASE_QUERY + ' WHERE e.cedula = ?', [cedula]) as [any[], any];
-  return rows[0] ?? null;
+  return conAsignacion(rows[0] ?? null);
 }
 
 /** Carrera del estudiante (o null si no tiene ninguna asignada). */

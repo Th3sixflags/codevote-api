@@ -4,8 +4,8 @@ import * as planRepo       from '../repositories/plan_trabajo.repository.js';
 import * as procesoRepo    from '../repositories/proceso_electoral.repository.js';
 import * as votacionRepo   from '../repositories/votacion.repository.js';
 import * as estudianteRepo from '../repositories/estudiante.repository.js';
+import * as asignacionRepo from '../repositories/asignacion_candidatura.repository.js';
 import { HttpError } from '../utils/httpError.js';
-import { procesoVisible } from '../utils/accesoCarrera.js';
 import { PROMEDIO_MINIMO_POSTULACION } from '../config/reglas.js';
 import {
   CrearListaCandidatoDTO, ActualizarListaCandidatoDTO,
@@ -65,13 +65,15 @@ export async function obtenerMiLista(cedula: string) {
  * carrera del candidato (una global o la suya).
  */
 export async function crearLista(cedula: string, data: CrearListaCandidatoDTO) {
-  const votacion = await votacionRepo.findById(data.fk_id_votacion);
-  if (!votacion) throw new HttpError(404, 'La votación indicada no existe.');
-
-  const carreraEstudiante = await estudianteRepo.findCarreraId(cedula);
-  if (!procesoVisible(votacion.fk_id_carrera, carreraEstudiante)) {
-    throw new HttpError(403, 'Esa votación corresponde a otra carrera.');
+  // La papeleta viene de la asignación hecha por el administrador: el candidato
+  // no la elige. Sin asignación no puede crear lista.
+  const asignacion = await asignacionRepo.findActivaDeEstudiante(cedula);
+  if (!asignacion) {
+    throw new HttpError(409, 'Todavía no tienes una papeleta asignada. La administración electoral debe asignarte una antes de inscribir tu lista.');
   }
+
+  const votacion = await votacionRepo.findById(asignacion.fk_id_votacion);
+  if (!votacion) throw new HttpError(404, 'La papeleta asignada ya no existe.');
 
   const proceso = await procesoRepo.findById(votacion.id_proceso);
   if (!proceso) throw new HttpError(404, 'Proceso electoral no encontrado.');
@@ -83,7 +85,7 @@ export async function crearLista(cedula: string, data: CrearListaCandidatoDTO) {
   }
   // La lista nace en 'pendiente' (borrador editable) hasta que se envía a revisión.
   return listaRepo.createDeCandidato(
-    data.fk_id_votacion, votacion.id_proceso, data.nombre_lista, data.lema ?? null,
+    asignacion.fk_id_votacion, votacion.id_proceso, data.nombre_lista, data.lema ?? null,
     'pendiente', cedula, data.foto_url ?? null
   );
 }

@@ -248,3 +248,16 @@ CREATE TABLE notificacion (
   fecha_creacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_notificacion_estudiante FOREIGN KEY (fk_cedula_estudiante) REFERENCES estudiante(cedula)
 );
+
+-- 20. asignacion_candidatura (el admin asigna UNA papeleta a cada candidato)
+-- El candidato no elige proceso/carrera/papeleta: trabaja solo con su asignación.
+CREATE TABLE asignacion_candidatura (
+  id_asignacion INT AUTO_INCREMENT PRIMARY KEY,
+  fk_cedula_estudiante CHAR(10) NOT NULL,
+  fk_id_votacion INT NOT NULL,
+  fecha_asignacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  estado ENUM('activa', 'retirada') NOT NULL DEFAULT 'activa',
+  CONSTRAINT uq_asignacion_estudiante UNIQUE (fk_cedula_estudiante),
+  CONSTRAINT fk_asignacion_estudiante FOREIGN KEY (fk_cedula_estudiante) REFERENCES estudiante(cedula),
+  CONSTRAINT fk_asignacion_votacion FOREIGN KEY (fk_id_votacion) REFERENCES votacion(id_votacion)
+);

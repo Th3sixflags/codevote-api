@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { requireAuth, requireCandidato } from '../middleware/auth.js';
 import * as ctrl from '../controllers/candidato_portal.controller.js';
+import * as asignacionCtrl from '../controllers/asignacion_candidatura.controller.js';
 
 // Portal del candidato. Todas las rutas exigen rol 'candidato'; además, cada
 // operación valida en el servicio que la lista/candidato/plan pertenezca al
@@ -9,6 +10,7 @@ const router = Router();
 
 router.use(requireAuth, requireCandidato);
 
+router.get('/mi-asignacion',               asignacionCtrl.miAsignacion);
 router.get('/mi-lista',                    ctrl.miLista);
 
 router.post('/listas',                     ctrl.crearLista);

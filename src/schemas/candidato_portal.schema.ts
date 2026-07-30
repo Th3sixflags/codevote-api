@@ -9,9 +9,9 @@ const CARGO = z.enum(['presidente', 'vicepresidente', 'secretario', 'tesorero', 
 const AREA  = z.enum(['academico', 'deportivo', 'cultural', 'infraestructura', 'social']);
 
 export const crearListaCandidatoSchema = z.object({
-  // El candidato elige la papeleta (categoría) en la que compite. El proceso y
-  // la carrera se derivan de ella: no se vuelven a pedir.
-  fk_id_votacion: z.number().int().positive(),
+  // La papeleta NO se acepta desde el cliente: se toma de la asignación que el
+  // administrador hizo al candidato (ver asignacion_candidatura). El proceso y
+  // la carrera se derivan de ella.
   nombre_lista:   z.string().min(1).max(80),
   lema:           z.string().max(120).optional(),
   foto_url:       urlImagenHttpsSchema.optional(),

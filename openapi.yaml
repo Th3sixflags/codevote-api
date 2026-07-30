@@ -36,6 +36,7 @@ tags:
   - name: Notificaciones
   - name: Portal candidato
   - name: Perfil
+  - name: Asignación de candidatura
   - name: Sistema
 
 paths:
@@ -410,6 +411,105 @@ paths:
         '401': { $ref: '#/components/responses/NoAutenticado' }
         '403': { $ref: '#/components/responses/SinPermiso' }
         '422': { $ref: '#/components/responses/ValidacionFallida' }
+
+  /estudiantes/{cedula}/asignacion-candidatura:
+    parameters:
+      - name: cedula
+        in: path
+        required: true
+        schema: { type: string, minLength: 10, maxLength: 10 }
+    get:
+      tags: [Asignación de candidatura]
+      summary: Consulta la asignación de un candidato (requiere rol admin)
+      responses:
+        '200':
+          description: Asignación encontrada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AsignacionCandidatura' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { description: El estudiante no tiene asignación }
+    post:
+      tags: [Asignación de candidatura]
+      summary: Asigna una papeleta a un candidato (requiere rol admin)
+      description: >-
+        Reglas: la cuenta debe tener rol candidato; solo puede tener una
+        asignación; la papeleta debe existir y su proceso estar en periodo de
+        inscripción; si la papeleta es de una carrera, el candidato debe
+        pertenecer a esa misma carrera.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fk_id_votacion]
+              properties:
+                fk_id_votacion: { type: integer, description: Papeleta (votación) asignada. }
+      responses:
+        '201':
+          description: Asignación creada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AsignacionCandidatura' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { description: El estudiante, la papeleta o su proceso no existen }
+        '409':
+          description: >-
+            Ya tiene una asignación, la cuenta no es candidato, el proceso no
+            está en inscripción, o la papeleta es de otra carrera
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
+    patch:
+      tags: [Asignación de candidatura]
+      summary: Cambia la papeleta asignada (requiere rol admin)
+      description: >-
+        No se permite si el candidato ya tiene una lista enviada a revisión,
+        aprobada o con votos: primero hay que retirar o rechazar esa lista.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fk_id_votacion]
+              properties:
+                fk_id_votacion: { type: integer }
+      responses:
+        '200':
+          description: Asignación actualizada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AsignacionCandidatura' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { description: El estudiante no tiene asignación }
+        '409':
+          description: Lista comprometida, papeleta de otra carrera o proceso fuera de inscripción
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
+    delete:
+      tags: [Asignación de candidatura]
+      summary: Retira la asignación (requiere rol admin)
+      description: >-
+        Elimina la asignación y deja libre al candidato. No se permite si ya
+        tiene una lista enviada a revisión, aprobada o con votos.
+      responses:
+        '204': { description: Asignación retirada }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { description: El estudiante no tiene asignación }
+        '409':
+          description: Tiene una lista que debe conservarse
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
 
   /estudiantes/{cedula}:
     parameters:
@@ -1905,6 +2005,25 @@ paths:
   # además que la lista/candidato/plan pertenezca al candidato autenticado,
   # que el proceso esté en inscripción y que la lista no esté aprobada.
   # ---------------------------------------------------------------------------
+  /candidato/mi-asignacion:
+    get:
+      tags: [Asignación de candidatura]
+      summary: Papeleta asignada al candidato autenticado
+      description: >-
+        Devuelve la papeleta asignada con su proceso, carrera y estado de
+        inscripción, o null si la administración todavía no le asignó ninguna
+        (sin asignación no puede inscribir lista).
+      responses:
+        '200':
+          description: Asignación propia, o null
+          content:
+            application/json:
+              schema:
+                nullable: true
+                allOf: [{ $ref: '#/components/schemas/AsignacionCandidatura' }]
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+
   /candidato/mi-lista:
     get:
       tags: [Portal candidato]
@@ -1924,16 +2043,19 @@ paths:
   /candidato/listas:
     post:
       tags: [Portal candidato]
-      summary: Crea la lista del candidato (proceso en inscripción)
+      summary: Crea la lista del candidato en su papeleta asignada
+      description: >-
+        La papeleta NO se envía: se toma de la asignación que la administración
+        hizo al candidato (ver GET /candidato/mi-asignacion). El proceso y la
+        carrera se derivan de ella. Sin asignación responde 409.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [fk_id_proceso, nombre_lista]
+              required: [nombre_lista]
               properties:
-                fk_id_proceso: { type: integer }
                 nombre_lista:  { type: string, maxLength: 80 }
                 lema:          { type: string, maxLength: 120 }
                 foto_url:
@@ -1951,7 +2073,9 @@ paths:
         '403': { $ref: '#/components/responses/SinPermiso' }
         '404': { $ref: '#/components/responses/NoEncontrado' }
         '409':
-          description: Proceso no está en inscripción, o ya tienes una lista en él
+          description: >-
+            Sin papeleta asignada, el proceso no está en inscripción, o ya tienes
+            una lista en él
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -2538,6 +2662,36 @@ components:
           nullable: true
           maxLength: 255
           description: URL de la foto de perfil (o null).
+        asignacion:
+          nullable: true
+          description: >-
+            Asignación de candidatura cuando aplica (solo cuentas con rol
+            candidato a las que el admin ya asignó una papeleta); null si no tiene.
+          allOf: [{ $ref: '#/components/schemas/AsignacionCandidatura' }]
+
+    AsignacionCandidatura:
+      type: object
+      description: >-
+        Papeleta que la administración asignó a un candidato. El candidato no
+        elige proceso, carrera ni papeleta: trabaja solo con esta asignación.
+      properties:
+        id_asignacion:      { type: integer }
+        fk_cedula_estudiante: { type: string, minLength: 10, maxLength: 10 }
+        fk_id_votacion:     { type: integer }
+        titulo_papeleta:    { type: string }
+        estado_votacion:    { type: string }
+        carrera_votacion:   { type: integer, nullable: true }
+        nombre_carrera:     { type: string, nullable: true, description: Carrera de la papeleta (null si es global). }
+        id_proceso:         { type: integer }
+        nombre_proceso:     { type: string }
+        estado_proceso:     { type: string, description: Estado del proceso; debe ser "inscripcion" para poder asignar. }
+        fecha_inicio_inscripcion: { type: string, nullable: true }
+        fecha_fin_inscripcion:    { type: string, nullable: true }
+        fecha_asignacion:   { type: string, format: date-time }
+        estado:             { type: string, enum: ["activa", "retirada"] }
+        nombres:            { type: string }
+        apellidos:          { type: string }
+        rol:                { type: string }
 
     EstadoEliminacion:
       type: object
