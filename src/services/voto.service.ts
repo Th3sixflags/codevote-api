@@ -56,6 +56,84 @@ export async function estadoResultados(votacionId: number) {
   return repo.estadoDeVotacion(votacionId);
 }
 
+/** Redondea a dos decimales sin arrastrar el error binario de los flotantes. */
+function redondear2(valor: number) {
+  return Math.round((valor + Number.EPSILON) * 100) / 100;
+}
+
+interface OpcionResultado {
+  id_lista: number | null;
+  opcion: string;
+  total_votos: number;
+}
+
+/**
+ * Resultados de una papeleta: conteo por opción más un resumen de participación
+ * y ganador.
+ *
+ * Todo es agregado. No se devuelven cédulas, nombres ni nada que relacione a
+ * una persona con su voto: los votos se cuentan de `voto` (que es anónima) y
+ * la participación de `codigo_voto` (que prueba que alguien votó, pero no qué).
+ */
 export async function obtenerResultados(votacionId: number) {
-  return repo.countByVotacion(votacionId);
+  const estado = await repo.estadoDeVotacion(votacionId);
+  if (!estado) throw new HttpError(404, 'La votación indicada no existe.');
+
+  const carreraVotacion = estado.carrera_votacion == null ? null : Number(estado.carrera_votacion);
+
+  const [filas, totalHabilitados, totalVotantes] = await Promise.all([
+    repo.countByVotacion(votacionId),
+    // Papeleta de carrera -> solo esa carrera; papeleta global -> todo el padrón.
+    repo.countHabilitados(votacionId, carreraVotacion),
+    repo.countVotantes(votacionId),
+  ]);
+
+  const resultados: OpcionResultado[] = filas.map((fila) => ({
+    id_lista:    fila.id_lista == null ? null : Number(fila.id_lista),
+    opcion:      String(fila.opcion),
+    total_votos: Number(fila.total_votos ?? 0),
+  }));
+
+  const faltantes = Math.max(0, totalHabilitados - totalVotantes);
+  const participacionPorcentaje = totalHabilitados > 0
+    ? redondear2((totalVotantes / totalHabilitados) * 100)
+    : 0;
+
+  // Una votación cerrada, o cuyo proceso ya finalizó, da resultados oficiales.
+  // Mientras siga abierta son provisionales, aunque ya haya votado todo el
+  // padrón: cerrar la votación es una decisión del admin, no un efecto de este
+  // endpoint (que solo lee).
+  const esOficial = estado.votacion === 'cerrada' || estado.proceso === 'finalizado';
+
+  // Solo las listas pueden ganar. Los blancos y nulos (id_lista nulo) cuentan
+  // para la participación, pero nunca son ganadores. Tampoco gana una lista con
+  // cero votos: si nadie votó, no hay ganador ni empate.
+  const candidatasAGanar = resultados.filter((r) => r.id_lista != null && r.total_votos > 0);
+  const maximo = candidatasAGanar.reduce((mayor, r) => Math.max(mayor, r.total_votos), 0);
+  const enElMaximo = candidatasAGanar.filter((r) => r.total_votos === maximo);
+
+  const conPorcentaje = (r: OpcionResultado) => ({
+    id_lista:     r.id_lista as number,
+    nombre_lista: r.opcion,
+    total_votos:  r.total_votos,
+    // Porcentaje sobre los votos emitidos, incluidos blancos y nulos.
+    porcentaje:   totalVotantes > 0 ? redondear2((r.total_votos / totalVotantes) * 100) : 0,
+  });
+
+  const hayEmpate = enElMaximo.length > 1;
+
+  return {
+    resultados,
+    resumen: {
+      total_habilitados:        totalHabilitados,
+      total_votantes:           totalVotantes,
+      faltantes,
+      participacion_porcentaje: participacionPorcentaje,
+      participacion_completa:   totalHabilitados > 0 && totalVotantes >= totalHabilitados,
+      estado_resultado:         esOficial ? 'oficial' : 'provisional',
+      ganador:                  hayEmpate || enElMaximo.length === 0 ? null : conPorcentaje(enElMaximo[0]),
+      empate:                   hayEmpate,
+      listas_empatadas:         hayEmpate ? enElMaximo.map(conPorcentaje) : [],
+    },
+  };
 }

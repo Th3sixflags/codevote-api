@@ -31,6 +31,11 @@ export async function votar(req: Request, res: Response) {
 // Roles que pueden ver resultados en cualquier momento.
 const ROLES_PRIVILEGIADOS = ['admin', 'administrador', 'junta_electoral'];
 
+/**
+ * Resultados de una papeleta: conteo por opción y resumen de participación,
+ * ganador y empate. Es de solo lectura: aunque el padrón haya votado completo,
+ * no cierra la votación — eso lo decide el admin.
+ */
 export async function resultados(req: Request, res: Response) {
   const votacionId = Number(req.params.votacionId);
   const rol = String(req.user?.rol ?? '').toLowerCase();

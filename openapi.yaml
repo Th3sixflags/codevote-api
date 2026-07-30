@@ -1951,9 +1951,16 @@ paths:
       tags: [Votos]
       summary: Escrutinio agregado de una votación
       description: >-
+        Conteo por opción más un resumen de participación, ganador y empate.
         Los roles admin, administrador y junta_electoral pueden consultar en
-        cualquier momento. Un estudiante solo puede ver los resultados cuando
-        la votación está cerrada o el proceso ha finalizado.
+        cualquier momento (resultados en vivo). Un estudiante solo puede ver los
+        resultados cuando la votación está cerrada o el proceso ha finalizado, y
+        únicamente de papeletas globales o de su propia carrera.
+
+
+        Todo es agregado: no se devuelven cédulas, nombres ni nada que relacione
+        a una persona con su voto. El endpoint es de solo lectura — aunque el
+        padrón haya votado completo, no cierra la votación.
       parameters:
         - name: votacionId
           in: path
@@ -1961,16 +1968,10 @@ paths:
           schema: { type: integer }
       responses:
         '200':
-          description: Conteo por opción
+          description: Conteo por opción y resumen del escrutinio
           content:
             application/json:
-              schema:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    opcion:      { type: string, description: Nombre de la lista, o "blanco"/"nulo" }
-                    total_votos: { type: integer }
+              schema: { $ref: '#/components/schemas/ResultadosVotacion' }
         '401': { $ref: '#/components/responses/NoAutenticado' }
         '403':
           description: La votación sigue abierta y el usuario no tiene rol privilegiado
@@ -3255,6 +3256,90 @@ components:
           type: string
           minLength: 10
           maxLength: 10
+
+    # Escrutinio de una papeleta. Todo agregado: ni cédulas, ni nombres, ni
+    # ninguna relación entre una persona y su voto.
+    ResultadosVotacion:
+      type: object
+      properties:
+        resultados:
+          type: array
+          description: >-
+            Una fila por opción. Incluye las listas que compiten aunque tengan
+            cero votos, y los blancos y nulos como filas con id_lista nulo.
+          items: { $ref: '#/components/schemas/OpcionResultado' }
+        resumen: { $ref: '#/components/schemas/ResumenEscrutinio' }
+
+    OpcionResultado:
+      type: object
+      properties:
+        id_lista:
+          type: integer
+          nullable: true
+          description: Identificador de la lista, o nulo si la fila es el voto blanco o el nulo.
+        opcion:
+          type: string
+          description: Nombre de la lista, o "blanco"/"nulo".
+        total_votos:
+          type: integer
+
+    ResumenEscrutinio:
+      type: object
+      properties:
+        total_habilitados:
+          type: integer
+          description: >-
+            Padrón de la papeleta. En una papeleta de carrera cuenta solo a los
+            estudiantes activos de esa carrera; en una global, a todo el padrón
+            activo. No incluye a la administración ni a los candidatos de esta
+            papeleta, que no pueden votarla.
+        total_votantes:
+          type: integer
+          description: Personas que votaron, incluidas las que votaron blanco o nulo.
+        faltantes:
+          type: integer
+          description: total_habilitados menos total_votantes, nunca negativo.
+        participacion_porcentaje:
+          type: number
+          format: float
+          description: total_votantes sobre total_habilitados, en porcentaje con dos decimales.
+          example: 100
+        participacion_completa:
+          type: boolean
+          description: >-
+            Verdadero cuando ya votó todo el padrón. Es informativo: no cierra
+            la votación, que sigue siendo una decisión del administrador.
+        estado_resultado:
+          type: string
+          enum: ["provisional", "oficial"]
+          description: >-
+            "provisional" mientras la votación siga abierta; "oficial" cuando la
+            votación está cerrada o el proceso finalizado.
+        ganador:
+          nullable: true
+          allOf: [{ $ref: '#/components/schemas/ListaGanadora' }]
+          description: >-
+            Lista más votada. Es nulo si hay empate o si todavía no hay votos.
+            Los blancos y nulos nunca ganan, aunque superen a las listas.
+        empate:
+          type: boolean
+          description: Verdadero si dos o más listas comparten el máximo de votos.
+        listas_empatadas:
+          type: array
+          description: Listas empatadas en el máximo. Vacío si no hay empate.
+          items: { $ref: '#/components/schemas/ListaGanadora' }
+
+    ListaGanadora:
+      type: object
+      properties:
+        id_lista:     { type: integer }
+        nombre_lista: { type: string }
+        total_votos:  { type: integer }
+        porcentaje:
+          type: number
+          format: float
+          description: Porcentaje sobre los votos emitidos, incluidos blancos y nulos.
+          example: 63.16
 
     # Comprobante tal como lo devuelven TODOS los endpoints de administración
     # (listado, puntual, por votación, creación y actualización): sin cédula,

@@ -101,15 +101,81 @@ export async function estadoDeVotacion(
   return rows[0] ?? null;
 }
 
+/**
+ * Conteo por opción de una papeleta.
+ *
+ * Incluye las listas que compiten aunque no hayan recibido votos (salen con
+ * total_votos = 0), para que el panel muestre la papeleta completa y no solo a
+ * quienes ya tienen votos. Los blancos y nulos aparecen como filas aparte, con
+ * `id_lista` nulo: cuentan para la participación pero nunca pueden ganar.
+ *
+ * El conteo es agregado: nunca sale una fila por votante, así que no hay forma
+ * de relacionar una persona con su voto.
+ */
 export async function countByVotacion(votacionId: number) {
   const [rows] = await pool.query(
-    `SELECT IFNULL(l.nombre_lista, v.tipo_voto) AS opcion, COUNT(*) AS total_votos
-     FROM voto v
-     LEFT JOIN lista_candidata l ON l.id_lista = v.fk_id_lista
-     WHERE v.fk_id_votacion = ?
-     GROUP BY l.nombre_lista, v.tipo_voto
-     ORDER BY total_votos DESC`,
-    [votacionId]
+    `SELECT l.id_lista, l.nombre_lista AS opcion, COUNT(v.id_voto) AS total_votos
+       FROM lista_candidata l
+       LEFT JOIN voto v
+         ON v.fk_id_lista = l.id_lista
+        AND v.fk_id_votacion = ?
+        AND v.tipo_voto = 'valido'
+      WHERE l.fk_id_votacion = ?
+      GROUP BY l.id_lista, l.nombre_lista
+     UNION ALL
+     SELECT NULL AS id_lista, v.tipo_voto AS opcion, COUNT(*) AS total_votos
+       FROM voto v
+      WHERE v.fk_id_votacion = ? AND v.tipo_voto <> 'valido'
+      GROUP BY v.tipo_voto
+     ORDER BY total_votos DESC, opcion ASC`,
+    [votacionId, votacionId, votacionId]
   );
   return rows as any[];
+}
+
+/**
+ * Padrón habilitado para una papeleta.
+ *
+ * - Papeleta de carrera (`carreraVotacion` con valor): solo estudiantes activos
+ *   de esa carrera. Papeleta global (`null`): todo el padrón activo.
+ * - No cuenta a la administración, que no vota.
+ * - No cuenta a los candidatos de ESTA papeleta, que no pueden votarse a sí
+ *   mismos: si contaran, la participación nunca podría llegar al 100%. Un
+ *   candidato de otra papeleta sí sigue habilitado aquí.
+ *
+ * Devuelve un número, nunca la lista de personas.
+ */
+export async function countHabilitados(votacionId: number, carreraVotacion: number | null) {
+  const [rows] = await pool.query(
+    `SELECT COUNT(*) AS total
+       FROM estudiante e
+      WHERE e.estado_academico = 'activo'
+        AND e.rol <> 'admin'
+        AND (? IS NULL OR e.fk_id_carrera = ?)
+        AND e.cedula NOT IN (
+          SELECT c.fk_cedula_estudiante
+            FROM candidato c
+            JOIN lista_candidata l ON l.id_lista = c.fk_id_lista
+           WHERE l.fk_id_votacion = ?
+          UNION
+          SELECT a.fk_cedula_estudiante
+            FROM asignacion_candidatura a
+           WHERE a.fk_id_votacion = ? AND a.estado = 'activa'
+        )`,
+    [carreraVotacion, carreraVotacion, votacionId, votacionId]
+  ) as [any[], any];
+  return Number(rows[0]?.total ?? 0);
+}
+
+/**
+ * Cuántas personas participaron: se cuentan los comprobantes emitidos, que son
+ * uno por votante. Incluye a quienes votaron en blanco o nulo. Solo el total,
+ * sin cédulas.
+ */
+export async function countVotantes(votacionId: number) {
+  const [rows] = await pool.query(
+    'SELECT COUNT(*) AS total FROM codigo_voto WHERE fk_id_votacion = ?',
+    [votacionId]
+  ) as [any[], any];
+  return Number(rows[0]?.total ?? 0);
 }
