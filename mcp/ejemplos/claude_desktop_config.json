@@ -1,0 +1,17 @@
+{
+  "_comentario": "Copia este bloque en claude_desktop_config.json. En macOS está en ~/Library/Application Support/Claude/, en Windows en %APPDATA%\\Claude\\. Cambia la ruta absoluta y las credenciales, y reinicia Claude Desktop.",
+  "mcpServers": {
+    "codevote": {
+      "command": "node",
+      "args": ["/ruta/absoluta/a/codevote-api/mcp/dist/index.js"],
+      "env": {
+        "CODEVOTE_API_URL": "https://codevote.lat/api",
+        "CODEVOTE_EMAIL": "cuenta-mcp@uide.edu.ec",
+        "CODEVOTE_PASSWORD": "REEMPLAZAR",
+        "CODEVOTE_MCP_MODE": "lectura",
+        "CODEVOTE_MCP_REDACT_PII": "true",
+        "CODEVOTE_MCP_LOG_LEVEL": "info"
+      }
+    }
+  }
+}

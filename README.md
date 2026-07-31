@@ -18,6 +18,26 @@ Implementada con Node.js, TypeScript, Express 5 y MySQL bajo una arquitectura de
 4. **Base de Datos (18 Tablas)**: Para reflejar fielmente la complejidad de un sistema de votaciones universitarias, el modelo EER incluye 18 tablas (estudiantes, carreras, facultades, procesos, actas, veedurías, etc.).
 5. **Enfoque de la API**: Para esta Fase 1, la API expone endpoints exclusivamente para las **4 entidades core** (Estudiantes, Procesos Electorales, Listas Candidatas y Votos).
 
+## Servidor MCP
+
+El proyecto incluye un **servidor MCP (Model Context Protocol)** en [`mcp/`](mcp/)
+que permite a un asistente de IA (Claude Desktop, Claude Code) consultar el
+proceso electoral: procesos, papeletas, candidaturas, escrutinio, actas y
+veeduría.
+
+Habla con esta API por HTTPS con JWT —no con MySQL directamente—, así que hereda
+su control de acceso. Expone 15 herramientas de consulta y 8 de administración
+frente a las 71 rutas de la API, y tres operaciones están bloqueadas de forma
+absoluta: **emitir un voto**, **borrar cualquier registro** y **tocar
+credenciales**.
+
+- Instalación y uso: [`mcp/README.md`](mcp/README.md)
+- Análisis de transporte, capacidades y hardening: [`mcp/docs/TA-3.2-analisis.md`](mcp/docs/TA-3.2-analisis.md)
+
+```bash
+cd mcp && npm install && npm run build
+```
+
 ## Estructura de la Base de Datos
 
 El proyecto utiliza un modelo Entidad-Relación de 18 tablas:
