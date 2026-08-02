@@ -132,7 +132,7 @@ Convenciones:
 ### Candidaturas
 | Recurso | Ruta base | Subrutas |
 |---------|-----------|----------|
-| Listas candidatas | `/api/listas-candidatas` | `GET /proceso/:procesoId` |
+| Listas candidatas | `/api/listas-candidatas` | `GET /proceso/:procesoId` · `PATCH /:id/responsable` **(solo admin)** |
 | Candidatos | `/api/candidatos` | `GET /lista/:listaId` |
 | Planes de trabajo | `/api/planes-trabajo` | `GET /lista/:listaId` |
 | Requisitos | `/api/requisitos` | — |
@@ -150,6 +150,39 @@ Convenciones:
 |---------|-----------|----------|
 | Veedores | `/api/veedores` | — |
 | Veedurías | `/api/veedurias` | `GET /votacion/:votacionId` |
+
+---
+
+## Responsable de la candidatura
+
+Solo el **responsable** de una lista tiene `rol = 'candidato'` y acceso al Portal
+del candidato (`/api/candidato/*`). Es, además, su **Presidente**.
+
+- `POST /api/candidato/listas` registra automáticamente al responsable en
+  `lista_candidata.fk_cedula_responsable` y lo inserta como integrante con cargo
+  `Presidente`, todo en una transacción.
+- Los demás integrantes (vicepresidente, secretario, tesorero, vocales) solo
+  obtienen una fila en la tabla `candidato`: **conservan `rol = 'estudiante'`**,
+  no reciben `asignacion_candidatura` ni acceso al portal.
+- Cada endpoint de escritura del portal comprueba
+  `req.user.sub === lista_candidata.fk_cedula_responsable` y responde `403` en
+  caso contrario, aunque quien llame conozca el ID de la lista.
+- Una lista no puede tener dos presidentes (`409`, reforzado con un índice único
+  en la base) ni eliminar a su responsable desde el portal (`409`).
+- Ningún integrante puede votar en la papeleta donde compite (`403`), tenga rol
+  `candidato` o `estudiante`. En otra papeleta habilitada sí puede votar.
+- Cambiar de presidente es exclusivo de la administración:
+  `PATCH /api/listas-candidatas/:id/responsable` con
+  `{ "cedula_nuevo_responsable": "1100000000" }`. La operación es transaccional:
+  el nuevo responsable pasa a `candidato`, recibe la asignación y queda como
+  `Presidente`; el anterior pierde su asignación y vuelve a `estudiante` si no
+  administra otra candidatura.
+
+Los cargos viajan capitalizados (`Presidente`, `Vicepresidente`, `Secretario`,
+`Tesorero`, `Vocal`). Se sigue aceptando la grafía antigua en minúsculas, que se
+normaliza automáticamente.
+
+Migración: `db/migrations/2026-08-01_responsable_presidente.sql` (idempotente).
 
 ---
 
@@ -172,6 +205,43 @@ mysql -u <usuario> -p codevote_db < db/seed.sql
 
 > Ambos archivos ejecutan `SET NAMES utf8mb4` para que las tildes y la ñ se guarden
 > correctamente sin depender del charset por defecto del cliente MySQL.
+
+### Migraciones sobre una base que ya está en uso
+
+`schema.sql` es para una base nueva: **no** se ejecuta sobre una base con datos.
+Para actualizar una existente se aplican los scripts de `db/migrations/` en orden
+de fecha. Son idempotentes, así que volver a correr uno ya aplicado no hace nada.
+
+Antes de aplicar cualquiera, respaldar:
+
+```bash
+mysqldump -u <usuario> -p --single-transaction --routines codevote_db > respaldo_$(date +%F_%H%M).sql
+```
+
+Aplicar la migración:
+
+```bash
+mysql -u <usuario> -p codevote_db < db/migrations/2026-08-01_responsable_presidente.sql
+```
+
+La base se indica en la línea de comandos: el script no fija ninguna con `USE`.
+MySQL hace `COMMIT` implícito en cada sentencia DDL, así que la migración **no
+es** una transacción única; si falla a mitad, se restaura el respaldo.
+
+Comprobar que quedó bien:
+
+```bash
+mysql -u <usuario> -p codevote_db -e "
+  SELECT l.id_lista, l.fk_cedula_responsable, c.cargo
+    FROM lista_candidata l
+    LEFT JOIN candidato c
+      ON c.fk_id_lista = l.id_lista
+     AND c.fk_cedula_estudiante = l.fk_cedula_responsable;
+  SELECT cedula, rol FROM estudiante WHERE rol = 'candidato';"
+```
+
+Cada lista con responsable debe mostrarlo con cargo `Presidente`, y los únicos
+`rol = 'candidato'` deben ser esos responsables.
 
 ## 2. Variables de entorno
 
@@ -219,10 +289,12 @@ docker run -d -p 3000:3000 --env-file .env codevote-api
 
 Todos los usuarios del seed usan la contraseña **`password123`**.
 
-| Correo | Rol |
-|--------|-----|
-| `schininin@uide.edu.ec` | admin |
-| `mgonzalez@uide.edu.ec` | estudiante |
+| Correo | Rol | Notas |
+|--------|-----|-------|
+| `schininin@uide.edu.ec` | admin | — |
+| `mgonzalez@uide.edu.ec` | candidato | Responsable/Presidenta de «Innovación UIDE» |
+| `smendoza@uide.edu.ec` | candidato | Responsable/Presidenta de «Unidad Estudiantil» |
+| `cperez@uide.edu.ec` | estudiante | Integrante de una lista: **no** entra al portal |
 
 > Son credenciales de demostración presentes en el repositorio: no deben usarse
 > como cuentas reales ni considerarse seguras.

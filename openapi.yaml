@@ -888,13 +888,16 @@ paths:
         schema: { type: integer }
     get:
       tags: [Listas candidatas]
-      summary: Obtiene un registro por su identificador
+      summary: Obtiene una lista con su responsable, integrantes y planes
+      description: >-
+        Incluye `fk_cedula_responsable`, el bloque `responsable` y el arreglo
+        `integrantes` (cada uno con su `cargo` y la bandera `es_responsable`).
       responses:
         '200':
           description: Registro encontrado
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/ListaCandidata' }
+              schema: { $ref: '#/components/schemas/ListaCandidataDetalle' }
         '401': { $ref: '#/components/responses/NoAutenticado' }
         '404': { $ref: '#/components/responses/NoEncontrado' }
     patch:
@@ -1004,6 +1007,62 @@ paths:
         '401': { $ref: '#/components/responses/NoAutenticado' }
         '403': { $ref: '#/components/responses/SinPermiso' }
         '404': { $ref: '#/components/responses/NoEncontrado' }
+
+  /listas-candidatas/{id}/responsable:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    patch:
+      tags: [Listas candidatas]
+      summary: Transfiere la responsabilidad de la lista (requiere rol admin)
+      description: >-
+        Operación EXCLUSIVA de administración: el presidente no puede
+        eliminarse ni cambiarse desde el Portal del candidato.
+
+
+        Dentro de una única transacción: el nuevo responsable queda en
+        `fk_cedula_responsable`, pasa a rol `candidato`, recibe la asignación de
+        candidatura de la papeleta de la lista y se convierte en `Presidente`
+        (asciende si ya era integrante, se inserta si no lo era). El responsable
+        anterior hereda el cargo que deja libre el nuevo —o el primer cargo sin
+        ocupar, si este no integraba la lista—, pierde su asignación y vuelve a
+        rol `estudiante` si no administra otra candidatura.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [cedula_nuevo_responsable]
+              properties:
+                cedula_nuevo_responsable:
+                  type: string
+                  minLength: 10
+                  maxLength: 10
+                  description: Cédula del estudiante que asumirá la presidencia de la lista.
+              example:
+                cedula_nuevo_responsable: "1100000000"
+      responses:
+        '200':
+          description: Responsabilidad transferida (lista con su nuevo responsable e integrantes)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ListaCandidataDetalle' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409':
+          description: >-
+            Ya es la responsable, cuenta de administración o estudiante inactivo,
+            carrera incompatible con la papeleta, la lista no tiene papeleta, la
+            persona ya participa en otra candidatura activa, o la lista tiene los
+            cinco cargos ocupados y quien asume no la integraba.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
 
   /candidatos:
     get:
@@ -1909,6 +1968,12 @@ paths:
         solo los estudiantes de esa carrera pueden votarla (403 en caso
         contrario). Además la lista elegida debe competir en esa misma papeleta
         (400 si no). Todo se valida en el backend, sin depender del frontend.
+
+
+        Restricción electoral: ningún integrante registrado en una lista de esta
+        papeleta puede votar en ella (403). Alcanza al presidente y también a los
+        integrantes que conservan `rol = estudiante`. En otra papeleta para la
+        que estén habilitados sí pueden votar.
       requestBody:
         required: true
         content:
@@ -1933,7 +1998,9 @@ paths:
               schema: { $ref: '#/components/schemas/Voto' }
         '401': { $ref: '#/components/responses/NoAutenticado' }
         '403':
-          description: La votación corresponde a otra carrera
+          description: >-
+            La votación corresponde a otra carrera, o quien vota compite en esta
+            papeleta como integrante de una lista.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -2156,8 +2223,12 @@ paths:
   /candidato/mi-lista:
     get:
       tags: [Portal candidato]
-      summary: Lista del candidato autenticado (con candidatos y planes)
-      description: Devuelve la lista de la que el candidato es responsable, o null si aún no tiene.
+      summary: Lista del candidato autenticado (con responsable, integrantes y planes)
+      description: >-
+        Devuelve la lista de la que el candidato es responsable, o null si aún no
+        tiene. Incluye el bloque `responsable`, el arreglo `integrantes` (cada uno
+        con su `cargo` y la bandera `es_responsable`) y `planes`. `candidatos` se
+        mantiene con el mismo contenido que `integrantes` por compatibilidad.
       responses:
         '200':
           description: Lista propia o null
@@ -2165,7 +2236,7 @@ paths:
             application/json:
               schema:
                 nullable: true
-                allOf: [{ $ref: '#/components/schemas/ListaCandidata' }]
+                allOf: [{ $ref: '#/components/schemas/ListaCandidataDetalle' }]
         '401': { $ref: '#/components/responses/NoAutenticado' }
         '403': { $ref: '#/components/responses/SinPermiso' }
 
@@ -2177,6 +2248,11 @@ paths:
         La papeleta NO se envía: se toma de la asignación que la administración
         hizo al candidato (ver GET /candidato/mi-asignacion). El proceso y la
         carrera se derivan de ella. Sin asignación responde 409.
+
+
+        La cédula del candidato autenticado se registra automáticamente en
+        `fk_cedula_responsable` y, en la misma transacción, se le inserta como
+        integrante con cargo `Presidente`. No hay que agregarlo a mano.
       requestBody:
         required: true
         content:
@@ -2257,8 +2333,18 @@ paths:
         schema: { type: integer }
     post:
       tags: [Portal candidato]
-      summary: Agrega un candidato a la lista propia
-      description: Valida que el estudiante exista, el cargo no se repita y la persona no esté en otra lista del mismo proceso.
+      summary: Agrega un integrante a la lista propia
+      description: >-
+        Solo el responsable de la lista puede llamarlo (403 en caso contrario).
+        El integrante conserva su `rol = estudiante`: NO recibe asignación de
+        candidatura ni acceso a /api/candidato/*; únicamente se crea su registro
+        en la tabla `candidato` con su cargo dentro de la lista.
+
+
+        El cargo `Presidente` está reservado al responsable y se rechaza con 409.
+        También se valida que el estudiante exista, cumpla el promedio mínimo,
+        pertenezca a la carrera de la papeleta, no repita cargo y no participe ya
+        en otra candidatura activa.
       requestBody:
         required: true
         content:
@@ -2267,7 +2353,7 @@ paths:
               type: object
               required: [cargo, fk_cedula_estudiante]
               properties:
-                cargo:                { type: string, enum: ["presidente", "vicepresidente", "secretario", "tesorero", "vocal"] }
+                cargo:                { type: string, enum: ["Presidente", "Vicepresidente", "Secretario", "Tesorero", "Vocal"] }
                 fk_cedula_estudiante: { type: string, minLength: 10, maxLength: 10 }
                 foto_url:             { type: string, maxLength: 255 }
       responses:
@@ -2280,7 +2366,10 @@ paths:
         '403': { $ref: '#/components/responses/SinPermiso' }
         '404': { $ref: '#/components/responses/NoEncontrado' }
         '409':
-          description: Cargo duplicado, persona en lista incompatible, o lista no editable
+          description: >-
+            Cargo duplicado, intento de registrar un segundo Presidente, persona
+            en lista incompatible o responsable de otra candidatura, o lista no
+            editable.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -2355,7 +2444,11 @@ paths:
         schema: { type: integer }
     patch:
       tags: [Portal candidato]
-      summary: Edita un candidato de la lista propia
+      summary: Edita un integrante de la lista propia
+      description: >-
+        No permite cambiar el cargo del responsable ni asignar `Presidente` a
+        otro integrante: la presidencia solo se transfiere desde la
+        administración (PATCH /listas-candidatas/{id}/responsable).
       requestBody:
         required: true
         content:
@@ -2363,7 +2456,7 @@ paths:
             schema:
               type: object
               properties:
-                cargo:    { type: string, enum: ["presidente", "vicepresidente", "secretario", "tesorero", "vocal"] }
+                cargo:    { type: string, enum: ["Presidente", "Vicepresidente", "Secretario", "Tesorero", "Vocal"] }
                 foto_url: { type: string, maxLength: 255 }
       responses:
         '200':
@@ -2375,21 +2468,29 @@ paths:
         '403': { $ref: '#/components/responses/SinPermiso' }
         '404': { $ref: '#/components/responses/NoEncontrado' }
         '409':
-          description: Cargo duplicado o lista no editable
+          description: >-
+            Cargo duplicado, intento de mover la presidencia desde el portal, o
+            lista no editable.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
         '422': { $ref: '#/components/responses/ValidacionFallida' }
     delete:
       tags: [Portal candidato]
-      summary: Quita un candidato de la lista propia
+      summary: Quita un integrante de la lista propia
+      description: >-
+        El responsable (Presidente) NO puede eliminarse desde el portal: se
+        responde 409. Para cambiarlo, la administración debe transferir la
+        responsabilidad.
       responses:
-        '204': { description: Candidato eliminado }
+        '204': { description: Integrante eliminado }
         '401': { $ref: '#/components/responses/NoAutenticado' }
         '403': { $ref: '#/components/responses/SinPermiso' }
         '404': { $ref: '#/components/responses/NoEncontrado' }
         '409':
-          description: Lista no editable o proceso fuera de inscripción
+          description: >-
+            Intento de eliminar al responsable de la lista, lista no editable o
+            proceso fuera de inscripción.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -3109,7 +3210,7 @@ components:
       properties:
         cargo:
           type: string
-          enum: ["presidente", "vicepresidente", "secretario", "tesorero", "vocal"]
+          enum: ["Presidente", "Vicepresidente", "Secretario", "Tesorero", "Vocal"]
         cumple_requisitos:
           type: boolean
         foto_url:
@@ -3124,12 +3225,17 @@ components:
 
     Candidato:
       type: object
+      description: >-
+        Integrante de una lista. Estar aquí NO implica tener rol `candidato`:
+        solo el responsable (cargo `Presidente`, `es_responsable: true`) tiene
+        rol `candidato` y acceso al Portal del candidato; el resto conserva
+        `rol = estudiante`.
       properties:
         id_candidato:
           type: integer
         cargo:
           type: string
-          enum: ["presidente", "vicepresidente", "secretario", "tesorero", "vocal"]
+          enum: ["Presidente", "Vicepresidente", "Secretario", "Tesorero", "Vocal"]
         cumple_requisitos:
           type: boolean
         foto_url:
@@ -3139,8 +3245,65 @@ components:
           type: string
           minLength: 10
           maxLength: 10
+        cedula:
+          type: string
+          minLength: 10
+          maxLength: 10
+          description: Alias de fk_cedula_estudiante.
+        nombres:
+          type: string
+        apellidos:
+          type: string
+        nombre_completo:
+          type: string
+        es_responsable:
+          type: boolean
+          description: >-
+            true solo para el Presidente, que es el responsable de la
+            candidatura. No se puede eliminar ni cambiar desde el portal.
         fk_id_lista:
           type: integer
+
+    ListaCandidataDetalle:
+      description: >-
+        Lista con su responsable, sus integrantes y sus planes de trabajo. La
+        devuelven GET /candidato/mi-lista, GET /listas-candidatas/{id} y
+        PATCH /listas-candidatas/{id}/responsable.
+      allOf:
+        - $ref: '#/components/schemas/ListaCandidata'
+        - type: object
+          properties:
+            responsable:
+              type: object
+              nullable: true
+              description: Datos del presidente/responsable de la lista.
+              properties:
+                cedula:    { type: string, minLength: 10, maxLength: 10 }
+                nombres:   { type: string }
+                apellidos: { type: string }
+            integrantes:
+              type: array
+              description: Integrantes de la lista, con el Presidente primero.
+              items: { $ref: '#/components/schemas/Candidato' }
+            candidatos:
+              type: array
+              description: Mismo contenido que `integrantes` (compatibilidad).
+              items: { $ref: '#/components/schemas/Candidato' }
+            planes:
+              type: array
+              items: { $ref: '#/components/schemas/PlanTrabajo' }
+          example:
+            fk_cedula_responsable: "1100000000"
+            responsable:
+              cedula: "1100000000"
+              nombres: "Nombre"
+              apellidos: "Apellido"
+            integrantes:
+              - cedula: "1100000000"
+                nombres: "Nombre"
+                apellidos: "Apellido"
+                cargo: "Presidente"
+                es_responsable: true
 
     PlanTrabajoInput:
       type: object

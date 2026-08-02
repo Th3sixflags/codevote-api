@@ -1,9 +1,14 @@
 import * as repo from '../repositories/lista_candidata.repository.js';
 import * as votacionRepo from '../repositories/votacion.repository.js';
 import * as borradoRepo from '../repositories/borrado.repository.js';
+import * as candidatoRepo from '../repositories/candidato.repository.js';
+import * as estudianteRepo from '../repositories/estudiante.repository.js';
+import * as planRepo from '../repositories/plan_trabajo.repository.js';
 import type { FiltroCarrera } from '../repositories/lista_candidata.repository.js';
 import { procesoVisible } from '../utils/accesoCarrera.js';
 import { HttpError } from '../utils/httpError.js';
+import { CARGOS } from '../schemas/common.js';
+import { componerLista } from './candidato_portal.service.js';
 import { CrearListaDTO, ActualizarListaDTO } from '../schemas/lista_candidata.schema.js';
 
 // Las listas de un proceso de carrera solo se devuelven a estudiantes de esa
@@ -12,11 +17,21 @@ export async function listarListas(filtro: FiltroCarrera = undefined) {
   return repo.findAll(filtro);
 }
 
+/**
+ * Detalle de una lista para la administración: incluye `responsable`,
+ * `integrantes` (con la bandera `es_responsable`) y sus planes de trabajo, con
+ * la misma forma que devuelve GET /api/candidato/mi-lista.
+ */
 export async function obtenerLista(id: number, filtro: FiltroCarrera = undefined) {
   const lista = await repo.findById(id);
   if (!lista) return null;
-  if (!procesoVisible(lista.carrera_proceso, filtro)) return null;
-  return lista;
+  if (!procesoVisible(lista.carrera_votacion, filtro)) return null;
+
+  const [integrantes, planes] = await Promise.all([
+    candidatoRepo.findByLista(id),
+    planRepo.findByLista(id),
+  ]);
+  return componerLista(lista, integrantes, planes);
 }
 
 export async function listarPorProceso(procesoId: number, filtro: FiltroCarrera = undefined) {
@@ -84,4 +99,67 @@ export async function retirarLista(id: number) {
   const existente = await repo.findById(id);
   if (!existente) return null;
   return repo.setEstadoRevision(id, 'retirada', existente.motivo_rechazo ?? null);
+}
+
+// --- Transferencia de la responsabilidad ----------------------------------
+
+/**
+ * PATCH /api/listas-candidatas/:id/responsable — operación EXCLUSIVA de la
+ * administración. El presidente no puede eliminarse ni cambiarse desde el
+ * Portal del candidato; esta es la única vía para moverlo.
+ *
+ * El nuevo responsable pasa a rol 'candidato', recibe la asignación de la
+ * papeleta de la lista y queda como Presidente. El anterior pierde su
+ * asignación y vuelve a 'estudiante' si no administra otra candidatura. Todo
+ * ocurre dentro de una transacción (ver repositorio).
+ */
+export async function transferirResponsable(listaId: number, nuevaCedula: string) {
+  const lista = await repo.findById(listaId);
+  if (!lista) return null;
+
+  if (lista.fk_id_votacion == null) {
+    throw new HttpError(409, 'La lista no tiene papeleta asignada, así que no se puede transferir la responsabilidad.');
+  }
+  if (lista.fk_cedula_responsable === nuevaCedula) {
+    throw new HttpError(409, 'Esa persona ya es la responsable de la lista.');
+  }
+
+  const nuevo = await estudianteRepo.findByCedula(nuevaCedula);
+  if (!nuevo) throw new HttpError(404, 'El estudiante indicado no existe.');
+  if (String(nuevo.rol).toLowerCase() === 'admin') {
+    throw new HttpError(409, 'Una cuenta de administración no puede ser responsable de una candidatura.');
+  }
+  if (nuevo.estado_academico !== 'activo') {
+    throw new HttpError(409, 'El estudiante no está activo, así que no puede ser responsable de una candidatura.');
+  }
+
+  // Papeleta de carrera: el nuevo responsable debe pertenecer a esa carrera.
+  if (lista.carrera_votacion != null) {
+    const carreraNuevo = nuevo.id_carrera == null ? null : Number(nuevo.id_carrera);
+    if (carreraNuevo !== Number(lista.carrera_votacion)) {
+      throw new HttpError(409, `Esta lista compite en la papeleta de la carrera "${lista.nombre_carrera}" y esa persona no pertenece a ella.`);
+    }
+  }
+
+  // No puede estar comprometido en otra candidatura activa (salvo esta misma).
+  const activa = await candidatoRepo.candidaturaActiva(nuevaCedula);
+  if (activa && Number(activa.id_lista) !== Number(listaId)) {
+    throw new HttpError(409, `Esa persona ya participa en la lista "${activa.nombre_lista}" de "${activa.nombre_proceso}". Solo se permite una candidatura a la vez.`);
+  }
+
+  // Si el nuevo responsable todavía no integra la lista, la presidencia le deja
+  // su cargo al anterior; con los cinco cargos ocupados no queda ninguno libre
+  // y la lista pasaría a tener seis integrantes.
+  const integrantes = await candidatoRepo.findByLista(listaId);
+  const yaIntegra   = integrantes.some((i) => i.fk_cedula_estudiante === nuevaCedula);
+  if (!yaIntegra && integrantes.length >= CARGOS.length) {
+    throw new HttpError(409, 'La lista ya tiene los cinco cargos ocupados: retira a un integrante antes de transferir la responsabilidad.');
+  }
+
+  await repo.transferirResponsable(
+    listaId, Number(lista.fk_id_votacion), nuevaCedula, lista.fk_cedula_responsable ?? null
+  );
+  // Se devuelve el detalle completo (responsable + integrantes) para que el
+  // frontend refresque la vista sin una segunda llamada.
+  return obtenerLista(listaId);
 }

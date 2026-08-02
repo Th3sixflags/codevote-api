@@ -153,7 +153,10 @@ export async function buscarPosiblesIntegrantes(
      LEFT JOIN carrera c ON c.id_carrera = e.fk_id_carrera
      WHERE (e.nombres LIKE ? OR e.apellidos LIKE ? OR e.cedula LIKE ?)
        ${filtroCarrera}
-       -- Excluye a quienes ya tienen una candidatura activa.
+       -- La administración no se postula.
+       AND e.rol <> 'admin'
+       AND e.estado_academico = 'activo'
+       -- Excluye a quienes ya pertenecen a otra candidatura activa.
        AND NOT EXISTS (
          SELECT 1 FROM candidato ca
          JOIN lista_candidata l ON l.id_lista = ca.fk_id_lista
@@ -162,6 +165,12 @@ export async function buscarPosiblesIntegrantes(
            AND l.estado_revision NOT IN ('rechazada', 'retirada')
            AND p.estado NOT IN ('finalizado', 'cancelado')
            AND p.archivado_at IS NULL
+       )
+       -- Excluye a otros responsables: quien tiene una asignación activa es el
+       -- presidente de su propia lista y no puede ser integrante de otra.
+       AND NOT EXISTS (
+         SELECT 1 FROM asignacion_candidatura a
+         WHERE a.fk_cedula_estudiante = e.cedula AND a.estado = 'activa'
        )
      ORDER BY e.apellidos, e.nombres
      LIMIT ?`,

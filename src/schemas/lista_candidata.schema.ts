@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { urlImagenHttpsSchema } from './common.js';
+import { urlImagenHttpsSchema, cedulaSchema } from './common.js';
 
 export const crearListaSchema = z.object({
   // La lista compite en una papeleta concreta; el proceso se deriva de ella.
@@ -19,6 +19,13 @@ export const rechazarListaSchema = z.object({
   motivo: z.string().min(1, 'Debe indicar el motivo del rechazo.').max(250),
 });
 
-export type CrearListaDTO      = z.infer<typeof crearListaSchema>;
-export type ActualizarListaDTO = z.infer<typeof actualizarListaSchema>;
-export type RechazarListaDTO   = z.infer<typeof rechazarListaSchema>;
+// Transferencia de la responsabilidad de la lista (operación exclusiva de la
+// administración). El presidente NO puede cambiarse desde el Portal candidato.
+export const transferirResponsableSchema = z.object({
+  cedula_nuevo_responsable: cedulaSchema,
+});
+
+export type CrearListaDTO            = z.infer<typeof crearListaSchema>;
+export type ActualizarListaDTO       = z.infer<typeof actualizarListaSchema>;
+export type RechazarListaDTO         = z.infer<typeof rechazarListaSchema>;
+export type TransferirResponsableDTO = z.infer<typeof transferirResponsableSchema>;

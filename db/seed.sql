@@ -78,23 +78,38 @@ INSERT INTO votacion (fk_id_proceso, titulo_papeleta, fecha_apertura, fecha_cier
 -- 9. lista_candidata
 -- Cada lista compite en una papeleta concreta (fk_id_votacion); su carrera se
 -- deriva de esa votación.
-INSERT INTO lista_candidata (fk_id_proceso, fk_id_votacion, nombre_lista, lema, estado_revision, fecha_inscripcion) VALUES
-(1, 1, 'Innovación UIDE', 'Hacia el futuro', 'aprobada', '2026-06-06'),
-(1, 1, 'Unidad Estudiantil', 'Juntos somos más', 'aprobada', '2026-06-08'),
-(2, 2, 'Opción SÍ', 'Mejores estatutos', 'aprobada', '2025-05-06');
+-- El responsable de la lista es su Presidente y la única persona de la lista con
+-- rol 'candidato' (acceso al Portal del candidato).
+INSERT INTO lista_candidata (fk_id_proceso, fk_id_votacion, nombre_lista, lema, estado_revision, fecha_inscripcion, fk_cedula_responsable) VALUES
+(1, 1, 'Innovación UIDE', 'Hacia el futuro', 'aprobada', '2026-06-06', '1710000017'),
+(1, 1, 'Unidad Estudiantil', 'Juntos somos más', 'aprobada', '2026-06-08', '1710000058'),
+(2, 2, 'Opción SÍ', 'Mejores estatutos', 'aprobada', '2025-05-06', NULL);
+
+-- Solo los dos responsables tienen rol 'candidato'; el resto de integrantes
+-- sigue siendo 'estudiante'.
+UPDATE estudiante SET rol = 'candidato' WHERE cedula IN ('1710000017', '1710000058');
+
+-- Cada responsable necesita la asignación de la papeleta en la que compite para
+-- operar el Portal del candidato.
+INSERT INTO asignacion_candidatura (fk_cedula_estudiante, fk_id_votacion, estado) VALUES
+('1710000017', 1, 'activa'),
+('1710000058', 1, 'activa');
 
 -- 10. candidato
-INSERT INTO candidato (cargo, cumple_requisitos, foto_url, fk_cedula_estudiante, fk_id_lista) VALUES 
-('presidente', 1, 'url_foto_1', '1710000009', 1),
-('vicepresidente', 1, 'url_foto_2', '1710000017', 1),
-('secretario', 1, 'url_foto_3', '1710000025', 1),
-('tesorero', 1, 'url_foto_4', '1710000033', 1),
-('vocal', 1, 'url_foto_5', '1710000041', 1),
-('presidente', 1, 'url_foto_6', '1710000058', 2),
-('vicepresidente', 1, 'url_foto_7', '1710000066', 2),
-('secretario', 1, 'url_foto_8', '1710000074', 2),
-('tesorero', 1, 'url_foto_9', '1710000082', 2),
-('vocal', 1, 'url_foto_10', '1710000090', 2);
+-- Cada lista tiene exactamente un Presidente, que coincide con su responsable.
+INSERT INTO candidato (cargo, cumple_requisitos, foto_url, fk_cedula_estudiante, fk_id_lista) VALUES
+('Presidente', 1, 'url_foto_1', '1710000017', 1),
+('Vicepresidente', 1, 'url_foto_2', '1710000025', 1),
+('Secretario', 1, 'url_foto_3', '1710000033', 1),
+('Tesorero', 1, 'url_foto_4', '1710000041', 1),
+-- Se evita a quienes ya emitieron voto en la papeleta 1 (ver codigo_voto): un
+-- integrante no puede votar en la papeleta donde compite.
+('Vocal', 1, 'url_foto_5', '1710000140', 1),
+('Presidente', 1, 'url_foto_6', '1710000058', 2),
+('Vicepresidente', 1, 'url_foto_7', '1710000066', 2),
+('Secretario', 1, 'url_foto_8', '1710000074', 2),
+('Tesorero', 1, 'url_foto_9', '1710000082', 2),
+('Vocal', 1, 'url_foto_10', '1710000090', 2);
 
 -- 11. requisito
 INSERT INTO requisito (nombre_requisito, descripcion, tipo_requisito) VALUES 

@@ -85,6 +85,33 @@ export async function listaPerteneceAVotacion(listaId: number, votacionId: numbe
 }
 
 /**
+ * ¿La persona compite en esta papeleta?
+ *
+ * Cuenta como competidor cualquiera que aparezca en la tabla `candidato` de una
+ * lista de esta papeleta —el Presidente y también los integrantes que conservan
+ * rol 'estudiante'— y quien tenga una asignación de candidatura activa en ella
+ * (candidato al que ya se le asignó papeleta aunque todavía no haya inscrito su
+ * lista).
+ *
+ * Solo bloquea ESTA papeleta: en otra para la que esté habilitado puede votar
+ * con normalidad. Es la misma condición que usa `countHabilitados`, para que el
+ * padrón y la restricción de voto nunca se contradigan.
+ */
+export async function compiteEnVotacion(cedula: string, votacionId: number): Promise<boolean> {
+  const [rows] = await pool.query(
+    `SELECT 1 FROM candidato c
+       JOIN lista_candidata l ON l.id_lista = c.fk_id_lista
+      WHERE c.fk_cedula_estudiante = ? AND l.fk_id_votacion = ?
+      UNION
+     SELECT 1 FROM asignacion_candidatura a
+      WHERE a.fk_cedula_estudiante = ? AND a.fk_id_votacion = ? AND a.estado = 'activa'
+      LIMIT 1`,
+    [cedula, votacionId, cedula, votacionId]
+  ) as [any[], any];
+  return rows.length > 0;
+}
+
+/**
  * Estado de la votación y de su proceso, más la carrera del proceso, para
  * decidir si se puede votar y si se pueden ver los resultados.
  */

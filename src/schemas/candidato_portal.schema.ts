@@ -1,11 +1,11 @@
 import { z } from 'zod';
-import { cedulaSchema, urlImagenHttpsSchema } from './common.js';
+import { cedulaSchema, urlImagenHttpsSchema, cargoSchema } from './common.js';
 
 // Esquemas de entrada del portal del candidato. Reutilizan los mismos enums de
 // cargo y área que el resto del sistema, pero NO permiten fijar la lista ni el
 // dueño desde el body: esos se derivan de la ruta y del token.
 
-const CARGO = z.enum(['presidente', 'vicepresidente', 'secretario', 'tesorero', 'vocal']);
+const CARGO = cargoSchema;
 const AREA  = z.enum(['academico', 'deportivo', 'cultural', 'infraestructura', 'social']);
 
 export const crearListaCandidatoSchema = z.object({

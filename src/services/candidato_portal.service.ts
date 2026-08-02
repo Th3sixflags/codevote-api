@@ -7,11 +7,21 @@ import * as estudianteRepo from '../repositories/estudiante.repository.js';
 import * as asignacionRepo from '../repositories/asignacion_candidatura.repository.js';
 import { HttpError } from '../utils/httpError.js';
 import { PROMEDIO_MINIMO_POSTULACION } from '../config/reglas.js';
+import { CARGO_PRESIDENTE } from '../schemas/common.js';
 import {
   CrearListaCandidatoDTO, ActualizarListaCandidatoDTO,
   AgregarCandidatoDTO, ActualizarCandidatoPortalDTO,
   AgregarPlanDTO, ActualizarPlanDTO,
 } from '../schemas/candidato_portal.schema.js';
+
+/**
+ * Portal del candidato.
+ *
+ * Solo el RESPONSABLE de la candidatura (rol 'candidato' + asignación activa)
+ * entra aquí y es, a la vez, el Presidente de su lista. Los demás integrantes
+ * se registran en la tabla `candidato` pero conservan rol 'estudiante': no
+ * reciben asignación ni pueden llamar a /api/candidato/*.
+ */
 
 // Contexto mínimo (lista o candidato/plan con datos de su lista) para las
 // verificaciones de dueño y de estados.
@@ -21,10 +31,14 @@ interface Contexto {
   estado_proceso: string;
 }
 
-/** La lista debe pertenecer al candidato autenticado. */
+/**
+ * La lista debe pertenecer al candidato autenticado: se compara la cédula del
+ * token (req.user.sub) con lista_candidata.fk_cedula_responsable. Otro candidato
+ * —o un integrante que conociera el ID— recibe 403.
+ */
 function verificarDueno(ctx: Contexto, cedula: string) {
   if (ctx.fk_cedula_responsable !== cedula) {
-    throw new HttpError(403, 'Esta lista no te pertenece.');
+    throw new HttpError(403, 'Esta lista no te pertenece: solo su responsable puede modificarla.');
   }
 }
 
@@ -47,16 +61,39 @@ function verificarEditable(ctx: Contexto) {
 
 // ---------------------------------------------------------------------------
 
-/** Lista del candidato con sus candidatos y planes (o null si no tiene). */
+/**
+ * Arma la respuesta que espera el frontend: además de la lista, el bloque
+ * `responsable` y el arreglo `integrantes` con la bandera `es_responsable`.
+ * Se conserva `candidatos` (mismo contenido que `integrantes`) por
+ * compatibilidad con los clientes que ya lo consumen.
+ */
+export function componerLista(lista: any, integrantes: any[], planes: any[]) {
+  const presidente = integrantes.find((i) => i.es_responsable) ?? null;
+  return {
+    ...lista,
+    responsable: presidente
+      ? {
+          cedula:    presidente.fk_cedula_estudiante,
+          nombres:   presidente.nombres,
+          apellidos: presidente.apellidos,
+        }
+      : null,
+    integrantes,
+    candidatos: integrantes,
+    planes,
+  };
+}
+
+/** Lista del candidato con sus integrantes y planes (o null si no tiene). */
 export async function obtenerMiLista(cedula: string) {
   const lista = await listaRepo.findByResponsable(cedula);
   if (!lista) return null;
 
-  const [candidatos, planes] = await Promise.all([
+  const [integrantes, planes] = await Promise.all([
     candidatoRepo.findByLista(lista.id_lista),
     planRepo.findByLista(lista.id_lista),
   ]);
-  return { ...lista, candidatos, planes };
+  return componerLista(lista, integrantes, planes);
 }
 
 /**
@@ -83,8 +120,16 @@ export async function crearLista(cedula: string, data: CrearListaCandidatoDTO) {
   if (await listaRepo.existeResponsableEnProceso(cedula, votacion.id_proceso)) {
     throw new HttpError(409, 'Ya tienes una lista registrada en este proceso.');
   }
-  // La lista nace en 'pendiente' (borrador editable) hasta que se envía a revisión.
-  return listaRepo.createDeCandidato(
+  // Tampoco puede integrar la lista de otra persona: una sola candidatura activa.
+  const activa = await candidatoRepo.candidaturaActiva(cedula);
+  if (activa) {
+    throw new HttpError(409, `Ya participas en la lista "${activa.nombre_lista}" de "${activa.nombre_proceso}". Solo se permite una candidatura a la vez.`);
+  }
+
+  // La lista nace en 'pendiente' (borrador editable) hasta que se envía a
+  // revisión. El responsable queda registrado en fk_cedula_responsable y, en la
+  // misma transacción, como integrante con cargo 'Presidente'.
+  return listaRepo.crearListaConPresidente(
     asignacion.fk_id_votacion, votacion.id_proceso, data.nombre_lista, data.lema ?? null,
     'pendiente', cedula, data.foto_url ?? null
   );
@@ -103,12 +148,27 @@ export async function actualizarLista(cedula: string, listaId: number, data: Act
   });
 }
 
+/**
+ * Agrega un integrante a la lista (vicepresidente, secretario, tesorero,
+ * vocales). El integrante NO cambia de rol, NO recibe asignación de candidatura
+ * y NO obtiene acceso al portal: solo se crea su fila en la tabla `candidato`
+ * con su cargo dentro de la lista.
+ */
 export async function agregarCandidato(cedula: string, listaId: number, data: AgregarCandidatoDTO) {
   const lista = await listaRepo.findById(listaId);
   if (!lista) throw new HttpError(404, 'Lista no encontrada.');
   verificarDueno(lista, cedula);
   verificarInscripcion(lista);
   verificarEditable(lista);
+
+  // El cargo de Presidente está reservado al responsable, que ya se registró al
+  // crear la lista: no puede haber un segundo presidente.
+  if (data.cargo === CARGO_PRESIDENTE) {
+    throw new HttpError(409, 'El cargo de Presidente corresponde al responsable de la lista y ya está asignado.');
+  }
+  if (data.fk_cedula_estudiante === cedula) {
+    throw new HttpError(409, 'Ya formas parte de tu lista como Presidente.');
+  }
 
   const estudiante = await estudianteRepo.findByCedula(data.fk_cedula_estudiante);
   if (!estudiante) {
@@ -139,6 +199,14 @@ export async function agregarCandidato(cedula: string, listaId: number, data: Ag
   if (activa) {
     throw new HttpError(409, `Esa persona ya tiene una candidatura activa en "${activa.nombre_proceso}" (lista "${activa.nombre_lista}"). Solo se permite una candidatura a la vez.`);
   }
+  // Quien tiene asignación activa es responsable de su propia candidatura: no
+  // puede ser a la vez integrante de esta.
+  const asignacionAjena = await asignacionRepo.findActivaDeEstudiante(data.fk_cedula_estudiante);
+  if (asignacionAjena) {
+    throw new HttpError(409, 'Esa persona es responsable de otra candidatura y no puede integrar esta lista.');
+  }
+  // El integrante conserva su rol 'estudiante': aquí solo se crea su registro
+  // como integrante de la lista, sin tocar `estudiante.rol` ni crear asignación.
   return candidatoRepo.create({
     cargo: data.cargo,
     fk_cedula_estudiante: data.fk_cedula_estudiante,
@@ -154,6 +222,15 @@ export async function actualizarCandidato(cedula: string, candidatoId: number, d
   verificarInscripcion(ctx);
   verificarEditable(ctx);
 
+  // El cargo del responsable no se toca desde el portal: cambiarlo equivaldría
+  // a transferir la presidencia, que es una operación de administración
+  // (PATCH /api/listas-candidatas/:id/responsable).
+  if (ctx.es_responsable && data.cargo && data.cargo !== CARGO_PRESIDENTE) {
+    throw new HttpError(409, 'No puedes cambiar el cargo del responsable de la lista. La presidencia solo se transfiere desde la administración.');
+  }
+  if (!ctx.es_responsable && data.cargo === CARGO_PRESIDENTE) {
+    throw new HttpError(409, 'El cargo de Presidente corresponde al responsable de la lista y ya está asignado.');
+  }
   if (data.cargo && await candidatoRepo.existeCargoEnLista(ctx.fk_id_lista, data.cargo, candidatoId)) {
     throw new HttpError(409, `Ya existe un candidato con el cargo "${data.cargo}" en esta lista.`);
   }
@@ -166,6 +243,11 @@ export async function eliminarCandidato(cedula: string, candidatoId: number) {
   verificarDueno(ctx, cedula);
   verificarInscripcion(ctx);
   verificarEditable(ctx);
+  // El responsable no puede eliminarse a sí mismo de su lista: dejaría la
+  // candidatura sin presidente. Cambiarlo es una operación de administración.
+  if (ctx.es_responsable) {
+    throw new HttpError(409, 'No puedes eliminar al responsable de la lista. Para cambiarlo, la administración debe transferir la responsabilidad.');
+  }
   await candidatoRepo.remove(candidatoId);
 }
 
@@ -199,9 +281,11 @@ export async function enviarARevision(cedula: string, listaId: number) {
   verificarInscripcion(lista);
   verificarEditable(lista); // aprobada/retirada no pueden reenviarse
 
-  const candidatos = await candidatoRepo.findByLista(listaId);
-  if (candidatos.length === 0) {
-    throw new HttpError(409, 'Agrega al menos un candidato antes de enviar la lista a revisión.');
+  // El responsable ya cuenta como Presidente, así que se exige al menos un
+  // integrante más: una lista de una sola persona no es una candidatura.
+  const integrantes = await candidatoRepo.findByLista(listaId);
+  if (integrantes.filter((i) => !i.es_responsable).length === 0) {
+    throw new HttpError(409, 'Agrega al menos un integrante además del presidente antes de enviar la lista a revisión.');
   }
   return listaRepo.setEstadoRevision(listaId, 'en_revision', null);
 }

@@ -28,6 +28,14 @@ export async function registrarVoto(data: CrearVotoDTO, cedula: string, filtro: 
     throw new HttpError(403, 'Esta votación corresponde a otra carrera.');
   }
 
+  // Restricción electoral: quien compite en esta papeleta no puede votar en
+  // ella. Alcanza a TODOS los integrantes de la lista (el presidente y también
+  // los que conservan rol 'estudiante'), no solo a quien tiene rol 'candidato'.
+  // En otra papeleta para la que esté habilitado sí puede votar.
+  if (await repo.compiteEnVotacion(cedula, data.fk_id_votacion)) {
+    throw new HttpError(403, 'No puedes votar en una papeleta en la que compites como integrante de una lista.');
+  }
+
   // Un voto 'valido' debe ser por una lista que pertenezca a esta votación.
   if (data.tipo_voto === 'valido' && data.fk_id_lista != null) {
     if (!(await repo.listaPerteneceAVotacion(data.fk_id_lista, data.fk_id_votacion))) {

@@ -1,30 +1,69 @@
 import { pool } from '../config/database.js';
+import { CARGO_PRESIDENTE } from '../schemas/common.js';
 import { CrearCandidatoDTO, ActualizarCandidatoDTO } from '../schemas/candidato.schema.js';
 
+// `es_responsable` marca al Presidente de la lista: la única persona con rol
+// 'candidato' y acceso al Portal del candidato. El resto de integrantes sale
+// aquí igual, pero conserva su rol 'estudiante'.
 const BASE_QUERY = `
   SELECT
     c.id_candidato, c.cargo, c.cumple_requisitos, c.foto_url,
-    c.fk_cedula_estudiante, e.nombres, e.apellidos,
+    c.fk_cedula_estudiante, c.fk_cedula_estudiante AS cedula,
+    e.nombres, e.apellidos,
     CONCAT(e.nombres, ' ', e.apellidos) AS nombre_completo,
-    c.fk_id_lista, l.nombre_lista
+    c.fk_id_lista, l.nombre_lista,
+    (l.fk_cedula_responsable IS NOT NULL
+     AND l.fk_cedula_responsable = c.fk_cedula_estudiante) AS es_responsable
   FROM candidato c
   JOIN estudiante e ON e.cedula = c.fk_cedula_estudiante
   JOIN lista_candidata l ON l.id_lista = c.fk_id_lista
 `;
 
+/** MySQL devuelve los booleanos como 0/1: se normalizan a boolean real. */
+function normalizar(row: any) {
+  if (!row) return row;
+  return { ...row, es_responsable: Number(row.es_responsable) === 1 };
+}
+
 export async function findAll() {
   const [rows] = await pool.query(BASE_QUERY + ' ORDER BY c.id_candidato');
-  return rows as any[];
+  return (rows as any[]).map(normalizar);
 }
 
 export async function findById(id: number) {
   const [rows] = await pool.query(BASE_QUERY + ' WHERE c.id_candidato = ?', [id]) as [any[], any];
-  return rows[0] ?? null;
+  return normalizar(rows[0] ?? null);
 }
 
+/**
+ * Integrantes de una lista, con el Presidente (responsable) siempre primero
+ * para que el frontend pueda mostrarlo encabezando la candidatura.
+ */
 export async function findByLista(id: number) {
-  const [rows] = await pool.query(BASE_QUERY + ' WHERE c.fk_id_lista = ?', [id]);
-  return rows as any[];
+  const [rows] = await pool.query(
+    BASE_QUERY + ` WHERE c.fk_id_lista = ?
+                   ORDER BY (c.cargo = ?) DESC, c.id_candidato`,
+    [id, CARGO_PRESIDENTE]
+  );
+  return (rows as any[]).map(normalizar);
+}
+
+/** El Presidente (responsable) de la lista, o null si aún no lo tiene. */
+export async function findPresidenteDeLista(listaId: number) {
+  const [rows] = await pool.query(
+    BASE_QUERY + ' WHERE c.fk_id_lista = ? AND c.cargo = ? LIMIT 1',
+    [listaId, CARGO_PRESIDENTE]
+  ) as [any[], any];
+  return normalizar(rows[0] ?? null);
+}
+
+/** ¿La lista ya tiene Presidente? (opcionalmente excluye un candidato). */
+export async function existePresidenteEnLista(listaId: number, exceptId = 0): Promise<boolean> {
+  const [rows] = await pool.query(
+    'SELECT 1 FROM candidato WHERE fk_id_lista = ? AND cargo = ? AND id_candidato <> ? LIMIT 1',
+    [listaId, CARGO_PRESIDENTE, exceptId]
+  ) as [any[], any];
+  return rows.length > 0;
 }
 
 /** Indica si el estudiante ya es candidato en la lista indicada. */
@@ -67,14 +106,16 @@ export async function findByIdConLista(id: number) {
   const [rows] = await pool.query(
     `SELECT c.id_candidato, c.cargo, c.fk_cedula_estudiante, c.fk_id_lista,
             l.fk_cedula_responsable, l.estado_revision, l.fk_id_proceso,
-            p.estado AS estado_proceso
+            p.estado AS estado_proceso,
+            (l.fk_cedula_responsable IS NOT NULL
+             AND l.fk_cedula_responsable = c.fk_cedula_estudiante) AS es_responsable
      FROM candidato c
      JOIN lista_candidata l ON l.id_lista = c.fk_id_lista
      JOIN proceso_electoral p ON p.id_proceso = l.fk_id_proceso
      WHERE c.id_candidato = ?`,
     [id]
   ) as [any[], any];
-  return rows[0] ?? null;
+  return normalizar(rows[0] ?? null);
 }
 
 /** ¿Ya existe ese cargo en la lista? (excluye opcionalmente un candidato). */

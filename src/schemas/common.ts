@@ -39,6 +39,33 @@ export const cedulaSchema = z
   .refine(esCedulaEcuatorianaValida, 'La cédula no es válida: revisa el número (dígito verificador incorrecto).');
 
 /**
+ * Cargos de un integrante dentro de una lista.
+ *
+ * 'Presidente' está reservado al RESPONSABLE de la candidatura: es el único con
+ * rol 'candidato' y acceso al Portal del candidato. El resto de integrantes se
+ * registra en la tabla `candidato` conservando su rol 'estudiante'.
+ *
+ * Los valores viajan capitalizados (así están en el ENUM de la base). Se acepta
+ * la grafía antigua en minúsculas y se normaliza, para no romper a los clientes
+ * que todavía envían 'presidente'.
+ */
+export const CARGOS = ['Presidente', 'Vicepresidente', 'Secretario', 'Tesorero', 'Vocal'] as const;
+export type Cargo = (typeof CARGOS)[number];
+
+export const CARGO_PRESIDENTE: Cargo = 'Presidente';
+
+/** Cargos que puede ocupar un integrante que no es el responsable. */
+export const CARGOS_SECUNDARIOS = CARGOS.filter((c) => c !== CARGO_PRESIDENTE);
+
+/** Normaliza 'presidente' / 'PRESIDENTE' a 'Presidente'. Deja intacto lo demás. */
+export function normalizarCargo(valor: unknown): unknown {
+  if (typeof valor !== 'string') return valor;
+  return CARGOS.find((c) => c.toLowerCase() === valor.trim().toLowerCase()) ?? valor;
+}
+
+export const cargoSchema = z.preprocess(normalizarCargo, z.enum(CARGOS));
+
+/**
  * URL de una imagen alojada externamente. Se exige HTTPS para no degradar la
  * seguridad de la página con contenido mixto (http dentro de un sitio https).
  * Se acepta cadena vacía o null para quitar la imagen; ambas se normalizan a

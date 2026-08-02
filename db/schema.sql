@@ -134,15 +134,24 @@ CREATE TABLE lista_candidata (
 );
 
 -- 10. candidato
+-- Integrantes de una lista. OJO: estar aquí NO implica tener rol 'candidato'.
+-- Solo el responsable de la lista (Presidente) es rol 'candidato' y entra al
+-- Portal del candidato; el resto de integrantes conserva rol 'estudiante'.
 CREATE TABLE candidato (
   id_candidato INT AUTO_INCREMENT PRIMARY KEY,
-  cargo ENUM('presidente', 'vicepresidente', 'secretario', 'tesorero', 'vocal') NOT NULL,
+  cargo ENUM('Presidente', 'Vicepresidente', 'Secretario', 'Tesorero', 'Vocal') NOT NULL,
   cumple_requisitos TINYINT(1) DEFAULT 0,
   foto_url VARCHAR(255),
   fk_cedula_estudiante CHAR(10) NOT NULL,
   fk_id_lista INT NOT NULL,
+  -- Columna generada para garantizar UN solo Presidente por lista: vale el id
+  -- de la lista solo en la fila del presidente y NULL en las demás (MySQL no
+  -- considera duplicados los NULL en un índice único).
+  lista_presidente INT GENERATED ALWAYS AS (CASE WHEN cargo = 'Presidente' THEN fk_id_lista END) STORED,
   CONSTRAINT fk_candidato_estudiante FOREIGN KEY (fk_cedula_estudiante) REFERENCES estudiante(cedula),
-  CONSTRAINT fk_candidato_lista FOREIGN KEY (fk_id_lista) REFERENCES lista_candidata(id_lista)
+  CONSTRAINT fk_candidato_lista FOREIGN KEY (fk_id_lista) REFERENCES lista_candidata(id_lista),
+  CONSTRAINT uq_candidato_presidente_por_lista UNIQUE (lista_presidente),
+  CONSTRAINT uq_candidato_estudiante_lista UNIQUE (fk_id_lista, fk_cedula_estudiante)
 );
 
 -- 11. requisito

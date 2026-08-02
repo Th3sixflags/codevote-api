@@ -1,5 +1,8 @@
 import { Request, Response } from 'express';
-import { crearListaSchema, actualizarListaSchema, rechazarListaSchema } from '../schemas/lista_candidata.schema.js';
+import {
+  crearListaSchema, actualizarListaSchema, rechazarListaSchema,
+  transferirResponsableSchema,
+} from '../schemas/lista_candidata.schema.js';
 import * as service from '../services/lista_candidata.service.js';
 import { filtroCarreraDe } from '../utils/accesoCarrera.js';
 
@@ -75,6 +78,20 @@ export async function rechazar(req: Request, res: Response) {
 
 export async function retirar(req: Request, res: Response) {
   const lista = await service.retirarLista(Number(req.params.id));
+  if (!lista) {
+    res.status(404).json({ error: 'Lista no encontrada.' });
+    return;
+  }
+  res.json(lista);
+}
+
+/**
+ * PATCH /api/listas-candidatas/:id/responsable — transfiere la responsabilidad
+ * (y con ella la presidencia) a otro estudiante. Solo administración.
+ */
+export async function transferirResponsable(req: Request, res: Response) {
+  const { cedula_nuevo_responsable } = transferirResponsableSchema.parse(req.body);
+  const lista = await service.transferirResponsable(Number(req.params.id), cedula_nuevo_responsable);
   if (!lista) {
     res.status(404).json({ error: 'Lista no encontrada.' });
     return;

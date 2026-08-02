@@ -13,6 +13,8 @@ router.post('/',                   requireAuth, requireAdmin, ctrl.crear);
 router.patch('/:id/aprobar',       requireAuth, requireAdmin, ctrl.aprobar);
 router.patch('/:id/rechazar',      requireAuth, requireAdmin, ctrl.rechazar);
 router.patch('/:id/retirar',       requireAuth, requireAdmin, ctrl.retirar);
+// Transferencia de la responsabilidad/presidencia (solo administración).
+router.patch('/:id/responsable',   requireAuth, requireAdmin, ctrl.transferirResponsable);
 router.patch('/:id',               requireAuth, requireAdmin, ctrl.actualizar);
 router.delete('/:id',              requireAuth, requireAdmin, ctrl.eliminar);
 
