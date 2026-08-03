@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { crearVotoSchema } from '../schemas/voto.schema.js';
 import * as service from '../services/voto.service.js';
-import { filtroCarreraDe, procesoVisible } from '../utils/accesoCarrera.js';
+import { filtroCarreraDe, procesoVisible, esAdministracion } from '../utils/accesoCarrera.js';
 
 export async function votar(req: Request, res: Response) {
   const data = crearVotoSchema.parse(req.body);
@@ -28,8 +28,8 @@ export async function votar(req: Request, res: Response) {
   }
 }
 
-// Roles que pueden ver resultados en cualquier momento.
-const ROLES_PRIVILEGIADOS = ['admin', 'administrador', 'junta_electoral'];
+// Quién puede ver resultados en cualquier momento: la administración. Se usa
+// esAdministracion() en vez de una lista propia para no volver a divergir.
 
 /**
  * Resultados de una papeleta: conteo por opción y resumen de participación,
@@ -43,7 +43,7 @@ export async function resultados(req: Request, res: Response) {
   // Los estudiantes solo pueden ver resultados si la votación está cerrada
   // o el proceso ya finalizó (para no revelar quién va ganando antes de tiempo),
   // y únicamente de procesos globales o de su propia carrera.
-  if (!ROLES_PRIVILEGIADOS.includes(rol)) {
+  if (!esAdministracion(rol)) {
     const estado = await service.estadoResultados(votacionId);
     if (estado) {
       if (!procesoVisible(estado.carrera_votacion, await filtroCarreraDe(req))) {

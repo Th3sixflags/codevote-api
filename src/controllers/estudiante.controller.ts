@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { crearEstudianteSchema, actualizarEstudianteSchema } from '../schemas/estudiante.schema.js';
 import * as service from '../services/estudiante.service.js';
+import { esAdministracion } from '../utils/accesoCarrera.js';
 
 export async function listar(_req: Request, res: Response) {
   const estudiantes = await service.listarEstudiantes();
@@ -12,7 +13,7 @@ export async function obtener(req: Request, res: Response) {
 
   // Datos personales (correo, promedio): solo el admin o el propio estudiante.
   // Evita que cualquier usuario autenticado consulte el perfil de otro.
-  if (req.user!.rol !== 'admin' && req.user!.sub !== cedula) {
+  if (!esAdministracion(req.user!.rol) && req.user!.sub !== cedula) {
     res.status(403).json({ error: 'No tienes permiso para ver este perfil.' });
     return;
   }

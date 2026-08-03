@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { esAdministracion } from '../utils/accesoCarrera.js';
 
 export interface JwtPayload {
   sub:   string;
@@ -30,7 +31,9 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
 }
 
 export function requireAdmin(req: Request, res: Response, next: NextFunction) {
-  if (req.user?.rol !== 'admin') {
+  // Se delega en esAdministracion() para que la definición de "administración"
+  // sea la misma en todo el sistema (antes aquí era un literal suelto).
+  if (!esAdministracion(req.user?.rol)) {
     res.status(403).json({ error: 'Acceso denegado. Se requiere rol admin.' });
     return;
   }

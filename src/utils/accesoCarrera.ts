@@ -2,8 +2,20 @@ import { Request } from 'express';
 import * as estudianteRepo from '../repositories/estudiante.repository.js';
 import type { FiltroCarrera } from '../repositories/proceso_electoral.repository.js';
 
+/**
+ * Roles reales del sistema: son exactamente los del ENUM de `estudiante.rol`.
+ *
+ * Antes esta lista incluía 'administrador' y 'junta_electoral', que la base no
+ * admite y por tanto nunca podían darse. Peor aún, la comprobación no era
+ * uniforme: `requireAdmin` exigía el literal 'admin', así que esos roles
+ * imaginarios habrían pasado unos controles y no otros. Si algún día se añade
+ * un rol nuevo, va en el ENUM y aquí, y todo el sistema lo reconoce igual.
+ */
+export const ROLES = ['estudiante', 'admin', 'candidato'] as const;
+export type Rol = (typeof ROLES)[number];
+
 /** Roles con visibilidad total sobre todos los procesos y listas. */
-const ROLES_ADMINISTRACION = ['admin', 'administrador', 'junta_electoral'];
+const ROLES_ADMINISTRACION: readonly string[] = ['admin'];
 
 export function esAdministracion(rol: unknown): boolean {
   return ROLES_ADMINISTRACION.includes(String(rol ?? '').toLowerCase());
