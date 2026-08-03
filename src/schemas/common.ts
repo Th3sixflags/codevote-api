@@ -1,13 +1,6 @@
 import { z } from 'zod';
 
 /**
- * Cédula ecuatoriana: exactamente 10 dígitos numéricos.
- *
- * Se valida el formato (solo números, longitud 10). No se aplica el algoritmo
- * del dígito verificador (módulo 10) para no rechazar cédulas de prueba; si se
- * quisiera exigir cédulas 100% reales, aquí es donde se añadiría esa lógica.
- */
-/**
  * Valida una cédula ecuatoriana completa (algoritmo del Registro Civil):
  *  1. 10 dígitos numéricos.
  *  2. Los dos primeros son el código de provincia: 01–24, o 30 (exterior).
@@ -37,6 +30,27 @@ export const cedulaSchema = z
   .string()
   .regex(/^\d{10}$/, 'La cédula debe tener exactamente 10 dígitos numéricos.')
   .refine(esCedulaEcuatorianaValida, 'La cédula no es válida: revisa el número (dígito verificador incorrecto).');
+
+/**
+ * Nombre o apellido de una persona.
+ *
+ * Antes era un `string().min(1)`, así que "12345" pasaba como nombre válido. Se
+ * admiten letras (con tildes y ñ), espacios, apóstrofos y guiones —"D'Angelo",
+ * "Pérez-Mora"— pero ningún dígito. Los espacios sobrantes se recortan y los
+ * internos se colapsan para que "Juan   Carlos" y "Juan Carlos" se guarden
+ * igual.
+ */
+const LETRAS_NOMBRE = /^[\p{L}][\p{L}\p{M}'’\- ]*$/u;
+
+export const nombrePersonaSchema = z
+  .string()
+  .transform((valor) => valor.trim().replace(/\s+/g, ' '))
+  .pipe(
+    z.string()
+      .min(2, 'Debe tener al menos 2 caracteres.')
+      .max(80, 'No puede superar los 80 caracteres.')
+      .regex(LETRAS_NOMBRE, 'Solo se admiten letras, espacios, apóstrofos y guiones: no puede contener números ni símbolos.')
+  );
 
 /**
  * Cargos de un integrante dentro de una lista.

@@ -1,10 +1,11 @@
 import { z } from 'zod';
+import { nombrePersonaSchema } from './common.js';
 
 export const crearResponsableSchema = z.object({
-  nombres:    z.string().min(1).max(80),
-  apellidos:  z.string().min(1).max(80),
+  nombres:    nombrePersonaSchema,
+  apellidos:  nombrePersonaSchema,
   cargo:      z.string().max(60).optional(),
-  correo:     z.string().email().max(120),
+  correo:     z.string().email('El correo no tiene un formato válido.').max(120),
 });
 
 export const actualizarResponsableSchema = crearResponsableSchema.partial();

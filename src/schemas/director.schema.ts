@@ -1,9 +1,10 @@
 import { z } from 'zod';
+import { nombrePersonaSchema } from './common.js';
 
 export const crearDirectorSchema = z.object({
-  nombres:    z.string().min(1).max(80),
-  apellidos:  z.string().min(1).max(80),
-  correo:     z.string().email().max(120),
+  nombres:    nombrePersonaSchema,
+  apellidos:  nombrePersonaSchema,
+  correo:     z.string().email('El correo no tiene un formato válido.').max(120),
 });
 
 export const actualizarDirectorSchema = crearDirectorSchema.partial();

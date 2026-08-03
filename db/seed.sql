@@ -28,27 +28,29 @@ INSERT INTO carrera (nombre_carrera, fk_id_director, fk_id_facultad) VALUES
 
 -- 4. estudiante (20 registros con bcrypt password123)
 -- Hash: $2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e
+-- OJO: `promedio` va en escala 0–100, que es la que usa toda la aplicación
+-- (PROMEDIO_MINIMO_POSTULACION = 85). No cargar notas sobre 10.
 INSERT INTO estudiante (cedula, nombres, apellidos, correo_institucional, promedio, estado_academico, fk_id_carrera, password) VALUES
-('1710000009', 'Steven', 'Chininin', 'schininin@uide.edu.ec', 9.5, 'activo', 1, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e'),
-('1710000017', 'María', 'González', 'mgonzalez@uide.edu.ec', 8.2, 'activo', 1, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e'),
-('1710000025', 'Carlos', 'Pérez', 'cperez@uide.edu.ec', 7.5, 'activo', 2, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e'),
-('1710000033', 'Ana', 'Torres', 'atorres@uide.edu.ec', 9.8, 'activo', 3, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e'),
-('1710000041', 'Luis', 'Ramírez', 'lramirez@uide.edu.ec', 6.9, 'activo', 1, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e'),
-('1710000058', 'Sofía', 'Mendoza', 'smendoza@uide.edu.ec', 8.9, 'activo', 2, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e'),
-('1710000066', 'Diego', 'Castillo', 'dcastillo@uide.edu.ec', 7.8, 'activo', 3, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e'),
-('1710000074', 'Valentina', 'Ruiz', 'vruiz@uide.edu.ec', 9.1, 'activo', 1, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e'),
-('1710000082', 'Andrés', 'Mora', 'amora@uide.edu.ec', 8.4, 'activo', 2, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e'),
-('1710000090', 'Camila', 'Vega', 'cvega@uide.edu.ec', 7.2, 'activo', 3, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e'),
-('1710000108', 'Javier', 'Cordero', 'jcordero@uide.edu.ec', 8.6, 'activo', 1, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e'),
-('1710000116', 'Gabriela', 'Lara', 'glara@uide.edu.ec', 9.3, 'activo', 2, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e'),
-('1710000124', 'Martín', 'Suárez', 'msuarez@uide.edu.ec', 8.0, 'activo', 3, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e'),
-('1710000132', 'Lucía', 'Peña', 'lpena@uide.edu.ec', 7.9, 'activo', 1, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e'),
-('1710000140', 'Sebastián', 'Vargas', 'svargas@uide.edu.ec', 8.8, 'activo', 2, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e'),
-('1710000157', 'Isabella', 'Ríos', 'irios@uide.edu.ec', 9.0, 'activo', 3, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e'),
-('1710000165', 'Emilio', 'Bravo', 'ebravo@uide.edu.ec', 7.6, 'activo', 1, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e'),
-('1710000173', 'Antonella', 'Medina', 'amedina@uide.edu.ec', 8.5, 'activo', 2, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e'),
-('1710000181', 'Joaquín', 'Navarro', 'jnavarro@uide.edu.ec', 9.2, 'activo', 3, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e'),
-('1710000199', 'Renata', 'León', 'rleon@uide.edu.ec', 8.1, 'activo', 1, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e');
+('1710000009', 'Steven', 'Chininin', 'schininin@uide.edu.ec', 95, 'activo', 1, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e'),
+('1710000017', 'María', 'González', 'mgonzalez@uide.edu.ec', 82, 'activo', 1, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e'),
+('1710000025', 'Carlos', 'Pérez', 'cperez@uide.edu.ec', 75, 'activo', 2, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e'),
+('1710000033', 'Ana', 'Torres', 'atorres@uide.edu.ec', 98, 'activo', 3, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e'),
+('1710000041', 'Luis', 'Ramírez', 'lramirez@uide.edu.ec', 69, 'activo', 1, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e'),
+('1710000058', 'Sofía', 'Mendoza', 'smendoza@uide.edu.ec', 89, 'activo', 2, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e'),
+('1710000066', 'Diego', 'Castillo', 'dcastillo@uide.edu.ec', 78, 'activo', 3, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e'),
+('1710000074', 'Valentina', 'Ruiz', 'vruiz@uide.edu.ec', 91, 'activo', 1, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e'),
+('1710000082', 'Andrés', 'Mora', 'amora@uide.edu.ec', 84, 'activo', 2, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e'),
+('1710000090', 'Camila', 'Vega', 'cvega@uide.edu.ec', 72, 'activo', 3, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e'),
+('1710000108', 'Javier', 'Cordero', 'jcordero@uide.edu.ec', 86, 'activo', 1, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e'),
+('1710000116', 'Gabriela', 'Lara', 'glara@uide.edu.ec', 93, 'activo', 2, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e'),
+('1710000124', 'Martín', 'Suárez', 'msuarez@uide.edu.ec', 80, 'activo', 3, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e'),
+('1710000132', 'Lucía', 'Peña', 'lpena@uide.edu.ec', 79, 'activo', 1, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e'),
+('1710000140', 'Sebastián', 'Vargas', 'svargas@uide.edu.ec', 88, 'activo', 2, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e'),
+('1710000157', 'Isabella', 'Ríos', 'irios@uide.edu.ec', 90, 'activo', 3, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e'),
+('1710000165', 'Emilio', 'Bravo', 'ebravo@uide.edu.ec', 76, 'activo', 1, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e'),
+('1710000173', 'Antonella', 'Medina', 'amedina@uide.edu.ec', 85, 'activo', 2, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e'),
+('1710000181', 'Joaquín', 'Navarro', 'jnavarro@uide.edu.ec', 92, 'activo', 3, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e'),
+('1710000199', 'Renata', 'León', 'rleon@uide.edu.ec', 81, 'activo', 1, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e');
 
 -- Usuario administrador de prueba (el resto queda con el rol 'estudiante' por defecto)
 UPDATE estudiante SET rol = 'admin' WHERE cedula = '1710000009';
@@ -113,7 +115,7 @@ INSERT INTO candidato (cargo, cumple_requisitos, foto_url, fk_cedula_estudiante,
 
 -- 11. requisito
 INSERT INTO requisito (nombre_requisito, descripcion, tipo_requisito) VALUES 
-('Promedio', 'Promedio mayor a 8.0', 'academico'),
+('Promedio', 'Promedio mínimo de 85/100', 'academico'),
 ('Matricula', 'Estar legalmente matriculado', 'academico'),
 ('Sin Sanciones', 'No tener sanciones disciplinarias', 'disciplinario');
 

@@ -1,12 +1,14 @@
 import { z } from 'zod';
-import { cedulaSchema } from './common.js';
+import { cedulaSchema, nombrePersonaSchema } from './common.js';
 
 export const crearEstudianteSchema = z.object({
   cedula:               cedulaSchema,
-  nombres:              z.string().min(1).max(80),
-  apellidos:            z.string().min(1).max(80),
-  correo_institucional: z.string().email().max(120),
-  promedio:             z.number().min(0).max(100).optional(),
+  nombres:              nombrePersonaSchema,
+  apellidos:            nombrePersonaSchema,
+  correo_institucional: z.string().email('El correo institucional no tiene un formato válido.').max(120),
+  // `promedio` sobre 100. El .finite() descarta NaN e Infinity, que en JSON
+  // llegarían como null pero por FormData podrían colarse.
+  promedio:             z.number().finite().min(0, 'El promedio no puede ser negativo.').max(100, 'El promedio máximo es 100.').optional(),
   estado_academico:     z.enum(['activo', 'inactivo', 'egresado', 'graduado']).optional(),
   fk_id_carrera:        z.number().int().positive().optional(),
   password:             z.string().min(6),
