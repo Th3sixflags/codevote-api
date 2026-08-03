@@ -4,6 +4,7 @@ import * as borradoRepo from '../repositories/borrado.repository.js';
 import * as candidatoRepo from '../repositories/candidato.repository.js';
 import * as estudianteRepo from '../repositories/estudiante.repository.js';
 import * as planRepo from '../repositories/plan_trabajo.repository.js';
+import * as notificaciones from './notificacion.service.js';
 import type { FiltroCarrera } from '../repositories/lista_candidata.repository.js';
 import { procesoVisible } from '../utils/accesoCarrera.js';
 import { HttpError } from '../utils/httpError.js';
@@ -83,21 +84,84 @@ export async function eliminarLista(id: number) {
 // físico solo prospera para listas nuevas sin relaciones (si tiene relaciones,
 // el errorHandler traduce la FK a 409).
 
+/**
+ * Transiciones válidas del estado de revisión de una lista.
+ *
+ *   pendiente ──(el candidato envía)──> en_revision ──> aprobada | rechazada
+ *   aprobada  ──(la administración retira)──────────> retirada
+ *
+ * Antes cada acción escribía el estado directamente, así que se podía aprobar
+ * un borrador que el candidato nunca envió, o reactivar una lista retirada. El
+ * envío a revisión lo controla el portal del candidato (verificarEditable).
+ */
+const TRANSICIONES: Record<string, string[]> = {
+  aprobada:  ['en_revision'],
+  rechazada: ['en_revision'],
+  retirada:  ['aprobada'],
+};
+
+const COMO_LLEGAR: Record<string, string> = {
+  aprobada:  'Solo se puede aprobar una lista que esté en revisión.',
+  rechazada: 'Solo se puede rechazar una lista que esté en revisión.',
+  retirada:  'Solo se puede retirar una lista aprobada.',
+};
+
+const ETIQUETA_ESTADO: Record<string, string> = {
+  pendiente:   'en preparación',
+  en_revision: 'en revisión',
+  aprobada:    'aprobada',
+  rechazada:   'rechazada',
+  retirada:    'retirada',
+};
+
+/** Lanza 409 si la lista no puede pasar a `destino` desde su estado actual. */
+function verificarTransicion(actual: string, destino: string) {
+  const origen = String(actual ?? '').toLowerCase();
+  if (TRANSICIONES[destino].includes(origen)) return;
+
+  const desde = ETIQUETA_ESTADO[origen] ?? origen;
+  throw new HttpError(
+    409,
+    `La lista está ${desde} y no puede pasar a ${ETIQUETA_ESTADO[destino]}. ${COMO_LLEGAR[destino]}`
+  );
+}
+
 export async function aprobarLista(id: number) {
   const existente = await repo.findById(id);
   if (!existente) return null;
-  return repo.setEstadoRevision(id, 'aprobada', null);
+  verificarTransicion(existente.estado_revision, 'aprobada');
+
+  const lista = await repo.setEstadoRevision(id, 'aprobada', null);
+  // El responsable se entera del resultado sin tener que entrar a mirar. Como
+  // la transición exige partir de 'en_revision', repetir la petición devuelve
+  // 409 y no llega aquí: no se duplican notificaciones.
+  await notificaciones.notificarResolucionDeLista(
+    existente.fk_cedula_responsable,
+    existente.nombre_lista,
+    'aprobada'
+  );
+  return lista;
 }
 
 export async function rechazarLista(id: number, motivo: string) {
   const existente = await repo.findById(id);
   if (!existente) return null;
-  return repo.setEstadoRevision(id, 'rechazada', motivo);
+  verificarTransicion(existente.estado_revision, 'rechazada');
+
+  const lista = await repo.setEstadoRevision(id, 'rechazada', motivo);
+  await notificaciones.notificarResolucionDeLista(
+    existente.fk_cedula_responsable,
+    existente.nombre_lista,
+    'rechazada',
+    motivo
+  );
+  return lista;
 }
 
 export async function retirarLista(id: number) {
   const existente = await repo.findById(id);
   if (!existente) return null;
+  verificarTransicion(existente.estado_revision, 'retirada');
   return repo.setEstadoRevision(id, 'retirada', existente.motivo_rechazo ?? null);
 }
 

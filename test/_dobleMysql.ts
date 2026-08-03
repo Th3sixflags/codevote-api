@@ -27,6 +27,7 @@ export interface Lista {
   nombre_lista: string;
   lema?: string | null;
   estado_revision: string;
+  motivo_rechazo?: string | null;
   fk_cedula_responsable: string | null;
   fk_id_votacion: number | null;
   id_proceso: number;
@@ -74,6 +75,8 @@ export interface Estado {
   votaciones: Votacion[];
   procesos: Proceso[];
   planes: any[];
+  /** Notificaciones creadas, para comprobar avisos y ausencia de duplicados. */
+  notificaciones: Array<{ cedula: string; tipo: string; titulo: string; mensaje: string }>;
   /** Toda sentencia ejecutada, para verificar lo que NO debe ocurrir. */
   sentencias: string[];
   /** Marcas de la transacción: 'BEGIN' | 'COMMIT' | 'ROLLBACK'. */
@@ -85,7 +88,7 @@ export interface Estado {
 export function estadoVacio(): Estado {
   return {
     estudiantes: [], listas: [], candidatos: [], asignaciones: [],
-    votaciones: [], procesos: [], planes: [],
+    votaciones: [], procesos: [], planes: [], notificaciones: [],
     sentencias: [], transaccion: [], proximoId: 100,
   };
 }
@@ -122,7 +125,7 @@ function filaLista(l: Lista) {
     lema: l.lema ?? null,
     estado_revision: l.estado_revision,
     fecha_inscripcion: '2026-08-01',
-    motivo_rechazo: null,
+    motivo_rechazo: l.motivo_rechazo ?? null,
     fk_cedula_responsable: l.fk_cedula_responsable,
     foto_url: null,
     fk_id_votacion: l.fk_id_votacion,
@@ -250,8 +253,18 @@ export function instalarDoble(
     }
     if (sql.startsWith('UPDATE lista_candidata SET estado_revision')) {
       const l = e.listas.find((x) => x.id_lista === Number(params[2]));
-      if (l) l.estado_revision = params[0];
+      if (l) {
+        l.estado_revision = params[0];
+        l.motivo_rechazo = params[1] ?? null;
+      }
       return [];
+    }
+
+    // --- notificacion ------------------------------------------------------
+    if (sql.startsWith('INSERT INTO notificacion')) {
+      const [cedula, tipo, titulo, mensaje] = params;
+      e.notificaciones.push({ cedula, tipo, titulo, mensaje });
+      return { insertId: (e.proximoId += 1) };
     }
 
     // --- candidato ---------------------------------------------------------
