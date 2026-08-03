@@ -7,6 +7,11 @@ import bcrypt from 'bcryptjs';
 const BASE_QUERY = `
   SELECT
     e.cedula, e.nombres, e.apellidos, e.correo_institucional, e.promedio, e.estado_academico, e.rol, e.foto_url,
+    -- La clave foránea tal como la guarda la fila. Se devuelve además de
+    -- c.id_carrera porque el JOIN es LEFT: si la carrera se borrara,
+    -- c.id_carrera llegaría NULL y se perdería el valor que el estudiante
+    -- tiene realmente asignado. Es la que el formulario de edición precarga.
+    e.fk_id_carrera,
     c.id_carrera, c.nombre_carrera,
     a.fk_id_votacion AS asig_votacion, a.estado AS asig_estado, a.fecha_asignacion AS asig_fecha,
     v.titulo_papeleta AS asig_papeleta, ac.nombre_carrera AS asig_carrera,
