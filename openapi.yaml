@@ -946,6 +946,14 @@ paths:
     patch:
       tags: [Listas candidatas]
       summary: Aprueba una lista (requiere rol admin)
+      description: >-
+        Solo procede sobre una lista en revisión: un borrador que el candidato
+        nunca envió, o una lista ya resuelta o retirada, se rechazan con 409.
+
+
+        Al aprobarla se avisa al responsable en sus notificaciones. Repetir la
+        petición no duplica el aviso, porque la segunda llamada ya no parte de
+        `en_revision`.
       responses:
         '200':
           description: Lista aprobada
@@ -954,6 +962,14 @@ paths:
               schema: { $ref: '#/components/schemas/ListaCandidata' }
         '401': { $ref: '#/components/responses/NoAutenticado' }
         '403': { $ref: '#/components/responses/SinPermiso' }
+        '409':
+          description: >-
+            Transición de estado no válida. Solo se puede aprobar o rechazar una
+            lista en revisión, y solo se puede retirar una aprobada; el mensaje
+            indica el estado actual y desde cuál se llega al solicitado.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
         '404': { $ref: '#/components/responses/NoEncontrado' }
 
   /listas-candidatas/{id}/rechazar:
@@ -983,6 +999,14 @@ paths:
         '401': { $ref: '#/components/responses/NoAutenticado' }
         '403': { $ref: '#/components/responses/SinPermiso' }
         '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409':
+          description: >-
+            Transición de estado no válida. Solo se puede aprobar o rechazar una
+            lista en revisión, y solo se puede retirar una aprobada; el mensaje
+            indica el estado actual y desde cuál se llega al solicitado.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
         '422': { $ref: '#/components/responses/ValidacionFallida' }
 
   /listas-candidatas/{id}/retirar:
@@ -997,13 +1021,22 @@ paths:
       description: >-
         Marca la lista como retirada sin borrarla, conservándola para
         auditoría. Alternativa al borrado físico cuando la lista tiene
-        relaciones (candidatos, planes, votos).
+        relaciones (candidatos, planes, votos). Solo procede sobre una lista
+        aprobada.
       responses:
         '200':
           description: Lista retirada
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ListaCandidata' }
+        '409':
+          description: >-
+            Transición de estado no válida. Solo se puede aprobar o rechazar una
+            lista en revisión, y solo se puede retirar una aprobada; el mensaje
+            indica el estado actual y desde cuál se llega al solicitado.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
         '401': { $ref: '#/components/responses/NoAutenticado' }
         '403': { $ref: '#/components/responses/SinPermiso' }
         '404': { $ref: '#/components/responses/NoEncontrado' }
@@ -2007,7 +2040,14 @@ paths:
         '409':
           description: >-
             El estudiante ya emitió su voto en esta votación, la votación no está
-            abierta, o el proceso no está activo
+            abierta, o el proceso no está activo.
+
+
+            El doble voto se corta en dos capas: una comprobación previa y la
+            restricción `uq_codigo_votante UNIQUE (fk_id_votacion,
+            fk_cedula_estudiante)` de `codigo_voto`, que cubre la ventana entre
+            ambas cuando llegan peticiones simultáneas. Ambas responden 409, de
+            modo que solo puede existir un comprobante por estudiante y papeleta.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -3094,6 +3134,11 @@ components:
 
     Cronograma:
       type: object
+      description: >-
+        Actividad del cronograma electoral de un proceso. Las fechas van en
+        formato YYYY-MM-DD y `fecha_fin` no puede ser anterior a
+        `fecha_inicio` (el mismo día es válido); si no se cumple, la respuesta
+        es 422 señalando el campo.
       properties:
         id_cronograma:
           type: integer
@@ -3107,9 +3152,13 @@ components:
         fecha_inicio:
           type: string
           format: "date"
+          pattern: '^\d{4}-\d{2}-\d{2}$'
+          example: "2026-08-01"
         fecha_fin:
           type: string
           format: "date"
+          pattern: '^\d{4}-\d{2}-\d{2}$'
+          example: "2026-08-10"
 
     ListaCandidataInput:
       type: object
