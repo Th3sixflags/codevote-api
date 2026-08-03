@@ -1962,6 +1962,21 @@ paths:
     patch:
       tags: [Votaciones]
       summary: Actualiza una votación (requiere rol admin)
+      description: >-
+        Cambiar `estado` a `cerrada` es el CIERRE MANUAL, pensado como respaldo
+        para cerrar antes de tiempo. Pasa por la misma función que el cierre
+        automático, así que también emite el acta de escrutinio, avisa a la
+        administración en la campanita y le manda el correo.
+
+
+        Normalmente no hace falta: el backend cierra solo las papeletas cuyo
+        proceso pasó de `fecha_fin_votacion`, comprobándolo cada minuto en hora
+        de Ecuador (America/Guayaquil). Al arrancar hace además una
+        reconciliación, por si alguna venció con el servidor apagado.
+
+
+        La operación es idempotente: cerrar una papeleta ya cerrada no repite el
+        acta, la notificación ni el correo.
       requestBody:
         required: true
         content:
@@ -2698,7 +2713,13 @@ components:
 
     Votacion:
       type: object
-      description: Incluye además puede_eliminar y motivo_bloqueo (ver EstadoEliminacion).
+      description: >-
+        Incluye además puede_eliminar y motivo_bloqueo (ver EstadoEliminacion).
+
+
+        `estado` pasa a `cerrada` por sí solo cuando el proceso supera su
+        `fecha_fin_votacion` (comprobación cada minuto en hora de Ecuador). Una
+        papeleta cerrada deja de aceptar votos y su escrutinio pasa a oficial.
       properties:
         puede_eliminar:
           type: boolean

@@ -2,6 +2,7 @@ import * as repo from '../repositories/votacion.repository.js';
 import type { FiltroCarrera } from '../repositories/votacion.repository.js';
 import { HttpError } from '../utils/httpError.js';
 import { procesoVisible } from '../utils/accesoCarrera.js';
+import { cerrarPapeleta } from './cierre_votacion.service.js';
 import { CrearVotacionDTO, ActualizarVotacionDTO } from '../schemas/votacion.schema.js';
 
 export async function listarVotaciones() {
@@ -42,6 +43,29 @@ export async function actualizarVotacion(id: number, data: ActualizarVotacionDTO
     if (await repo.existeCarreraEnProceso(procesoFinal, carreraFinal, id)) {
       throw new HttpError(409, 'Ya existe una votación de esa carrera en este proceso electoral.');
     }
+  }
+
+  // Cierre manual: es el respaldo por si hay que cerrar antes de tiempo, y pasa
+  // por la MISMA función que el cierre automático, para que emita el acta,
+  // avise a la administración y registre el escrutinio igual que aquel. Si no,
+  // una papeleta cerrada a mano quedaría sin acta ni aviso.
+  const cierraAhora = data.estado === 'cerrada' && existente.estado === 'abierta';
+
+  if (cierraAhora) {
+    // El orden importa: `cerrarPapeleta` cierra con un UPDATE condicionado a
+    // que la papeleta siga abierta. Si se guardara antes el estado 'cerrada',
+    // esa condición no se cumpliría y se saltaría el acta y los avisos.
+    await cerrarPapeleta({
+      id_votacion: id,
+      titulo_papeleta: existente.titulo_papeleta,
+      nombre_proceso: existente.nombre_proceso ?? 'Proceso electoral',
+      nombre_carrera: existente.nombre_carrera ?? null,
+    });
+
+    // El resto de campos que vinieran en la misma petición, ya sin el estado.
+    const { estado, ...resto } = data;
+    if (Object.keys(resto).length > 0) await repo.update(id, resto);
+    return repo.findById(id);
   }
 
   return repo.update(id, data);

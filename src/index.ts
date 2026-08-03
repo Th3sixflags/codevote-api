@@ -8,6 +8,7 @@ import { rateLimiter }   from './middleware/rateLimiter.js';
 import { errorHandler }  from './middleware/errorHandler.js';
 import { registerRoutes } from './routes/index.js';
 import { openapiSpec } from './config/swagger.js';
+import { iniciarCierreProgramado } from './tareas/cierreProgramado.js';
 import { DIRECTORIO_UPLOADS, prepararDirectorios } from './config/uploads.js';
 
 const app  = express();
@@ -91,4 +92,9 @@ app.use(errorHandler);
 app.listen(PORT, HOST, () => {
   console.log(`Servidor CodeVote API corriendo en http://${HOST}:${PORT}`);
   console.log(`CORS permitido para: ${origenes?.length ? origenes.join(', ') : 'cualquier origen (modo pruebas)'}`);
+
+  // Cierra las papeletas cuyo proceso ya venció. Arranca con una
+  // reconciliación —por si alguna venció con el servidor apagado— y sigue
+  // comprobando cada minuto.
+  iniciarCierreProgramado();
 });
