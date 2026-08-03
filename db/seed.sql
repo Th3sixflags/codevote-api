@@ -146,11 +146,25 @@ INSERT INTO voto (fk_id_votacion, tipo_voto, fecha_hora, fk_id_lista) VALUES
 -- 15. codigo_voto
 -- codigo_verificacion es obligatorio y único (identificador público del
 -- comprobante). En datos reales lo genera el backend como UUID v4.
+--
+-- DEBE haber exactamente un comprobante por cada voto de la tabla `voto`: la
+-- participación se cuenta con los comprobantes y el reparto con los votos. Si
+-- no cuadran, la pantalla de resultados se contradice a sí misma (decía
+-- "0 votos" y participación 0 % mientras listaba 3 votos debajo).
+-- Ninguna de estas personas compite en la papeleta donde vota.
 INSERT INTO codigo_voto (fk_id_votacion, codigo_hash, estado_codigo, fecha_envio, fk_cedula_estudiante, codigo_verificacion) VALUES
+-- Papeleta 1 (Consejo Estudiantil): 4 votos -> 4 comprobantes. El resto del
+-- padrón sigue habilitado, para poder votar en vivo durante la demostración.
 (1, 'hash_codigo_1', 'usado', '2026-06-30 08:00:00', '1710000108', 'a1f4c0de-1111-4a1a-8b01-0c0de5eed001'),
 (1, 'hash_codigo_2', 'usado', '2026-06-30 08:00:00', '1710000116', 'b2e5d1ef-2222-4b2b-9c02-1d1ef6ffe002'),
 (1, 'hash_codigo_3', 'usado', '2026-06-30 08:00:00', '1710000124', 'c3d6e2f0-3333-4c3c-8d03-2e2f07aaf003'),
-(1, 'hash_codigo_4', 'usado', '2026-06-30 08:00:00', '1710000132', 'd4e7f3a1-4444-4d4d-9e04-3f3a18bba004');
+(1, 'hash_codigo_4', 'usado', '2026-06-30 08:00:00', '1710000132', 'd4e7f3a1-4444-4d4d-9e04-3f3a18bba004'),
+-- Papeleta 2 (Referéndum): 5 votos -> 5 comprobantes.
+(2, 'hash_codigo_6', 'usado', '2025-05-31 08:00:00', '1710000108', 'f6a9b5c3-6666-4f6f-9006-5b5c30ddc006'),
+(2, 'hash_codigo_7', 'usado', '2025-05-31 08:00:00', '1710000116', 'a7bac6d4-7777-4a7a-8107-6c6d41eed007'),
+(2, 'hash_codigo_8', 'usado', '2025-05-31 08:00:00', '1710000124', 'b8cbd7e5-8888-4b8b-9208-7d7e52ffe008'),
+(2, 'hash_codigo_9', 'usado', '2025-05-31 08:00:00', '1710000132', 'c9dce8f6-9999-4c9c-8309-8e8f63aaf009'),
+(2, 'hash_codigo_10', 'usado', '2025-05-31 08:00:00', '1710000157', 'daedf9a7-aaaa-4dad-940a-9f9a74bba00a');
 
 -- 16. acta_resultados
 INSERT INTO acta_resultados (fk_id_votacion, total_votantes, votos_validos, votos_blanco, votos_nulos, lista_ganadora, fecha_emision) VALUES 
