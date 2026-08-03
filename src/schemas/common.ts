@@ -96,3 +96,30 @@ export const urlImagenHttpsSchema = z
     }
   }, 'La imagen debe ser una URL válida que inicie con https://')
   .transform((valor) => (valor === '' ? null : valor));
+
+/**
+ * Documento de respaldo de un plan de trabajo.
+ *
+ * Antes era `z.string().max(255)`, es decir, cualquier texto. Por eso en
+ * producción apareció un plan con `archivo_url = 'aprobada'`: el formulario
+ * ofrece un campo de URL libre y lo que se escriba se guarda tal cual. Solo se
+ * admiten tres formas:
+ *
+ *   - vacío o null (el plan aún no tiene documento),
+ *   - la ruta que genera la propia subida de PDF: /api/uploads/planes/<archivo>.pdf,
+ *   - una URL https:// válida (por ejemplo un documento alojado fuera).
+ */
+const RUTA_PDF_SUBIDO = /^\/api\/uploads\/planes\/[\w.-]+\.pdf$/i;
+
+export const archivoPlanSchema = z
+  .union([z.string().max(255), z.null()])
+  .refine((valor) => {
+    if (valor === null || valor === '') return true;
+    if (RUTA_PDF_SUBIDO.test(valor)) return true;
+    try {
+      return new URL(valor).protocol === 'https:';
+    } catch {
+      return false;
+    }
+  }, 'El documento debe ser una URL https:// válida o un PDF subido desde el portal. Déjalo vacío si aún no tienes documento.')
+  .transform((valor) => (valor === '' ? null : valor));

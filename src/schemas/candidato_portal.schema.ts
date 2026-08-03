@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { cedulaSchema, urlImagenHttpsSchema, cargoSchema } from './common.js';
+import { cedulaSchema, urlImagenHttpsSchema, cargoSchema, archivoPlanSchema } from './common.js';
 
 // Esquemas de entrada del portal del candidato. Reutilizan los mismos enums de
 // cargo y área que el resto del sistema, pero NO permiten fijar la lista ni el
@@ -37,13 +37,13 @@ export const actualizarCandidatoPortalSchema = z.object({
 export const agregarPlanSchema = z.object({
   area:        AREA,
   propuesta:   z.string().min(1),
-  archivo_url: z.string().max(255).optional(),
+  archivo_url: archivoPlanSchema.optional(),
 });
 
 export const actualizarPlanSchema = z.object({
   area:        AREA.optional(),
   propuesta:   z.string().min(1).optional(),
-  archivo_url: z.string().max(255).optional(),
+  archivo_url: archivoPlanSchema.optional(),
 });
 
 export type CrearListaCandidatoDTO      = z.infer<typeof crearListaCandidatoSchema>;
