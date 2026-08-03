@@ -76,8 +76,6 @@ async function ejecutar(sqlCrudo: string, params: any[] = []): Promise<any> {
   if (sql.includes('FROM votacion v') && sql.includes('p.estado AS proceso')) {
     return [{ votacion: 'abierta', proceso: 'votacion', carrera_votacion: null }];
   }
-  // compiteEnVotacion: no compite.
-  if (sql.includes('FROM candidato c') && sql.includes('asignacion_candidatura a')) return [];
   if (sql.includes('FROM lista_candidata WHERE id_lista = ?')) return [{ 1: 1 }];
   if (sql.includes('fk_id_carrera FROM estudiante') || sql.includes('e.fk_id_carrera')) {
     return [{ fk_id_carrera: null }];

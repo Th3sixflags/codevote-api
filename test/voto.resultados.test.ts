@@ -162,16 +162,24 @@ test('papeleta de carrera: el padron se filtra por esa carrera', async () => {
   );
 });
 
-test('los candidatos de la papeleta no cuentan como habilitados', async () => {
+test('el padrón incluye a los candidatos y excluye a la administración', async () => {
+  // Competir no quita el derecho al voto, así que los candidatos entran en el
+  // padrón: si no, la participación nunca podría llegar al 100%.
   await pedirResultados();
   const consultaPadron = consultas.find((s) => s.includes('FROM estudiante e'))!;
 
-  assert.ok(consultaPadron.includes('FROM candidato c'), 'no excluye a los candidatos de la papeleta');
   assert.ok(
-    consultaPadron.includes('FROM asignacion_candidatura a'),
-    'no excluye a los candidatos asignados a la papeleta'
+    consultaPadron.includes("e.rol IN ('estudiante', 'candidato')"),
+    'el padrón debe contar a estudiantes y candidatos, y solo a ellos'
   );
-  assert.ok(consultaPadron.includes("e.rol <> 'admin'"), 'cuenta a la administración en el padrón');
+  assert.ok(
+    !consultaPadron.includes('FROM candidato c'),
+    'ya no debe excluir a los integrantes de las listas de la papeleta'
+  );
+  assert.ok(
+    !consultaPadron.includes('FROM asignacion_candidatura a'),
+    'ya no debe excluir a quien tiene una asignación de candidatura'
+  );
   assert.ok(consultaPadron.includes("e.estado_academico = 'activo'"), 'cuenta a estudiantes no activos');
 });
 

@@ -28,13 +28,10 @@ export async function registrarVoto(data: CrearVotoDTO, cedula: string, filtro: 
     throw new HttpError(403, 'Esta votación corresponde a otra carrera.');
   }
 
-  // Restricción electoral: quien compite en esta papeleta no puede votar en
-  // ella. Alcanza a TODOS los integrantes de la lista (el presidente y también
-  // los que conservan rol 'estudiante'), no solo a quien tiene rol 'candidato'.
-  // En otra papeleta para la que esté habilitado sí puede votar.
-  if (await repo.compiteEnVotacion(cedula, data.fk_id_votacion)) {
-    throw new HttpError(403, 'No puedes votar en una papeleta en la que compites como integrante de una lista.');
-  }
+  // Competir NO quita el derecho al voto: candidatos e integrantes de una lista
+  // votan con normalidad, incluida la papeleta en la que participan. Las demás
+  // garantías siguen en pie (una sola vez por papeleta, papeleta abierta, la
+  // carrera que corresponde y una lista de esa misma papeleta).
 
   // Un voto 'valido' debe ser por una lista que pertenezca a esta votación.
   if (data.tipo_voto === 'valido' && data.fk_id_lista != null) {
@@ -92,7 +89,7 @@ export async function obtenerResultados(votacionId: number) {
   const [filas, totalHabilitados, totalVotantes] = await Promise.all([
     repo.countByVotacion(votacionId),
     // Papeleta de carrera -> solo esa carrera; papeleta global -> todo el padrón.
-    repo.countHabilitados(votacionId, carreraVotacion),
+    repo.countHabilitados(carreraVotacion),
     repo.countVotantes(votacionId),
   ]);
 

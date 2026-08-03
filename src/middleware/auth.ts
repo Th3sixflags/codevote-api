@@ -52,3 +52,19 @@ export function requireCandidato(req: Request, res: Response, next: NextFunction
   }
   next();
 }
+
+/**
+ * Restringe la emisión del voto al padrón: estudiantes y candidatos.
+ *
+ * Competir no quita el derecho al voto, así que el candidato vota como
+ * cualquiera. La administración sí queda fuera: no forma parte del padrón y
+ * tampoco se la cuenta en `countHabilitados`, de modo que si pudiera votar la
+ * participación pasaría del 100%.
+ */
+export function requireVotante(req: Request, res: Response, next: NextFunction) {
+  if (esAdministracion(req.user?.rol)) {
+    res.status(403).json({ error: 'La administración no emite votos: no forma parte del padrón electoral.' });
+    return;
+  }
+  next();
+}

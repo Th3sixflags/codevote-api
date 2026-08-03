@@ -2003,10 +2003,10 @@ paths:
         (400 si no). Todo se valida en el backend, sin depender del frontend.
 
 
-        Restricción electoral: ningún integrante registrado en una lista de esta
-        papeleta puede votar en ella (403). Alcanza al presidente y también a los
-        integrantes que conservan `rol = estudiante`. En otra papeleta para la
-        que estén habilitados sí pueden votar.
+        Quién vota: el padrón lo forman los estudiantes y los candidatos.
+        Competir no quita el derecho al voto, así que un candidato o un
+        integrante de una lista vota con normalidad, incluida la papeleta en la
+        que participa. La administración queda fuera del padrón y recibe 403.
       requestBody:
         required: true
         content:
@@ -2032,8 +2032,8 @@ paths:
         '401': { $ref: '#/components/responses/NoAutenticado' }
         '403':
           description: >-
-            La votación corresponde a otra carrera, o quien vota compite en esta
-            papeleta como integrante de una lista.
+            La votación corresponde a otra carrera, o quien lo intenta es una
+            cuenta de administración, que no forma parte del padrón.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -3502,9 +3502,10 @@ components:
           type: integer
           description: >-
             Padrón de la papeleta. En una papeleta de carrera cuenta solo a los
-            estudiantes activos de esa carrera; en una global, a todo el padrón
-            activo. No incluye a la administración ni a los candidatos de esta
-            papeleta, que no pueden votarla.
+            activos de esa carrera; en una global, a todo el padrón activo.
+            Incluye a los candidatos, que votan como cualquier estudiante
+            —también en su propia papeleta—, de modo que la participación puede
+            llegar al 100%. No incluye a la administración, que no vota.
         total_votantes:
           type: integer
           description: Personas que votaron, incluidas las que votaron blanco o nulo.

@@ -85,33 +85,6 @@ export async function listaPerteneceAVotacion(listaId: number, votacionId: numbe
 }
 
 /**
- * ¿La persona compite en esta papeleta?
- *
- * Cuenta como competidor cualquiera que aparezca en la tabla `candidato` de una
- * lista de esta papeleta —el Presidente y también los integrantes que conservan
- * rol 'estudiante'— y quien tenga una asignación de candidatura activa en ella
- * (candidato al que ya se le asignó papeleta aunque todavía no haya inscrito su
- * lista).
- *
- * Solo bloquea ESTA papeleta: en otra para la que esté habilitado puede votar
- * con normalidad. Es la misma condición que usa `countHabilitados`, para que el
- * padrón y la restricción de voto nunca se contradigan.
- */
-export async function compiteEnVotacion(cedula: string, votacionId: number): Promise<boolean> {
-  const [rows] = await pool.query(
-    `SELECT 1 FROM candidato c
-       JOIN lista_candidata l ON l.id_lista = c.fk_id_lista
-      WHERE c.fk_cedula_estudiante = ? AND l.fk_id_votacion = ?
-      UNION
-     SELECT 1 FROM asignacion_candidatura a
-      WHERE a.fk_cedula_estudiante = ? AND a.fk_id_votacion = ? AND a.estado = 'activa'
-      LIMIT 1`,
-    [cedula, votacionId, cedula, votacionId]
-  ) as [any[], any];
-  return rows.length > 0;
-}
-
-/**
  * Estado de la votación y de su proceso, más la carrera del proceso, para
  * decidir si se puede votar y si se pueden ver los resultados.
  */
@@ -165,31 +138,21 @@ export async function countByVotacion(votacionId: number) {
  *
  * - Papeleta de carrera (`carreraVotacion` con valor): solo estudiantes activos
  *   de esa carrera. Papeleta global (`null`): todo el padrón activo.
+ * - Cuenta a estudiantes y candidatos. Competir no quita el derecho al voto:
+ *   un candidato vota como cualquiera, también en su propia papeleta, así que
+ *   entra en el padrón y la participación puede llegar al 100%.
  * - No cuenta a la administración, que no vota.
- * - No cuenta a los candidatos de ESTA papeleta, que no pueden votarse a sí
- *   mismos: si contaran, la participación nunca podría llegar al 100%. Un
- *   candidato de otra papeleta sí sigue habilitado aquí.
  *
  * Devuelve un número, nunca la lista de personas.
  */
-export async function countHabilitados(votacionId: number, carreraVotacion: number | null) {
+export async function countHabilitados(carreraVotacion: number | null) {
   const [rows] = await pool.query(
     `SELECT COUNT(*) AS total
        FROM estudiante e
       WHERE e.estado_academico = 'activo'
-        AND e.rol <> 'admin'
-        AND (? IS NULL OR e.fk_id_carrera = ?)
-        AND e.cedula NOT IN (
-          SELECT c.fk_cedula_estudiante
-            FROM candidato c
-            JOIN lista_candidata l ON l.id_lista = c.fk_id_lista
-           WHERE l.fk_id_votacion = ?
-          UNION
-          SELECT a.fk_cedula_estudiante
-            FROM asignacion_candidatura a
-           WHERE a.fk_id_votacion = ? AND a.estado = 'activa'
-        )`,
-    [carreraVotacion, carreraVotacion, votacionId, votacionId]
+        AND e.rol IN ('estudiante', 'candidato')
+        AND (? IS NULL OR e.fk_id_carrera = ?)`,
+    [carreraVotacion, carreraVotacion]
   ) as [any[], any];
   return Number(rows[0]?.total ?? 0);
 }
