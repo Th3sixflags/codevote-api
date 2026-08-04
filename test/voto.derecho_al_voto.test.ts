@@ -34,6 +34,11 @@ interface Escenario {
   yaVoto: boolean;
   /** Estado de revisión de la lista elegida; null si no compite en la papeleta. */
   estadoLista: string | null;
+  /** Fin del plazo de votación, en hora de Ecuador. */
+  finVotacion: string;
+  /** Inicio de la ventana de la papeleta. */
+  aperturaVotacion: string;
+  archivado: boolean;
 }
 
 let escenario: Escenario;
@@ -61,6 +66,11 @@ function ejecutar(sqlCrudo: string, params: any[] = []): any {
       votacion: escenario.votacion,
       proceso: escenario.proceso,
       carrera_votacion: escenario.carreraVotacion,
+      archivado: escenario.archivado ? 1 : 0,
+      // El servicio comprueba las FECHAS además del estado guardado.
+      fecha_apertura: escenario.aperturaVotacion,
+      fecha_cierre: escenario.finVotacion,
+      fecha_fin_votacion: escenario.finVotacion,
     }];
   }
   // Estado de la lista dentro de la papeleta: solo se puede votar por una aprobada.
@@ -115,7 +125,8 @@ beforeEach(() => {
   escenario = {
     votacion: 'abierta', proceso: 'votacion',
     carreraVotacion: null, carreraEstudiante: null, yaVoto: false,
-    estadoLista: 'aprobada',
+    estadoLista: 'aprobada', finVotacion: '2099-12-31 23:59:59',
+    aperturaVotacion: '2026-01-01 08:00:00', archivado: false,
   };
 });
 
@@ -216,6 +227,42 @@ test('una lista que no compite en la papeleta sigue dando 400', async () => {
 
   assert.equal(estado, 400);
   assert.match(cuerpo.error, /no pertenece a esta votaci[óo]n/i);
+  assert.deepEqual(insertados, []);
+});
+
+// --- El plazo manda sobre el estado guardado --------------------------------
+// El cierre automático corre cada minuto: entre la hora final y la pasada de la
+// tarea, `votacion.estado` todavía dice 'abierta'. Un voto ahí dentro sería un
+// voto fuera de plazo, así que el servicio comprueba la FECHA por su cuenta.
+
+test('pasada la hora final no se vota, aunque el estado siga en abierta: 409', async () => {
+  escenario.votacion = 'abierta';
+  escenario.finVotacion = '2020-01-01 18:00:00';
+
+  const { estado: codigo, cuerpo } = await votar(AJENO, 1);
+
+  assert.equal(codigo, 409);
+  assert.match(cuerpo.error, /ha finalizado/i);
+  assert.deepEqual(insertados, [], 'se registró un voto fuera de plazo');
+});
+
+test('antes de la apertura tampoco se vota: 409', async () => {
+  escenario.aperturaVotacion = '2099-01-01 08:00:00';
+
+  const { estado: codigo, cuerpo } = await votar(AJENO, 1);
+
+  assert.equal(codigo, 409);
+  assert.match(cuerpo.error, /todav[íi]a no ha abierto/i);
+  assert.deepEqual(insertados, []);
+});
+
+test('un proceso archivado no acepta votos: 409', async () => {
+  escenario.archivado = true;
+
+  const { estado: codigo, cuerpo } = await votar(AJENO, 1);
+
+  assert.equal(codigo, 409);
+  assert.match(cuerpo.error, /archivado/i);
   assert.deepEqual(insertados, []);
 });
 

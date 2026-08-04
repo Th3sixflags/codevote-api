@@ -1,5 +1,7 @@
 import { pool } from '../config/database.js';
 import { calcularBloqueo, bandera } from '../utils/bloqueoEliminacion.js';
+import { disponibilidadDeVoto } from '../utils/estadoVotacion.js';
+import { ahoraEnEcuador } from '../utils/zonaHoraria.js';
 import { CrearVotacionDTO, ActualizarVotacionDTO } from '../schemas/votacion.schema.js';
 
 // Se calcula la actividad electoral de la votación para que el frontend sepa si
@@ -18,11 +20,17 @@ function condicionCarrera(filtro: FiltroCarrera): { sql: string; params: any[] }
   return { sql: ' AND (v.fk_id_carrera IS NULL OR v.fk_id_carrera = ?)', params: [filtro] };
 }
 
+// Se traen el estado del proceso, su fin de votación y la marca de archivado
+// porque son lo que decide el estado EFECTIVO de la papeleta (ver
+// utils/estadoVotacion.ts): sin ellos habría que consultarlos aparte en cada
+// pantalla, y el frontend acabaría deduciendo la regla por su cuenta.
 const BASE_QUERY = `
   SELECT
     v.id_votacion, v.titulo_papeleta, v.fecha_apertura, v.fecha_cierre, v.estado, v.foto_url,
     v.fk_id_carrera, c.nombre_carrera,
     p.id_proceso, p.nombre_proceso,
+    p.estado AS estado_proceso, p.fecha_fin_votacion,
+    (p.archivado_at IS NOT NULL) AS archivado,
     EXISTS(SELECT 1 FROM voto x WHERE x.fk_id_votacion = v.id_votacion) AS tiene_votos,
     EXISTS(SELECT 1 FROM codigo_voto cv WHERE cv.fk_id_votacion = v.id_votacion) AS tiene_comprobantes,
     EXISTS(SELECT 1 FROM acta_resultados a WHERE a.fk_id_votacion = v.id_votacion) AS tiene_actas,
@@ -32,12 +40,24 @@ const BASE_QUERY = `
   LEFT JOIN carrera c ON c.id_carrera = v.fk_id_carrera
 `;
 
-/** Añade puede_eliminar / motivo_bloqueo y quita las banderas crudas. */
-function conBloqueo(row: any) {
+/**
+ * Completa la fila con lo que el cliente necesita para no equivocarse:
+ *
+ *   puede_eliminar / motivo_bloqueo   si es evidencia electoral o un borrador;
+ *   estado_efectivo / puede_votar /   el estado que vale AHORA, derivado de la
+ *   motivo_no_disponible              fecha y no del último valor guardado.
+ *
+ * `estado` se conserva tal cual está en la base para no romper a quien ya lo
+ * consume ni ocultar el desfase; `estado_efectivo` es el que debe mirarse para
+ * decidir si se puede votar.
+ */
+function conBloqueo(row: any, ahora = ahoraEnEcuador()) {
   if (!row) return row;
   const { tiene_votos, tiene_comprobantes, tiene_actas, tiene_veedurias, ...votacion } = row;
   return {
     ...votacion,
+    archivado: Number(votacion.archivado) === 1,
+    ...disponibilidadDeVoto(votacion, ahora),
     ...calcularBloqueo({
       votos:        bandera(tiene_votos),
       comprobantes: bandera(tiene_comprobantes),
@@ -49,7 +69,10 @@ function conBloqueo(row: any) {
 
 export async function findAll() {
   const [rows] = await pool.query(BASE_QUERY + ' ORDER BY v.fecha_apertura DESC');
-  return (rows as any[]).map(conBloqueo);
+  // Un solo corte para todo el listado: si se calculara por fila, dos papeletas
+  // que vencen en el mismo instante podrían salir con estados distintos.
+  const ahora = ahoraEnEcuador();
+  return (rows as any[]).map((fila) => conBloqueo(fila, ahora));
 }
 
 export async function findById(id: number) {
@@ -69,7 +92,8 @@ export async function findByProceso(procesoId: number, filtro: FiltroCarrera = u
     `${BASE_QUERY} WHERE v.fk_id_proceso = ?${sql} ORDER BY v.fecha_apertura`,
     [procesoId, ...params]
   );
-  return (rows as any[]).map(conBloqueo);
+  const ahora = ahoraEnEcuador();
+  return (rows as any[]).map((fila) => conBloqueo(fila, ahora));
 }
 
 /** ¿Ya existe una papeleta de esa carrera en el proceso? (excluye una opcional) */

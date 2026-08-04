@@ -91,15 +91,30 @@ export async function estadoDeListaEnVotacion(
   return rows[0] ? String(rows[0].estado_revision) : null;
 }
 
+export interface EstadoDeVotacion {
+  votacion: string;
+  proceso: string;
+  carrera_votacion: number | null;
+  archivado: boolean;
+  /** Ventana propia de la papeleta. */
+  fecha_apertura: string | null;
+  fecha_cierre: string | null;
+  /** Fin del periodo de votación del proceso: el plazo que manda. */
+  fecha_fin_votacion: string | null;
+}
+
 /**
- * Estado de la votación y de su proceso, más la carrera del proceso, para
- * decidir si se puede votar y si se pueden ver los resultados.
+ * Estado de la votación y de su proceso, con las FECHAS además de los estados.
+ *
+ * Las fechas son imprescindibles: el cierre automático corre cada minuto, así
+ * que `votacion.estado` puede seguir diciendo 'abierta' un rato después de la
+ * hora final. Quien decide si se admite un voto tiene que mirar el reloj, no
+ * solo esa columna (ver utils/estadoVotacion.ts).
  */
-export async function estadoDeVotacion(
-  votacionId: number
-): Promise<{ votacion: string; proceso: string; carrera_votacion: number | null; archivado: boolean } | null> {
+export async function estadoDeVotacion(votacionId: number): Promise<EstadoDeVotacion | null> {
   const [rows] = await pool.query(
     `SELECT v.estado AS votacion, p.estado AS proceso, v.fk_id_carrera AS carrera_votacion,
+            v.fecha_apertura, v.fecha_cierre, p.fecha_fin_votacion,
             (p.archivado_at IS NOT NULL) AS archivado
      FROM votacion v
      JOIN proceso_electoral p ON p.id_proceso = v.fk_id_proceso

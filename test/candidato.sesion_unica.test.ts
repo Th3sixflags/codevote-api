@@ -68,8 +68,9 @@ function ejecutar(sqlCrudo: string, params: any[] = []): any {
   // --- votación ------------------------------------------------------------
   if (sql.includes('FROM votacion v') && sql.includes('p.estado AS proceso')) {
     return [{
-      votacion: 'abierta', proceso: 'votacion', carrera_votacion: null,
-      archivado: 0, fecha_fin_votacion: '2099-01-01 23:59:59',
+      votacion: 'abierta', proceso: 'votacion', carrera_votacion: null, archivado: 0,
+      fecha_apertura: '2026-01-01 08:00:00', fecha_cierre: '2099-01-01 23:59:59',
+      fecha_fin_votacion: '2099-01-01 23:59:59',
     }];
   }
   if (sql.includes('FROM lista_candidata WHERE id_lista = ?')) {

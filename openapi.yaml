@@ -5,11 +5,30 @@ info:
   description: |
     API REST del sistema de votaciones estudiantiles CodeVote (UIDE).
 
-    **Autenticación:** sin contraseña. Se pide un código de 6 dígitos al correo
-    institucional (`POST /auth/codigo`) y se canjea por el token
-    (`POST /auth/verificar`). Todos los endpoints salvo `/auth/*` y `/health`
-    requieren ese token JWT en la cabecera `Authorization: Bearer <token>`.
-    Las operaciones de escritura (POST/PATCH/DELETE) requieren rol `admin`.
+    **Autenticación, según el rol:**
+
+    - `estudiante` y `candidato`: código de 6 dígitos al correo institucional
+      (`POST /auth/codigo` + `POST /auth/verificar`). Sin contraseña.
+    - `admin`: correo y contraseña (`POST /auth/login`).
+
+    Ninguna de las dos vías revela el rol de una cuenta: pedir código para un
+    admin devuelve la misma respuesta que una cédula inexistente, y una cuenta
+    del padrón enviada a `/auth/login` recibe el mismo 401 que una contraseña
+    equivocada.
+
+    El candidato usa UNA sola sesión para todo: su JWT lleva `rol: candidato`,
+    que le abre el portal de su lista sin quitarle el derecho a votar ni el
+    acceso a las pantallas de estudiante.
+
+    Todos los endpoints salvo `/auth/*` y `/health` requieren el token JWT en la
+    cabecera `Authorization: Bearer <token>`. Las operaciones de escritura
+    (POST/PATCH/DELETE) requieren rol `admin`.
+
+    **Fechas y estado de las papeletas:** las fechas viajan como
+    `YYYY-MM-DD HH:mm:ss` en hora de Ecuador (America/Guayaquil), sin sufijo Z.
+    Para saber si una papeleta admite votos hay que mirar `estado_efectivo` y
+    `puede_votar`, no `estado`: el cierre automático corre cada minuto, así que
+    el valor guardado puede ir por detrás de la realidad.
 
     **Resultados electorales:** el escrutinio (`/votos/resultados/{votacionId}`)
     y las actas (`/actas-resultados`) son de LECTURA exclusivamente
@@ -66,11 +85,16 @@ paths:
         entre envíos a la misma cuenta (429 si no se respeta).
 
 
-        **La respuesta es siempre la misma exista o no la cuenta.** Si el
-        identificador no corresponde a nadie, no se envía nada y
-        `correo_enmascarado` llega en `null`, pero ni el estado HTTP ni el
-        mensaje cambian: así este endpoint no sirve para averiguar qué correos o
-        cédulas están registrados.
+        **Solo para `estudiante` y `candidato`.** La administración entra con
+        correo y contraseña (`POST /auth/login`): un buzón comprometido no debe
+        abrir el panel administrativo.
+
+
+        **La respuesta es siempre la misma exista o no la cuenta**, y también si
+        la cuenta es de administración: no se emite ningún código,
+        `correo_enmascarado` llega en `null` y ni el estado HTTP ni el mensaje
+        cambian. Así este endpoint no sirve para averiguar qué correos o cédulas
+        están registrados, ni cuáles son administrativos.
       requestBody:
         required: true
         content:
@@ -178,14 +202,20 @@ paths:
   /auth/login:
     post:
       tags: [Autenticación]
-      summary: '[Retirado] Inicio de sesión por contraseña'
+      summary: Inicio de sesión de la administración (correo y contraseña)
       security: []
-      deprecated: true
       description: >-
-        **Retirado.** El acceso es por código al correo
-        (`/auth/codigo` + `/auth/verificar`). Responde **410** salvo que se
-        active `AUTH_PASSWORD_FALLBACK=true`, que existe solo como puerta de
-        emergencia para la administración si el SMTP se cae.
+        Vía de acceso del rol `admin`.
+
+
+        Una cuenta `estudiante` o `candidato` recibe **401 con el mismo mensaje
+        genérico** que una contraseña equivocada: el error no revela el rol. Su
+        vía es el código al correo (`/auth/codigo`).
+
+
+        `AUTH_PASSWORD_FALLBACK=true` admite también al padrón, como puerta de
+        emergencia si el SMTP se cae en plena votación; solo funciona para
+        cuentas que conserven un hash de contraseña.
       requestBody:
         required: true
         content:
@@ -198,7 +228,7 @@ paths:
                 password:             { type: string }
       responses:
         '200':
-          description: Autenticación correcta (solo con el respaldo activado)
+          description: Autenticación correcta
           content:
             application/json:
               schema:
@@ -207,12 +237,14 @@ paths:
                   token:   { type: string }
                   usuario: { type: object }
         '400': { $ref: '#/components/responses/SolicitudInvalida' }
-        '401': { $ref: '#/components/responses/NoAutenticado' }
-        '410':
-          description: El acceso con contraseña está retirado
+        '401':
+          description: >-
+            Credenciales inválidas, o cuenta del padrón sin el respaldo activado.
+            El mensaje es idéntico en ambos casos.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+              example: { error: 'Credenciales inválidas.' }
 
   /facultades:
     get:
@@ -2271,10 +2303,18 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
         '409':
           description: >-
-            El estudiante ya emitió su voto en esta votación, la votación no está
-            abierta, el proceso no está activo, o la lista elegida no está
-            aprobada (una lista pendiente, en revisión, rechazada o retirada no
-            es una opción de la papeleta y tampoco se muestra en Elecciones).
+            El estudiante ya emitió su voto en esta votación, la papeleta no está
+            disponible, o la lista elegida no está aprobada (una lista pendiente,
+            en revisión, rechazada o retirada no es una opción de la papeleta y
+            tampoco se muestra en Elecciones).
+
+
+            La disponibilidad se comprueba contra la FECHA, no solo contra
+            `votacion.estado`: pasada `fecha_fin_votacion` el voto se rechaza
+            aunque el cierre automático todavía no haya pasado. El mensaje es el
+            mismo `motivo_no_disponible` que devuelven las consultas de la
+            papeleta ("La votación ha finalizado.", "La votación todavía no ha
+            abierto.", "El proceso electoral fue cancelado.", etc.).
 
 
             El doble voto se corta en dos capas: una comprobación previa y la
@@ -3127,9 +3167,23 @@ components:
         Incluye además puede_eliminar y motivo_bloqueo (ver EstadoEliminacion).
 
 
-        `estado` pasa a `cerrada` por sí solo cuando el proceso supera su
-        `fecha_fin_votacion` (comprobación cada minuto en hora de Ecuador). Una
-        papeleta cerrada deja de aceptar votos y su escrutinio pasa a oficial.
+        **Qué mirar para saber si se puede votar: `estado_efectivo` y
+        `puede_votar`, NO `estado`.**
+
+
+        `estado` es el valor guardado en la base. El cierre automático corre cada
+        minuto, así que entre la hora final y esa pasada `estado` puede seguir
+        diciendo `abierta` cuando la votación ya terminó. `estado_efectivo` se
+        deriva de la FECHA en el momento de la consulta, de modo que nunca indica
+        que se pueda votar después de `fecha_fin_votacion`. `POST /votos` aplica
+        exactamente la misma regla, así que lo que la API muestra y lo que acepta
+        nunca se contradicen.
+
+
+        Las fechas viajan como `YYYY-MM-DD HH:mm:ss` en **hora de Ecuador**
+        (America/Guayaquil), sin zona horaria ni sufijo Z: los DATETIME del
+        esquema son hora de Ecuador por convención y se leen como texto para que
+        ninguna conversión los desplace.
       properties:
         puede_eliminar:
           type: boolean
@@ -3145,9 +3199,40 @@ components:
           nullable: true
         id_votacion:     { type: integer }
         titulo_papeleta: { type: string }
-        fecha_apertura:  { type: string, format: date-time }
-        fecha_cierre:    { type: string, format: date-time }
-        estado:          { type: string, example: abierta }
+        fecha_apertura:  { type: string, example: '2026-08-10 08:00:00' }
+        fecha_cierre:    { type: string, example: '2026-08-10 18:00:00' }
+        estado:
+          type: string
+          enum: ["pendiente", "abierta", "cerrada"]
+          example: abierta
+          description: >-
+            Valor guardado. Puede ir hasta un minuto por detrás de la realidad;
+            para decidir usa `estado_efectivo`.
+        estado_efectivo:
+          type: string
+          enum: ["pendiente", "abierta", "cerrada"]
+          example: cerrada
+          description: Estado real en el momento de la consulta, derivado de la fecha.
+        puede_votar:
+          type: boolean
+          example: false
+          description: Si esta papeleta admite votos ahora mismo.
+        motivo_no_disponible:
+          type: string
+          nullable: true
+          example: La votación ha finalizado.
+          description: Por qué no se puede votar. null cuando `puede_votar` es true.
+        estado_proceso:
+          type: string
+          description: Estado del proceso al que pertenece la papeleta.
+        fecha_fin_votacion:
+          type: string
+          nullable: true
+          description: Fin del periodo de votación del proceso; es el plazo que manda.
+          example: '2026-08-10 18:00:00'
+        archivado:
+          type: boolean
+          description: Si su proceso está archivado (historial de solo lectura).
         id_proceso:      { type: integer }
         nombre_proceso:  { type: string }
         foto_url:

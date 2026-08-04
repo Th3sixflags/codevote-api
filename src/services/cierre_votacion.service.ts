@@ -172,11 +172,13 @@ async function avisarALaAdministracion(
 export async function cerrarPapeletasVencidas(): Promise<ResultadoCierre[]> {
   const corte = ahoraEnEcuador();
   const vencidas = await repo.papeletasVencidas(corte);
-  if (vencidas.length === 0) return [];
 
   const cerradas: ResultadoCierre[] = [];
+  const procesosTocados = new Set<number>();
+
   // En serie: son pocas y así un fallo en una no arrastra a las demás.
   for (const papeleta of vencidas) {
+    procesosTocados.add(Number(papeleta.id_proceso));
     try {
       const resultado = await cerrarPapeleta(papeleta);
       if (resultado) cerradas.push(resultado);
@@ -184,5 +186,43 @@ export async function cerrarPapeletasVencidas(): Promise<ResultadoCierre[]> {
       console.error(`[cierre] falló el cierre de la votación ${papeleta.id_votacion}`, err);
     }
   }
+
+  // Con la última papeleta cerrada, el proceso queda finalizado. Se intenta
+  // también para los procesos cuyas papeletas ya estaban todas cerradas de antes
+  // (cierre manual, o un reinicio a mitad de la pasada anterior): si no, un
+  // proceso podría quedarse en 'votacion' para siempre.
+  for (const procesoId of await procesosPendientesDeFinalizar(corte, procesosTocados)) {
+    try {
+      await finalizarProceso(procesoId, corte);
+    } catch (err) {
+      console.error(`[cierre] no se pudo finalizar el proceso ${procesoId}`, err);
+    }
+  }
+
   return cerradas;
+}
+
+/**
+ * Procesos que podrían tener que finalizar: los que acaban de perder su última
+ * papeleta abierta, más los que ya estaban del todo cerrados y siguen sin
+ * finalizar. El UPDATE de `finalizarSiTodoCerrado` es el que decide de verdad.
+ */
+async function procesosPendientesDeFinalizar(
+  corte: string, tocados: Set<number>
+): Promise<number[]> {
+  const candidatos = new Set(tocados);
+  for (const id of await repo.procesosVencidosSinFinalizar(corte)) candidatos.add(Number(id));
+  return [...candidatos];
+}
+
+/** Finaliza el proceso y avisa una sola vez a quienes participaron. */
+async function finalizarProceso(procesoId: number, corte: string) {
+  if (!(await repo.finalizarSiTodoCerrado(procesoId, corte))) return;
+
+  const nombre = (await repo.nombreDeProceso(procesoId)) ?? 'Proceso electoral';
+  console.info(`[cierre] proceso ${procesoId} ("${nombre}") finalizado: todas sus papeletas están cerradas`);
+
+  // El aviso va DESPUÉS del UPDATE y solo si este cambió algo, así que repetir
+  // la pasada no vuelve a notificar.
+  await notificaciones.notificarResultadosDeProceso(procesoId, nombre);
 }

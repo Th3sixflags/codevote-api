@@ -2,6 +2,7 @@ import * as repo from '../repositories/voto.repository.js';
 import * as notificaciones from './notificacion.service.js';
 import { HttpError } from '../utils/httpError.js';
 import { procesoVisible } from '../utils/accesoCarrera.js';
+import { disponibilidadDeVoto } from '../utils/estadoVotacion.js';
 import type { FiltroCarrera } from '../repositories/proceso_electoral.repository.js';
 import { CrearVotoDTO } from '../schemas/voto.schema.js';
 
@@ -16,15 +17,25 @@ export async function registrarVoto(data: CrearVotoDTO, cedula: string, filtro: 
   // el backend debe hacerlo por su cuenta).
   const estado = await repo.estadoDeVotacion(data.fk_id_votacion);
   if (!estado) throw new HttpError(404, 'La votación indicada no existe.');
-  if (estado.votacion !== 'abierta') throw new HttpError(409, 'La votación no está abierta.');
-  if (estado.proceso === 'finalizado' || estado.proceso === 'cancelado') {
-    throw new HttpError(409, 'El proceso electoral no está activo.');
-  }
-  // Un proceso archivado es historial de solo lectura. En la práctica ya estaría
-  // finalizado o cancelado —son los únicos estados archivables—, pero se
-  // comprueba aparte para que la regla sea explícita y no dependa de eso.
-  if (estado.archivado) {
-    throw new HttpError(409, 'El proceso electoral está archivado: es historial y no admite votos.');
+
+  // La FECHA se comprueba aquí directamente, no se confía en `votacion.estado`.
+  //
+  // El cierre automático corre cada minuto: entre que pasa la hora final y la
+  // tarea cierra la papeleta hay una ventana en la que la columna todavía dice
+  // 'abierta'. Si el servidor estuvo caído, esa ventana puede durar horas.
+  // Aceptar un voto ahí dentro sería admitir votos fuera de plazo, así que la
+  // misma regla que usan las consultas para responder `puede_votar` decide aquí
+  // si el voto entra (ver utils/estadoVotacion.ts).
+  const disponibilidad = disponibilidadDeVoto({
+    estado:             estado.votacion,
+    fecha_apertura:     estado.fecha_apertura,
+    fecha_cierre:       estado.fecha_cierre,
+    fecha_fin_votacion: estado.fecha_fin_votacion,
+    estado_proceso:     estado.proceso,
+    archivado:          estado.archivado,
+  });
+  if (!disponibilidad.puede_votar) {
+    throw new HttpError(409, disponibilidad.motivo_no_disponible!);
   }
 
   // Segmentación por carrera: cada papeleta puede ser global o de una carrera.

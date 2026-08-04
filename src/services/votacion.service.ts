@@ -2,6 +2,7 @@ import * as repo from '../repositories/votacion.repository.js';
 import type { FiltroCarrera } from '../repositories/votacion.repository.js';
 import { HttpError } from '../utils/httpError.js';
 import { procesoVisible } from '../utils/accesoCarrera.js';
+import { estaVencida } from '../utils/estadoVotacion.js';
 import { cerrarPapeleta } from './cierre_votacion.service.js';
 import * as avisos from './avisos_electorales.service.js';
 import { CrearVotacionDTO, ActualizarVotacionDTO } from '../schemas/votacion.schema.js';
@@ -57,6 +58,21 @@ export async function actualizarVotacion(id: number, data: ActualizarVotacionDTO
     if (await repo.existeCarreraEnProceso(procesoFinal, carreraFinal, id)) {
       throw new HttpError(409, 'Ya existe una votación de esa carrera en este proceso electoral.');
     }
+  }
+
+  // Una papeleta cerrada NO se reabre si su plazo ya venció.
+  //
+  // Sin esto, cualquier edición del proceso que reenviara `estado: 'abierta'`
+  // —un formulario que manda el objeto entero, por ejemplo— resucitaba una
+  // elección terminada y volvía a admitir votos. La tarea de cierre la cerraría
+  // en el siguiente minuto, pero en ese hueco los votos entrarían y quedarían
+  // registrados, incoherentes con un acta ya emitida.
+  const reabre = data.estado === 'abierta' && existente.estado === 'cerrada';
+  if (reabre && estaVencida(existente)) {
+    throw new HttpError(
+      409,
+      'La votación ya terminó y no puede reabrirse. Si hay que votar de nuevo, extiende primero el periodo del proceso electoral.'
+    );
   }
 
   // Cierre manual: es el respaldo por si hay que cerrar antes de tiempo, y pasa

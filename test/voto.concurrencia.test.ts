@@ -74,7 +74,13 @@ async function ejecutar(sqlCrudo: string, params: any[] = []): Promise<any> {
   const sql = sqlCrudo.replace(/\s+/g, ' ').trim();
 
   if (sql.includes('FROM votacion v') && sql.includes('p.estado AS proceso')) {
-    return [{ votacion: 'abierta', proceso: 'votacion', carrera_votacion: null }];
+    // Además del estado, el servicio comprueba las FECHAS: una papeleta cuyo
+    // plazo venció no admite votos aunque la columna siga diciendo 'abierta'.
+    return [{
+      votacion: 'abierta', proceso: 'votacion', carrera_votacion: null, archivado: 0,
+      fecha_apertura: '2026-01-01 08:00:00', fecha_cierre: '2099-12-31 23:59:59',
+      fecha_fin_votacion: '2099-12-31 23:59:59',
+    }];
   }
   // Estado de la lista dentro de la papeleta: solo se puede votar por una aprobada.
   if (sql.includes('FROM lista_candidata WHERE id_lista = ?')) return [{ estado_revision: 'aprobada' }];
