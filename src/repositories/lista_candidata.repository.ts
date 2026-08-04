@@ -44,27 +44,75 @@ function conBloqueo(row: any) {
  */
 export type FiltroCarrera = number | null | undefined;
 
+/**
+ * Qué listas puede ver quien consulta.
+ *
+ * Una candidatura solo es pública cuando la administración la aprueba: mientras
+ * está en preparación, en revisión, rechazada o retirada no debe aparecer en
+ * Elecciones. Antes cualquier estudiante veía todos los estados, así que se
+ * enteraba de quién se había postulado y a quién habían rechazado.
+ *
+ *  - `filtro`: carrera de la papeleta (ver más abajo).
+ *  - `soloAprobadas`: true para estudiantes y candidatos.
+ *  - `cedula`: quien consulta. Su PROPIA lista (aquella de la que es
+ *    responsable) sigue siendo visible aunque no esté aprobada; es la misma que
+ *    gestiona desde el Portal del candidato.
+ */
+export interface VisibilidadListas {
+  filtro: FiltroCarrera;
+  soloAprobadas: boolean;
+  cedula?: string | null;
+}
+
+/** Visibilidad de la administración: todas las listas, en cualquier estado. */
+export const VISIBILIDAD_TOTAL: VisibilidadListas = {
+  filtro: undefined, soloAprobadas: false, cedula: null,
+};
+
 function condicionCarrera(filtro: FiltroCarrera): { sql: string; params: any[] } {
   if (filtro === undefined) return { sql: '', params: [] };
   if (filtro === null) return { sql: ' AND vo.fk_id_carrera IS NULL', params: [] };
   return { sql: ' AND (vo.fk_id_carrera IS NULL OR vo.fk_id_carrera = ?)', params: [filtro] };
 }
 
-export async function findAll(filtro: FiltroCarrera = undefined) {
-  const { sql, params } = condicionCarrera(filtro);
+/** Condición completa: carrera de la papeleta + estado de revisión. */
+function condicionVisibilidad(vis: VisibilidadListas): { sql: string; params: any[] } {
+  const { sql, params } = condicionCarrera(vis.filtro);
+  if (!vis.soloAprobadas) return { sql, params };
+  if (vis.cedula) {
+    return {
+      sql: `${sql} AND (l.estado_revision = 'aprobada' OR l.fk_cedula_responsable = ?)`,
+      params: [...params, vis.cedula],
+    };
+  }
+  return { sql: `${sql} AND l.estado_revision = 'aprobada'`, params };
+}
+
+/** ¿Esta fila de lista es visible para quien consulta? (mismo criterio que el SQL). */
+export function listaVisible(lista: any, vis: VisibilidadListas): boolean {
+  if (!vis.soloAprobadas) return true;
+  if (String(lista?.estado_revision ?? '').toLowerCase() === 'aprobada') return true;
+  return !!vis.cedula && lista?.fk_cedula_responsable === vis.cedula;
+}
+
+export async function findAll(vis: VisibilidadListas = VISIBILIDAD_TOTAL) {
+  const { sql, params } = condicionVisibilidad(vis);
   const where = sql ? ` WHERE 1=1${sql}` : '';
   const [rows] = await pool.query(`${BASE_QUERY}${where} ORDER BY l.fecha_inscripcion DESC`, params);
   return (rows as any[]).map(conBloqueo);
 }
 
-/** Sin filtro de carrera: uso interno (portal del candidato, acciones de admin). */
+/**
+ * Sin filtro alguno: uso INTERNO (portal del candidato, acciones de admin). Lo
+ * que se devuelva a quien consulta pasa además por `listaVisible`.
+ */
 export async function findById(id: number) {
   const [rows] = await pool.query(BASE_QUERY + ' WHERE l.id_lista = ?', [id]) as [any[], any];
   return conBloqueo(rows[0] ?? null);
 }
 
-export async function findByProceso(procesoId: number, filtro: FiltroCarrera = undefined) {
-  const { sql, params } = condicionCarrera(filtro);
+export async function findByProceso(procesoId: number, vis: VisibilidadListas = VISIBILIDAD_TOTAL) {
+  const { sql, params } = condicionVisibilidad(vis);
   const [rows] = await pool.query(
     `${BASE_QUERY} WHERE l.fk_id_proceso = ?${sql} ORDER BY l.nombre_lista`,
     [procesoId, ...params]
@@ -73,8 +121,8 @@ export async function findByProceso(procesoId: number, filtro: FiltroCarrera = u
 }
 
 /** Listas que compiten en una papeleta concreta. */
-export async function findByVotacion(votacionId: number, filtro: FiltroCarrera = undefined) {
-  const { sql, params } = condicionCarrera(filtro);
+export async function findByVotacion(votacionId: number, vis: VisibilidadListas = VISIBILIDAD_TOTAL) {
+  const { sql, params } = condicionVisibilidad(vis);
   const [rows] = await pool.query(
     `${BASE_QUERY} WHERE l.fk_id_votacion = ?${sql} ORDER BY l.nombre_lista`,
     [votacionId, ...params]

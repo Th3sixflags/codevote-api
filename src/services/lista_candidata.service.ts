@@ -5,28 +5,33 @@ import * as candidatoRepo from '../repositories/candidato.repository.js';
 import * as estudianteRepo from '../repositories/estudiante.repository.js';
 import * as planRepo from '../repositories/plan_trabajo.repository.js';
 import * as notificaciones from './notificacion.service.js';
-import type { FiltroCarrera } from '../repositories/lista_candidata.repository.js';
+import { VISIBILIDAD_TOTAL, type VisibilidadListas } from '../repositories/lista_candidata.repository.js';
 import { procesoVisible } from '../utils/accesoCarrera.js';
 import { HttpError } from '../utils/httpError.js';
 import { CARGOS } from '../schemas/common.js';
 import { componerLista } from './candidato_portal.service.js';
 import { CrearListaDTO, ActualizarListaDTO } from '../schemas/lista_candidata.schema.js';
 
-// Las listas de un proceso de carrera solo se devuelven a estudiantes de esa
-// carrera; la administración las ve todas.
-export async function listarListas(filtro: FiltroCarrera = undefined) {
-  return repo.findAll(filtro);
+// Doble filtro para estudiantes y candidatos: la carrera de la papeleta y el
+// estado de revisión (solo las aprobadas). La administración las ve todas.
+export async function listarListas(vis: VisibilidadListas = VISIBILIDAD_TOTAL) {
+  return repo.findAll(vis);
 }
 
 /**
- * Detalle de una lista para la administración: incluye `responsable`,
- * `integrantes` (con la bandera `es_responsable`) y sus planes de trabajo, con
- * la misma forma que devuelve GET /api/candidato/mi-lista.
+ * Detalle de una lista: incluye `responsable`, `integrantes` (con la bandera
+ * `es_responsable`) y sus planes de trabajo, con la misma forma que devuelve
+ * GET /api/candidato/mi-lista.
+ *
+ * Una lista de otra carrera, o que quien consulta no puede ver por su estado de
+ * revisión, se responde como NO ENCONTRADA (404): así el acceso directo por ID
+ * no revela ni siquiera que existe.
  */
-export async function obtenerLista(id: number, filtro: FiltroCarrera = undefined) {
+export async function obtenerLista(id: number, vis: VisibilidadListas = VISIBILIDAD_TOTAL) {
   const lista = await repo.findById(id);
   if (!lista) return null;
-  if (!procesoVisible(lista.carrera_votacion, filtro)) return null;
+  if (!procesoVisible(lista.carrera_votacion, vis.filtro)) return null;
+  if (!repo.listaVisible(lista, vis)) return null;
 
   const [integrantes, planes] = await Promise.all([
     candidatoRepo.findByLista(id),
@@ -35,8 +40,8 @@ export async function obtenerLista(id: number, filtro: FiltroCarrera = undefined
   return componerLista(lista, integrantes, planes);
 }
 
-export async function listarPorProceso(procesoId: number, filtro: FiltroCarrera = undefined) {
-  return repo.findByProceso(procesoId, filtro);
+export async function listarPorProceso(procesoId: number, vis: VisibilidadListas = VISIBILIDAD_TOTAL) {
+  return repo.findByProceso(procesoId, vis);
 }
 
 /**
@@ -49,9 +54,9 @@ export async function crearLista(data: CrearListaDTO) {
   return repo.create(data, votacion.id_proceso);
 }
 
-/** Listas que compiten en una papeleta (filtradas por carrera de quien consulta). */
-export async function listarPorVotacion(votacionId: number, filtro: FiltroCarrera = undefined) {
-  return repo.findByVotacion(votacionId, filtro);
+/** Listas que compiten en una papeleta, según lo que pueda ver quien consulta. */
+export async function listarPorVotacion(votacionId: number, vis: VisibilidadListas = VISIBILIDAD_TOTAL) {
+  return repo.findByVotacion(votacionId, vis);
 }
 
 export async function actualizarLista(id: number, data: ActualizarListaDTO) {

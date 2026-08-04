@@ -39,10 +39,17 @@ export async function registrarVoto(data: CrearVotoDTO, cedula: string, filtro: 
   // garantías siguen en pie (una sola vez por papeleta, papeleta abierta, la
   // carrera que corresponde y una lista de esa misma papeleta).
 
-  // Un voto 'valido' debe ser por una lista que pertenezca a esta votación.
+  // Un voto 'valido' debe ser por una lista que pertenezca a esta votación y que
+  // esté APROBADA. Una lista en preparación, en revisión, rechazada o retirada
+  // no es una opción de la papeleta: tampoco se muestra en Elecciones, así que
+  // llegar aquí con ella solo puede venir de una llamada directa a la API.
   if (data.tipo_voto === 'valido' && data.fk_id_lista != null) {
-    if (!(await repo.listaPerteneceAVotacion(data.fk_id_lista, data.fk_id_votacion))) {
+    const estadoLista = await repo.estadoDeListaEnVotacion(data.fk_id_lista, data.fk_id_votacion);
+    if (estadoLista === null) {
       throw new HttpError(400, 'La lista seleccionada no pertenece a esta votación.');
+    }
+    if (estadoLista.toLowerCase() !== 'aprobada') {
+      throw new HttpError(409, 'La lista seleccionada no está aprobada, así que no se puede votar por ella.');
     }
   }
 

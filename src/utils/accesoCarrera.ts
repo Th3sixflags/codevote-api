@@ -1,6 +1,7 @@
 import { Request } from 'express';
 import * as estudianteRepo from '../repositories/estudiante.repository.js';
 import type { FiltroCarrera } from '../repositories/proceso_electoral.repository.js';
+import { VISIBILIDAD_TOTAL, type VisibilidadListas } from '../repositories/lista_candidata.repository.js';
 
 /**
  * Roles reales del sistema: son exactamente los del ENUM de `estudiante.rol`.
@@ -31,6 +32,25 @@ export function esAdministracion(rol: unknown): boolean {
 export async function filtroCarreraDe(req: Request): Promise<FiltroCarrera> {
   if (esAdministracion(req.user?.rol)) return undefined;
   return estudianteRepo.findCarreraId(req.user!.sub);
+}
+
+/**
+ * Qué listas candidatas puede ver quien hace la petición:
+ *  - administración -> todas, en cualquier estado de revisión.
+ *  - estudiante o candidato -> solo las APROBADAS de su carrera (o globales),
+ *    más su propia lista si es responsable de una, que gestiona desde el Portal
+ *    del candidato aunque todavía no esté aprobada.
+ *
+ * Una candidatura solo es pública cuando la administración la aprueba: pendiente,
+ * en_revision, rechazada y retirada no deben aparecer en Elecciones.
+ */
+export async function visibilidadListasDe(req: Request): Promise<VisibilidadListas> {
+  if (esAdministracion(req.user?.rol)) return VISIBILIDAD_TOTAL;
+  return {
+    filtro:        await estudianteRepo.findCarreraId(req.user!.sub),
+    soloAprobadas: true,
+    cedula:        req.user!.sub,
+  };
 }
 
 /**

@@ -4,16 +4,23 @@ import {
   transferirResponsableSchema,
 } from '../schemas/lista_candidata.schema.js';
 import * as service from '../services/lista_candidata.service.js';
-import { filtroCarreraDe } from '../utils/accesoCarrera.js';
+import { visibilidadListasDe } from '../utils/accesoCarrera.js';
+
+// Estudiantes y candidatos que navegan por Elecciones solo reciben listas
+// APROBADAS (más la propia, si son responsables de una). La administración las
+// ve todas. Vale para el listado general, el de proceso, el de papeleta y el
+// detalle por ID: ver `visibilidadListasDe`.
 
 export async function listar(req: Request, res: Response) {
-  const listas = await service.listarListas(await filtroCarreraDe(req));
+  const listas = await service.listarListas(await visibilidadListasDe(req));
   res.json(listas);
 }
 
 export async function obtener(req: Request, res: Response) {
-  // Una lista de un proceso de otra carrera se responde como no encontrada.
-  const lista = await service.obtenerLista(Number(req.params.id), await filtroCarreraDe(req));
+  // Una lista de otra carrera, o que quien consulta no puede ver por su estado
+  // de revisión, se responde como no encontrada: el acceso directo por ID no
+  // revela ni siquiera que existe.
+  const lista = await service.obtenerLista(Number(req.params.id), await visibilidadListasDe(req));
   if (!lista) {
     res.status(404).json({ error: 'Lista no encontrada.' });
     return;
@@ -22,13 +29,13 @@ export async function obtener(req: Request, res: Response) {
 }
 
 export async function listarPorProceso(req: Request, res: Response) {
-  const listas = await service.listarPorProceso(Number(req.params.procesoId), await filtroCarreraDe(req));
+  const listas = await service.listarPorProceso(Number(req.params.procesoId), await visibilidadListasDe(req));
   res.json(listas);
 }
 
 /** Listas que compiten en una papeleta concreta. */
 export async function listarPorVotacion(req: Request, res: Response) {
-  const listas = await service.listarPorVotacion(Number(req.params.votacionId), await filtroCarreraDe(req));
+  const listas = await service.listarPorVotacion(Number(req.params.votacionId), await visibilidadListasDe(req));
   res.json(listas);
 }
 

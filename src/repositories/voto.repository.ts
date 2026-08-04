@@ -72,16 +72,23 @@ export async function createConComprobante(data: CrearVotoDTO, cedula: string) {
 }
 
 /**
- * ¿La lista compite exactamente en esa papeleta? Ahora cada lista pertenece a
- * una votación concreta, así que la comprobación es directa (antes se deducía
- * por el proceso, lo que permitía votar por una lista de otra categoría).
+ * Estado de revisión de una lista DENTRO de esa papeleta, o null si no compite
+ * en ella. Cada lista pertenece a una votación concreta, así que la comprobación
+ * es directa (antes se deducía por el proceso, lo que permitía votar por una
+ * lista de otra categoría).
+ *
+ * Devuelve el estado, y no solo un booleano, porque solo se puede votar por una
+ * lista APROBADA: una en preparación, en revisión, rechazada o retirada no es
+ * una opción válida de la papeleta.
  */
-export async function listaPerteneceAVotacion(listaId: number, votacionId: number): Promise<boolean> {
+export async function estadoDeListaEnVotacion(
+  listaId: number, votacionId: number
+): Promise<string | null> {
   const [rows] = await pool.query(
-    'SELECT 1 FROM lista_candidata WHERE id_lista = ? AND fk_id_votacion = ? LIMIT 1',
+    'SELECT estado_revision FROM lista_candidata WHERE id_lista = ? AND fk_id_votacion = ? LIMIT 1',
     [listaId, votacionId]
   ) as [any[], any];
-  return rows.length > 0;
+  return rows[0] ? String(rows[0].estado_revision) : null;
 }
 
 /**

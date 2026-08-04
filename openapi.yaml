@@ -849,6 +849,18 @@ paths:
     get:
       tags: [Listas candidatas]
       summary: Lista todos los registros
+      description: >-
+        **Visibilidad.** Una candidatura solo es pública cuando la administración
+        la aprueba. Los roles `estudiante` y `candidato` reciben únicamente las
+        listas con `estado_revision = 'aprobada'`; las `pendiente`,
+        `en_revision`, `rechazada` y `retirada` no aparecen. La única excepción
+        es la lista propia: el responsable sigue viendo la suya, que es la que
+        gestiona desde el Portal del candidato. El rol `admin` las ve todas.
+
+
+        Se aplica el mismo criterio en los cuatro contratos de lectura: este
+        listado, `/proceso/{procesoId}`, `/votacion/{votacionId}` y el detalle
+        `/{id}`. Sigue vigente además el filtro por carrera de la papeleta.
       responses:
         '200':
           description: Listado
@@ -880,6 +892,9 @@ paths:
     get:
       tags: [Listas candidatas]
       summary: Lista las listas candidatas de un proceso
+      description: >-
+        Estudiantes y candidatos reciben solo las listas aprobadas (más la
+        propia); la administración, todas. Ver `/listas-candidatas`.
       parameters:
         - name: procesoId
           in: path
@@ -900,8 +915,10 @@ paths:
       tags: [Listas candidatas]
       summary: Listas que compiten en una papeleta
       description: >-
-        Devuelve las listas de esa votación. El estudiante solo recibe las de
-        papeletas globales o de su propia carrera; la administración ve todas.
+        Devuelve las listas de esa votación. El estudiante y el candidato solo
+        reciben las APROBADAS de papeletas globales o de su propia carrera (más
+        la lista de la que son responsables); la administración ve todas, en
+        cualquier estado de revisión.
       parameters:
         - name: votacionId
           in: path
@@ -929,6 +946,11 @@ paths:
       description: >-
         Incluye `fk_cedula_responsable`, el bloque `responsable` y el arreglo
         `integrantes` (cada uno con su `cargo` y la bandera `es_responsable`).
+
+
+        Una lista que quien consulta no puede ver —de otra carrera, o que no
+        está aprobada y no es la suya— se responde **404**, no 403: el acceso
+        directo por ID no revela ni siquiera que existe.
       responses:
         '200':
           description: Registro encontrado
@@ -936,7 +958,13 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ListaCandidataDetalle' }
         '401': { $ref: '#/components/responses/NoAutenticado' }
-        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '404':
+          description: >-
+            La lista no existe, o no es visible para quien consulta (otra
+            carrera, o no aprobada y ajena).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
     patch:
       tags: [Listas candidatas]
       summary: Actualiza un registro (requiere rol admin)
@@ -2064,7 +2092,8 @@ paths:
         Segmentación por carrera: cada papeleta puede ser global o de una carrera;
         solo los estudiantes de esa carrera pueden votarla (403 en caso
         contrario). Además la lista elegida debe competir en esa misma papeleta
-        (400 si no). Todo se valida en el backend, sin depender del frontend.
+        (400 si no) y estar APROBADA (409 si no). Todo se valida en el backend,
+        sin depender del frontend.
 
 
         Quién vota: el padrón lo forman los estudiantes y los candidatos.
@@ -2104,7 +2133,9 @@ paths:
         '409':
           description: >-
             El estudiante ya emitió su voto en esta votación, la votación no está
-            abierta, o el proceso no está activo.
+            abierta, el proceso no está activo, o la lista elegida no está
+            aprobada (una lista pendiente, en revisión, rechazada o retirada no
+            es una opción de la papeleta y tampoco se muestra en Elecciones).
 
 
             El doble voto se corta en dos capas: una comprobación previa y la

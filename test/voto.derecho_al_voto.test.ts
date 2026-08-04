@@ -32,6 +32,8 @@ interface Escenario {
   carreraVotacion: number | null;
   carreraEstudiante: number | null;
   yaVoto: boolean;
+  /** Estado de revisión de la lista elegida; null si no compite en la papeleta. */
+  estadoLista: string | null;
 }
 
 let escenario: Escenario;
@@ -61,7 +63,10 @@ function ejecutar(sqlCrudo: string, params: any[] = []): any {
       carrera_votacion: escenario.carreraVotacion,
     }];
   }
-  if (sql.includes('FROM lista_candidata WHERE id_lista = ?')) return [{ 1: 1 }];
+  // Estado de la lista dentro de la papeleta: solo se puede votar por una aprobada.
+  if (sql.includes('FROM lista_candidata WHERE id_lista = ?')) {
+    return escenario.estadoLista === null ? [] : [{ estado_revision: escenario.estadoLista }];
+  }
   // yaVotoEstudiante: comprobante previo en esa papeleta.
   if (sql.startsWith('SELECT 1 FROM codigo_voto')) return escenario.yaVoto ? [{ 1: 1 }] : [];
   if (sql.includes('fk_id_carrera FROM estudiante') || sql.includes('e.fk_id_carrera')) {
@@ -110,6 +115,7 @@ beforeEach(() => {
   escenario = {
     votacion: 'abierta', proceso: 'votacion',
     carreraVotacion: null, carreraEstudiante: null, yaVoto: false,
+    estadoLista: 'aprobada',
   };
 });
 
@@ -185,6 +191,32 @@ test('la papeleta de la propia carrera sí se vota', async () => {
   escenario.carreraEstudiante = 1;
   const { estado } = await votar(VOCAL, 1);
   assert.equal(estado, 201);
+});
+
+// --- Solo se vota por listas aprobadas --------------------------------------
+// Las no aprobadas ni siquiera se muestran en Elecciones, así que llegar aquí
+// con una solo puede venir de una llamada directa a la API.
+
+test('no se puede votar por una lista que no está aprobada: 409', async () => {
+  for (const estado of ['pendiente', 'en_revision', 'rechazada', 'retirada']) {
+    escenario.estadoLista = estado;
+    insertados = [];
+
+    const { estado: codigo, cuerpo } = await votar(AJENO, 1);
+
+    assert.equal(codigo, 409, `la lista ${estado} aceptó el voto`);
+    assert.match(cuerpo.error, /no está aprobada/i);
+    assert.deepEqual(insertados, [], 'no debe registrarse ningún voto');
+  }
+});
+
+test('una lista que no compite en la papeleta sigue dando 400', async () => {
+  escenario.estadoLista = null;
+  const { estado, cuerpo } = await votar(AJENO, 1);
+
+  assert.equal(estado, 400);
+  assert.match(cuerpo.error, /no pertenece a esta votaci[óo]n/i);
+  assert.deepEqual(insertados, []);
 });
 
 test('una papeleta que no está abierta no acepta votos: 409', async () => {
