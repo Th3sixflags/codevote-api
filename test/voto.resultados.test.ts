@@ -50,6 +50,10 @@ const tokenEstudiante = jwt.sign(
   { sub: '1105946139', email: 'ancarpioto@uide.edu.ec', rol: 'estudiante' },
   process.env.JWT_SECRET!
 );
+const tokenCandidato = jwt.sign(
+  { sub: '1710000017', email: 'presidente@uide.edu.ec', rol: 'candidato' },
+  process.env.JWT_SECRET!
+);
 
 before(async () => {
   // Doble de MySQL: reconoce cada consulta por su forma y responde lo que diga
@@ -114,9 +118,9 @@ beforeEach(() => {
   };
 });
 
-async function pedirResultados(token = tokenAdmin, votacionId = 1) {
+async function pedirResultados(token: string | null = tokenAdmin, votacionId = 1) {
   const respuesta = await fetch(`${baseUrl}/api/votos/resultados/${votacionId}`, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
   return { estado: respuesta.status, cuerpo: await respuesta.json() };
 }
@@ -293,10 +297,18 @@ test('las listas sin votos aparecen en el conteo con cero', async () => {
   assert.ok(consultaConteo.includes('LEFT JOIN voto'), 'las listas sin votos quedarían fuera del conteo');
 });
 
+// --- Quién puede consultar el escrutinio -----------------------------------
+// El resultado es EXCLUSIVAMENTE administrativo, en cualquier momento y estado.
+
 test('admin recibe 200 con la votacion abierta', async () => {
   escenario.votacion = 'abierta';
   const { estado } = await pedirResultados(tokenAdmin);
   assert.equal(estado, 200);
+});
+
+test('usuario sin token recibe 401', async () => {
+  const { estado } = await pedirResultados(null);
+  assert.equal(estado, 401);
 });
 
 test('estudiante recibe 403 con la votacion abierta', async () => {
@@ -306,16 +318,34 @@ test('estudiante recibe 403 con la votacion abierta', async () => {
   const { estado, cuerpo } = await pedirResultados(tokenEstudiante);
 
   assert.equal(estado, 403);
-  assert.match(cuerpo.error, /disponibles cuando finalice/i);
+  assert.match(cuerpo.error, /rol admin/i);
 });
 
-test('estudiante si ve los resultados de una votacion cerrada', async () => {
+test('candidato recibe 403: competir no da acceso al escrutinio', async () => {
+  const { estado } = await pedirResultados(tokenCandidato);
+  assert.equal(estado, 403);
+});
+
+test('cerrar la votacion no habilita los resultados al estudiante', async () => {
   escenario.votacion = 'cerrada';
 
-  const { estado, cuerpo } = await pedirResultados(tokenEstudiante);
+  const { estado } = await pedirResultados(tokenEstudiante);
 
-  assert.equal(estado, 200);
-  assert.equal(cuerpo.resumen.estado_resultado, 'oficial');
+  assert.equal(estado, 403);
+});
+
+test('finalizar el proceso tampoco los habilita al estudiante ni al candidato', async () => {
+  escenario.votacion = 'cerrada';
+  escenario.proceso = 'finalizado';
+
+  assert.equal((await pedirResultados(tokenEstudiante)).estado, 403);
+  assert.equal((await pedirResultados(tokenCandidato)).estado, 403);
+});
+
+test('un 403 no consulta el conteo: no se filtra nada por la respuesta', async () => {
+  consultas.length = 0;
+  await pedirResultados(tokenEstudiante);
+  assert.deepEqual(consultas, [], 'se consultó la base pese a no tener permiso');
 });
 
 test('la respuesta no contiene identidad de votantes', async () => {

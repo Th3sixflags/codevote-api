@@ -63,10 +63,6 @@ export async function registrarVoto(data: CrearVotoDTO, cedula: string, filtro: 
   return voto;
 }
 
-export async function estadoResultados(votacionId: number) {
-  return repo.estadoDeVotacion(votacionId);
-}
-
 /** Redondea a dos decimales sin arrastrar el error binario de los flotantes. */
 function redondear2(valor: number) {
   return Math.round((valor + Number.EPSILON) * 100) / 100;

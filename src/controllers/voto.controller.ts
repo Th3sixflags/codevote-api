@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { crearVotoSchema } from '../schemas/voto.schema.js';
 import * as service from '../services/voto.service.js';
-import { filtroCarreraDe, procesoVisible, esAdministracion } from '../utils/accesoCarrera.js';
+import { filtroCarreraDe } from '../utils/accesoCarrera.js';
 
 export async function votar(req: Request, res: Response) {
   const data = crearVotoSchema.parse(req.body);
@@ -28,36 +28,18 @@ export async function votar(req: Request, res: Response) {
   }
 }
 
-// Quién puede ver resultados en cualquier momento: la administración. Se usa
-// esAdministracion() en vez de una lista propia para no volver a divergir.
-
 /**
  * Resultados de una papeleta: conteo por opción y resumen de participación,
  * ganador y empate. Es de solo lectura: aunque el padrón haya votado completo,
  * no cierra la votación — eso lo decide el admin.
+ *
+ * El escrutinio es EXCLUSIVAMENTE administrativo. La ruta ya exige `requireAdmin`
+ * (401 sin token, 403 para estudiante o candidato), así que aquí no hay ninguna
+ * excepción por estado: cerrar la votación o finalizar el proceso no habilita a
+ * nadie más a consultarlo. El cálculo en vivo y el cierre automático no cambian:
+ * solo cambia quién puede pedirlo.
  */
 export async function resultados(req: Request, res: Response) {
-  const votacionId = Number(req.params.votacionId);
-  const rol = String(req.user?.rol ?? '').toLowerCase();
-
-  // Los estudiantes solo pueden ver resultados si la votación está cerrada
-  // o el proceso ya finalizó (para no revelar quién va ganando antes de tiempo),
-  // y únicamente de procesos globales o de su propia carrera.
-  if (!esAdministracion(rol)) {
-    const estado = await service.estadoResultados(votacionId);
-    if (estado) {
-      if (!procesoVisible(estado.carrera_votacion, await filtroCarreraDe(req))) {
-        res.status(403).json({ error: 'Esta votación corresponde a otra carrera.' });
-        return;
-      }
-      const disponible = estado.votacion === 'cerrada' || estado.proceso === 'finalizado';
-      if (!disponible) {
-        res.status(403).json({ error: 'Los resultados estarán disponibles cuando finalice la votación.' });
-        return;
-      }
-    }
-  }
-
-  const resultados = await service.obtenerResultados(votacionId);
+  const resultados = await service.obtenerResultados(Number(req.params.votacionId));
   res.json(resultados);
 }

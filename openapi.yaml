@@ -8,6 +8,12 @@ info:
     **Autenticación:** todos los endpoints salvo `/auth/login` y `/health`
     requieren un token JWT en la cabecera `Authorization: Bearer <token>`.
     Las operaciones de escritura (POST/PATCH/DELETE) requieren rol `admin`.
+
+    **Resultados electorales:** el escrutinio (`/votos/resultados/{votacionId}`)
+    y las actas (`/actas-resultados`) son de LECTURA exclusivamente
+    administrativa: 401 sin token y 403 con rol `estudiante` o `candidato`, en
+    cualquier estado de la papeleta. Ningún otro contrato devuelve conteos,
+    porcentajes, ganador, empate ni participación.
 servers:
   - url: https://codevote.lat/api
     description: Producción
@@ -1659,7 +1665,14 @@ paths:
   /actas-resultados:
     get:
       tags: [Actas de resultados]
-      summary: Lista todos los registros
+      summary: Lista todos los registros (requiere rol admin)
+      description: >-
+        Un acta es el resultado consolidado y archivado de una papeleta
+        (votantes, válidos, blancos, nulos y lista ganadora), así que la lectura
+        es **exclusivamente administrativa**, igual que el escrutinio en vivo:
+        401 sin token y 403 para estudiantes y candidatos. De lo contrario
+        bastaría con pedir el acta para saltarse la restricción de
+        `/votos/resultados/{votacionId}`.
       responses:
         '200':
           description: Listado
@@ -1669,6 +1682,7 @@ paths:
                 type: array
                 items: { $ref: '#/components/schemas/ActaResultados' }
         '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
     post:
       tags: [Actas de resultados]
       summary: Crea un registro (requiere rol admin)
@@ -1690,7 +1704,8 @@ paths:
   /actas-resultados/votacion/{votacionId}:
     get:
       tags: [Actas de resultados]
-      summary: Obtiene el acta de una votación
+      summary: Obtiene el acta de una votación (requiere rol admin)
+      description: Resultados históricos, exclusivamente administrativos.
       parameters:
         - name: votacionId
           in: path
@@ -1705,6 +1720,7 @@ paths:
                 type: array
                 items: { $ref: '#/components/schemas/ActaResultados' }
         '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
 
   /actas-resultados/{id}:
     parameters:
@@ -1714,7 +1730,8 @@ paths:
         schema: { type: integer }
     get:
       tags: [Actas de resultados]
-      summary: Obtiene un registro por su identificador
+      summary: Obtiene un registro por su identificador (requiere rol admin)
+      description: Resultados históricos, exclusivamente administrativos.
       responses:
         '200':
           description: Registro encontrado
@@ -1722,6 +1739,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ActaResultados' }
         '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
         '404': { $ref: '#/components/responses/NoEncontrado' }
     patch:
       tags: [Actas de resultados]
@@ -2102,13 +2120,20 @@ paths:
   /votos/resultados/{votacionId}:
     get:
       tags: [Votos]
-      summary: Escrutinio agregado de una votación
+      summary: Escrutinio agregado de una votación (requiere rol admin)
       description: >-
         Conteo por opción más un resumen de participación, ganador y empate.
-        Los roles admin, administrador y junta_electoral pueden consultar en
-        cualquier momento (resultados en vivo). Un estudiante solo puede ver los
-        resultados cuando la votación está cerrada o el proceso ha finalizado, y
-        únicamente de papeletas globales o de su propia carrera.
+
+
+        **Exclusivamente administrativo.** Solo el rol `admin` puede consultarlo:
+        sin token responde 401 y con rol `estudiante` o `candidato` responde 403,
+        esté la papeleta abierta o cerrada y haya finalizado o no el proceso.
+        Cerrar una votación ya no publica sus resultados a los estudiantes.
+
+
+        El cálculo sigue siendo en tiempo real y el cierre automático de las
+        papeletas vencidas no cambia: lo único que cambia es quién puede
+        consultarlo.
 
 
         Todo es agregado: no se devuelven cédulas, nombres ni nada que relacione
@@ -2127,11 +2152,12 @@ paths:
               schema: { $ref: '#/components/schemas/ResultadosVotacion' }
         '401': { $ref: '#/components/responses/NoAutenticado' }
         '403':
-          description: La votación sigue abierta y el usuario no tiene rol privilegiado
+          description: Quien consulta no es administración (estudiante o candidato)
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
-              example: { error: 'Los resultados estarán disponibles cuando finalice la votación.' }
+              example: { error: 'Acceso denegado. Se requiere rol admin.' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
 
   /notificaciones:
     get:
