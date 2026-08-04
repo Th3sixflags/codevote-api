@@ -11,7 +11,11 @@ export const crearEstudianteSchema = z.object({
   promedio:             z.number().finite().min(0, 'El promedio no puede ser negativo.').max(100, 'El promedio máximo es 100.').optional(),
   estado_academico:     z.enum(['activo', 'inactivo', 'egresado', 'graduado']).optional(),
   fk_id_carrera:        z.number().int().positive().optional(),
-  password:             z.string().min(6),
+  // OPCIONAL desde el cambio a inicio de sesión por código: la cuenta nace sin
+  // contraseña y se entra con el código que llega al correo institucional. Se
+  // mantiene el campo por si se quiere dejar una contraseña de respaldo para la
+  // administración (ver AUTH_PASSWORD_FALLBACK).
+  password:             z.string().min(6).optional(),
   rol:                  z.enum(['estudiante', 'admin', 'candidato']).optional(),
 });
 

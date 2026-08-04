@@ -5,8 +5,10 @@ info:
   description: |
     API REST del sistema de votaciones estudiantiles CodeVote (UIDE).
 
-    **Autenticación:** todos los endpoints salvo `/auth/login` y `/health`
-    requieren un token JWT en la cabecera `Authorization: Bearer <token>`.
+    **Autenticación:** sin contraseña. Se pide un código de 6 dígitos al correo
+    institucional (`POST /auth/codigo`) y se canjea por el token
+    (`POST /auth/verificar`). Todos los endpoints salvo `/auth/*` y `/health`
+    requieren ese token JWT en la cabecera `Authorization: Bearer <token>`.
     Las operaciones de escritura (POST/PATCH/DELETE) requieren rol `admin`.
 
     **Resultados electorales:** el escrutinio (`/votos/resultados/{votacionId}`)
@@ -46,26 +48,101 @@ tags:
   - name: Sistema
 
 paths:
-  /auth/login:
+  /auth/codigo:
     post:
       tags: [Autenticación]
-      summary: Inicia sesión y devuelve un token JWT
+      summary: Envía un código de acceso al correo institucional
       security: []
+      description: >-
+        Primer paso del inicio de sesión. La persona escribe su **correo
+        institucional o su cédula** y recibe un código de 6 dígitos en el correo.
+        No hay contraseña.
+
+
+        El código vive 10 minutos, sirve una sola vez y admite 5 intentos. Pedir
+        uno nuevo invalida el anterior, y hay una espera mínima de 60 segundos
+        entre envíos a la misma cuenta (429 si no se respeta).
+
+
+        **La respuesta es siempre la misma exista o no la cuenta.** Si el
+        identificador no corresponde a nadie, no se envía nada y
+        `correo_enmascarado` llega en `null`, pero ni el estado HTTP ni el
+        mensaje cambian: así este endpoint no sirve para averiguar qué correos o
+        cédulas están registrados.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [correo_institucional, password]
+              additionalProperties: false
+              required: [identificador]
               properties:
-                correo_institucional:
+                identificador:
                   type: string
-                  format: email
+                  description: Correo institucional o cédula de 10 dígitos.
                   example: schininin@uide.edu.ec
-                password:
+      responses:
+        '200':
+          description: Solicitud recibida (se haya enviado o no un código)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  correo_enmascarado:
+                    type: string
+                    nullable: true
+                    description: Buzón al que fue el código. null si no hay cuenta activa.
+                    example: s********n@uide.edu.ec
+                  expira_en_segundos:      { type: integer, example: 600 }
+                  espera_reenvio_segundos: { type: integer, example: 60 }
+                  mensaje:                 { type: string }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
+        '429':
+          description: Se pidió otro código antes de la espera mínima, o demasiados desde esta red
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503':
+          description: No se pudo enviar el correo (SMTP caído o sin configurar en producción)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /auth/verificar:
+    post:
+      tags: [Autenticación]
+      summary: Canjea el código por la sesión (token JWT)
+      security: []
+      description: >-
+        Segundo paso. Devuelve el JWT si el código es correcto y sigue vigente.
+
+
+        El código se consume: un segundo intento con el mismo código responde
+        401. Un código equivocado descuenta intentos (quedan indicados en el
+        mensaje) y al agotar los 5 se invalida y hay que pedir otro.
+
+
+        Los mensajes de error no distinguen entre cuenta inexistente, código
+        equivocado y código caducado, para no revelar qué cuentas existen.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [identificador, codigo]
+              properties:
+                identificador:
                   type: string
-                  example: password123
+                  description: El mismo con el que se pidió el código.
+                  example: schininin@uide.edu.ec
+                codigo:
+                  type: string
+                  description: 6 dígitos. Se admiten espacios y guiones al pegarlo.
+                  example: "482913"
       responses:
         '200':
           description: Autenticación correcta
@@ -78,13 +155,62 @@ paths:
                   usuario:
                     type: object
                     properties:
-                      cedula:    { type: string }
-                      nombres:   { type: string }
-                      apellidos: { type: string }
-                      rol:       { type: string, enum: ["estudiante", "admin", "candidato"] }
-                      foto_url:  { type: string, nullable: true }
+                      cedula:               { type: string }
+                      nombres:              { type: string }
+                      apellidos:            { type: string }
+                      correo_institucional: { type: string, format: email }
+                      rol:                  { type: string, enum: ["estudiante", "admin", "candidato"] }
+                      foto_url:             { type: string, nullable: true }
+        '401':
+          description: Código inválido, caducado o ya usado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
+        '429':
+          description: Se agotaron los intentos de ese código, o hubo demasiados fallos desde esta red
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /auth/login:
+    post:
+      tags: [Autenticación]
+      summary: '[Retirado] Inicio de sesión por contraseña'
+      security: []
+      deprecated: true
+      description: >-
+        **Retirado.** El acceso es por código al correo
+        (`/auth/codigo` + `/auth/verificar`). Responde **410** salvo que se
+        active `AUTH_PASSWORD_FALLBACK=true`, que existe solo como puerta de
+        emergencia para la administración si el SMTP se cae.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [correo_institucional, password]
+              properties:
+                correo_institucional: { type: string, format: email }
+                password:             { type: string }
+      responses:
+        '200':
+          description: Autenticación correcta (solo con el respaldo activado)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:   { type: string }
+                  usuario: { type: object }
         '400': { $ref: '#/components/responses/SolicitudInvalida' }
         '401': { $ref: '#/components/responses/NoAutenticado' }
+        '410':
+          description: El acceso con contraseña está retirado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
 
   /facultades:
     get:

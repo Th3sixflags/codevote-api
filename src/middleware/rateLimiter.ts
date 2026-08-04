@@ -27,9 +27,11 @@ export const rateLimiter = rateLimit({
 });
 
 /**
- * Límite para el login: mitiga ataques de fuerza bruta sobre contraseñas.
- * Solo cuenta los intentos FALLIDOS (skipSuccessfulRequests), así que abrir y
- * cerrar sesión con credenciales correctas nunca gasta cupo.
+ * Límite para el canje del código de acceso: mitiga la fuerza bruta sobre un
+ * código de 6 dígitos. Solo cuenta los intentos FALLIDOS
+ * (skipSuccessfulRequests), así que entrar con el código correcto nunca gasta
+ * cupo. Es la segunda barrera: la primera son los 5 intentos por código que
+ * lleva la cuenta en `codigo_acceso.intentos`.
  * Ajustable con LOGIN_RATE_LIMIT_MAX.
  */
 export const loginRateLimiter = rateLimit({
@@ -39,4 +41,22 @@ export const loginRateLimiter = rateLimit({
   legacyHeaders:           false,
   skipSuccessfulRequests:  true,
   message:                 { error: `Demasiados intentos de inicio de sesión. Intenta de nuevo en ${VENTANA_MIN} minutos.` },
+});
+
+/**
+ * Límite para PEDIR el código de acceso. Aquí sí cuentan las peticiones
+ * correctas: cada una envía un correo, y sin este tope el login sería un
+ * generador de mensajes hacia el buzón de cualquier estudiante.
+ *
+ * Es un límite por IP y va además de la espera mínima entre envíos a una misma
+ * cuenta (ver ESPERA_REENVIO_SEG en auth.service). Se deja holgado porque toda
+ * una sala de votación puede compartir la IP de la red del campus.
+ * Ajustable con CODIGO_RATE_LIMIT_MAX.
+ */
+export const codigoRateLimiter = rateLimit({
+  windowMs:        ventanaMs,
+  limit:           entero('CODIGO_RATE_LIMIT_MAX', 60),
+  standardHeaders: 'draft-8',
+  legacyHeaders:   false,
+  message:         { error: `Se pidieron demasiados códigos desde esta red. Intenta de nuevo en ${VENTANA_MIN} minutos.` },
 });

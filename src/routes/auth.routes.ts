@@ -1,47 +1,21 @@
 import { Router } from 'express';
-import bcrypt from 'bcryptjs';
-import jwt    from 'jsonwebtoken';
-import { pool } from '../config/database.js';
-import { loginRateLimiter } from '../middleware/rateLimiter.js';
+import { loginRateLimiter, codigoRateLimiter } from '../middleware/rateLimiter.js';
+import * as ctrl from '../controllers/auth.controller.js';
 
 const router = Router();
 
-router.post('/login', loginRateLimiter, async (req, res) => {
-  const { correo_institucional, password } = req.body as { correo_institucional?: string; password?: string };
-  if (!correo_institucional || !password) {
-    res.status(400).json({ error: 'Correo institucional y password son requeridos.' });
-    return;
-  }
+// Acceso por código de un solo uso enviado al correo institucional. No hay
+// contraseña: se pide el código y se canjea por la sesión.
+//
+// Los dos pasos llevan límite propio: el envío, para que nadie use el login
+// como generador de correos hacia un buzón ajeno; la verificación, contra la
+// fuerza bruta sobre un código de 6 dígitos (que además solo admite 5 intentos
+// por código, ver auth.service).
+router.post('/codigo',    codigoRateLimiter, ctrl.solicitarCodigo);
+router.post('/verificar', loginRateLimiter,  ctrl.verificarCodigo);
 
-  const [rows] = await pool.query(
-    'SELECT cedula, nombres, apellidos, correo_institucional, password, rol, foto_url, debe_cambiar_password FROM estudiante WHERE correo_institucional = ?',
-    [correo_institucional]
-  ) as [any[], any];
-
-  const usuario = rows[0];
-  if (!usuario || !(await bcrypt.compare(password, usuario.password))) {
-    res.status(401).json({ error: 'Credenciales inválidas.' });
-    return;
-  }
-
-  const token = jwt.sign(
-    { sub: usuario.cedula, email: usuario.correo_institucional, rol: usuario.rol },
-    process.env.JWT_SECRET!,
-    { expiresIn: (process.env.JWT_EXPIRES_IN ?? '1h') as any }
-  );
-
-  res.json({
-    token,
-    usuario: {
-      cedula: usuario.cedula,
-      nombres: usuario.nombres,
-      apellidos: usuario.apellidos,
-      rol: usuario.rol,
-      foto_url: usuario.foto_url ?? null,
-      // El frontend obliga a cambiar la contraseña temporal antes de continuar.
-      debe_cambiar_password: Number(usuario.debe_cambiar_password) === 1,
-    },
-  });
-});
+// Puerta de emergencia por contraseña. Devuelve 410 salvo que se active con
+// AUTH_PASSWORD_FALLBACK=true.
+router.post('/login',     loginRateLimiter,  ctrl.loginConPassword);
 
 export default router;

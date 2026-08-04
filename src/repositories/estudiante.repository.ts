@@ -70,14 +70,18 @@ export async function findByEmail(email: string) {
   return rows[0] ?? null;
 }
 
+/**
+ * Crea la cuenta. Con el acceso por código al correo, la contraseña ya no hace
+ * falta: si no se envía, la cuenta nace SIN contraseña y se entra pidiendo el
+ * código. Si el administrador sí manda una (respaldo para la administración),
+ * se guarda hasheada y se marca para que la persona la cambie al usarla.
+ */
 export async function create(data: CrearEstudianteDTO) {
-  const hash = await bcrypt.hash(data.password, 12);
-  // La cuenta nace con una contraseña temporal asignada por el administrador,
-  // así que se marca para que la persona la cambie en su primer ingreso.
+  const hash = data.password ? await bcrypt.hash(data.password, 12) : null;
   await pool.query(
     `INSERT INTO estudiante (cedula, nombres, apellidos, correo_institucional, promedio, estado_academico, fk_id_carrera, password, rol, debe_cambiar_password)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
-    [data.cedula, data.nombres, data.apellidos, data.correo_institucional, data.promedio ?? null, data.estado_academico ?? 'activo', data.fk_id_carrera ?? null, hash, data.rol ?? 'estudiante']
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [data.cedula, data.nombres, data.apellidos, data.correo_institucional, data.promedio ?? null, data.estado_academico ?? 'activo', data.fk_id_carrera ?? null, hash, data.rol ?? 'estudiante', hash ? 1 : 0]
   );
   return findByCedula(data.cedula);
 }
