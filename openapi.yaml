@@ -1016,6 +1016,15 @@ paths:
         nunca envió, o una lista ya resuelta o retirada, se rechazan con 409.
 
 
+        Se vuelve a exigir el **programa completo** (al menos una propuesta, cada
+        una con área, resumen y PDF subido a CodeVote), porque la lista sigue
+        siendo editable mientras está en revisión: sin esta segunda comprobación
+        bastaría con añadir después una propuesta vacía. Así una lista aprobada
+        nunca contiene propuestas sin PDF. Rechazar y retirar no lo exigen:
+        rechazar una lista incompleta es justamente lo que debe poder hacer la
+        administración.
+
+
         Al aprobarla se avisa al responsable en sus notificaciones. Repetir la
         petición no duplica el aviso, porque la segunda llamada ya no parte de
         `en_revision`.
@@ -1029,9 +1038,11 @@ paths:
         '403': { $ref: '#/components/responses/SinPermiso' }
         '409':
           description: >-
-            Transición de estado no válida. Solo se puede aprobar o rechazar una
+            Transición de estado no válida (solo se puede aprobar o rechazar una
             lista en revisión, y solo se puede retirar una aprobada; el mensaje
-            indica el estado actual y desde cuál se llega al solicitado.
+            indica el estado actual y desde cuál se llega al solicitado), o
+            programa incompleto: sin propuestas, o con alguna sin área, sin
+            resumen o sin PDF.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -2526,21 +2537,26 @@ paths:
         schema: { type: integer }
     post:
       tags: [Portal candidato]
-      summary: Agrega un plan de trabajo a la lista propia
+      summary: Agrega un plan de trabajo (propuesta) a la lista propia
+      description: >-
+        La propuesta nace SIN documento. `archivo_url` no se acepta en el cuerpo:
+        el respaldo tiene que ser un PDF subido a CodeVote y la única vía para
+        escribirlo es `POST /candidato/listas/{listaId}/planes/archivo`. Enviar
+        `archivo_url` —por ejemplo una URL https:// externa— responde **422**.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
+              additionalProperties: false
               required: [area, propuesta]
               properties:
-                area:        { type: string, enum: ["academico", "deportivo", "cultural", "infraestructura", "social"] }
-                propuesta:   { type: string }
-                archivo_url: { type: string, maxLength: 255 }
+                area:      { type: string, enum: ["academico", "deportivo", "cultural", "infraestructura", "social"] }
+                propuesta: { type: string, description: Resumen de la propuesta. }
       responses:
         '201':
-          description: Plan agregado
+          description: Plan agregado (con archivo_url en null)
           content:
             application/json:
               schema: { $ref: '#/components/schemas/PlanTrabajo' }
@@ -2563,7 +2579,26 @@ paths:
     post:
       tags: [Portal candidato]
       summary: Envía la lista propia a revisión administrativa
-      description: Pasa la lista a estado en_revision. Requiere al menos un candidato y proceso en inscripción.
+      description: >-
+        Pasa la lista a estado `en_revision`. Requiere proceso en inscripción, al
+        menos un integrante además del presidente y el **programa completo**:
+
+
+        - al menos UNA propuesta;
+
+        - cada propuesta con su `area`, su `propuesta` (resumen) y su
+          `archivo_url` apuntando a un PDF subido a CodeVote
+          (`/api/uploads/planes/*.pdf`).
+
+
+        Si falta algo se responde **409** con un mensaje que identifica cada
+        propuesta incompleta (su id y su área) y qué le falta a cada una.
+
+
+        La misma comprobación se repite al aprobar
+        (`PATCH /listas-candidatas/{id}/aprobar`), porque la lista sigue siendo
+        editable mientras está en revisión: así una lista aprobada nunca contiene
+        propuestas sin PDF.
       responses:
         '200':
           description: Lista enviada a revisión
@@ -2574,10 +2609,17 @@ paths:
         '403': { $ref: '#/components/responses/SinPermiso' }
         '404': { $ref: '#/components/responses/NoEncontrado' }
         '409':
-          description: Sin candidatos, lista aprobada/retirada o proceso fuera de inscripción
+          description: >-
+            Sin integrantes, sin propuestas o con propuestas incompletas (sin
+            área, sin resumen o sin PDF), lista aprobada/retirada, o proceso
+            fuera de inscripción.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+              example:
+                error: >-
+                  No se puede enviar la lista a revisión: hay una propuesta incompleta.
+                  Propuesta 2 (deportivo): falta el PDF subido a CodeVote.
 
   /candidato/candidatos/{id}:
     parameters:
@@ -2646,17 +2688,21 @@ paths:
         schema: { type: integer }
     patch:
       tags: [Portal candidato]
-      summary: Edita un plan de trabajo de la lista propia
+      summary: Edita un plan de trabajo (propuesta) de la lista propia
+      description: >-
+        Solo el área y el resumen. `archivo_url` no se acepta en el cuerpo
+        (**422**): el PDF se cambia volviendo a subirlo con
+        `POST /candidato/listas/{listaId}/planes/archivo`.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
+              additionalProperties: false
               properties:
-                area:        { type: string, enum: ["academico", "deportivo", "cultural", "infraestructura", "social"] }
-                propuesta:   { type: string }
-                archivo_url: { type: string, maxLength: 255 }
+                area:      { type: string, enum: ["academico", "deportivo", "cultural", "infraestructura", "social"] }
+                propuesta: { type: string, description: Resumen de la propuesta. }
       responses:
         '200':
           description: Plan actualizado
@@ -3472,14 +3518,24 @@ components:
           enum: ["academico", "deportivo", "cultural", "infraestructura", "social"]
         propuesta:
           type: string
+          description: Resumen de la propuesta.
         archivo_url:
           type: string
+          nullable: true
           maxLength: 255
+          pattern: '^/api/uploads/planes/[\w.-]+\.pdf$'
+          description: >-
+            Solo se admite la ruta de un PDF ya subido a CodeVote, o null. Un
+            enlace externo (aunque sea https) se rechaza con 422.
         fk_id_lista:
           type: integer
 
     PlanTrabajo:
       type: object
+      description: >-
+        Propuesta de una lista. Para que la lista pueda enviarse a revisión y
+        aprobarse, las tres cosas son obligatorias: `area`, `propuesta` (el
+        resumen) y `archivo_url` con el PDF subido a CodeVote.
       properties:
         id_plan:
           type: integer
@@ -3488,9 +3544,17 @@ components:
           enum: ["academico", "deportivo", "cultural", "infraestructura", "social"]
         propuesta:
           type: string
+          description: Resumen de la propuesta.
         archivo_url:
           type: string
+          nullable: true
           maxLength: 255
+          pattern: '^/api/uploads/planes/[\w.-]+\.pdf$'
+          description: >-
+            Ruta del PDF subido a CodeVote. Solo la escribe
+            POST /candidato/listas/{listaId}/planes/archivo; no se admiten
+            enlaces externos. Es null mientras la propuesta no tenga documento.
+          example: /api/uploads/planes/8a1a82f8-3c1e-4a0d-9f2b-7c5e1d4a6b90.pdf
         fk_id_lista:
           type: integer
 

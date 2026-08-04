@@ -382,7 +382,45 @@ export function instalarDoble(
     }
 
     // --- plan_trabajo ------------------------------------------------------
+    if (sql.startsWith('INSERT INTO plan_trabajo')) {
+      const [area, propuesta, archivoUrl, listaId] = params;
+      const id = e.proximoId += 1;
+      e.planes.push({
+        id_plan: id, area, propuesta, archivo_url: archivoUrl ?? null,
+        fk_id_lista: Number(listaId),
+      });
+      return { insertId: id };
+    }
+    if (sql.startsWith('UPDATE plan_trabajo SET')) {
+      const plan = e.planes.find((p) => p.id_plan === Number(params[params.length - 1]));
+      if (plan) {
+        // Los campos del SET, en el mismo orden en que el repositorio los arma.
+        const campos = sql.slice(sql.indexOf('SET ') + 4, sql.indexOf(' WHERE '))
+          .split(',').map((c) => c.split('=')[0].trim());
+        campos.forEach((campo, i) => { plan[campo] = params[i]; });
+      }
+      return [];
+    }
+    if (sql.startsWith('DELETE FROM plan_trabajo')) {
+      e.planes = e.planes.filter((p) => p.id_plan !== Number(params[0]));
+      return [];
+    }
+    // Plan con datos de su lista (verificación de dueño y estados).
+    if (sql.startsWith('SELECT pl.id_plan')) {
+      const plan = e.planes.find((p) => p.id_plan === Number(params[0]));
+      if (!plan) return [];
+      const l = e.listas.find((x) => x.id_lista === plan.fk_id_lista)!;
+      return [{
+        id_plan: plan.id_plan, fk_id_lista: plan.fk_id_lista,
+        fk_cedula_responsable: l.fk_cedula_responsable,
+        estado_revision: l.estado_revision, fk_id_proceso: l.id_proceso,
+        estado_proceso: l.estado_proceso,
+      }];
+    }
     if (sql.includes('FROM plan_trabajo')) {
+      if (sql.includes('p.id_plan = ?')) {
+        return e.planes.filter((p) => p.id_plan === Number(params[0]));
+      }
       return e.planes.filter((p) => p.fk_id_lista === Number(params[0]));
     }
 

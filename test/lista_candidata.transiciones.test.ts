@@ -48,6 +48,13 @@ function sembrar(estadoRevision: string): Estado {
     fk_cedula_responsable: RESPONSABLE, fk_id_votacion: 1, id_proceso: 1,
     estado_proceso: 'inscripcion', carrera_votacion: null,
   }];
+  // Programa completo: aprobar exige que toda propuesta tenga área, resumen y
+  // su PDF subido a CodeVote.
+  e.planes = [{
+    id_plan: 1, area: 'academico', propuesta: 'Tutorías entre pares',
+    archivo_url: '/api/uploads/planes/8a1a82f8-1111-4222-8333-444455556666.pdf',
+    fk_id_lista: 1,
+  }];
   return e;
 }
 
@@ -90,6 +97,40 @@ test('una lista en revisión se puede aprobar', async () => {
   const { http } = await accion('aprobar');
   assert.equal(http, 200);
   assert.equal(estado.listas[0].estado_revision, 'aprobada');
+});
+
+test('no se aprueba una lista con una propuesta sin PDF: 409', async () => {
+  // La lista sigue siendo editable mientras está en revisión, así que se puede
+  // colar una propuesta vacía después de enviarla. Una lista APROBADA nunca
+  // debe contener propuestas sin PDF.
+  estado.planes.push({ id_plan: 2, area: 'deportivo', propuesta: 'Torneos', archivo_url: null, fk_id_lista: 1 });
+
+  const { http, cuerpo } = await accion('aprobar');
+
+  assert.equal(http, 409);
+  assert.match(cuerpo.error, /Propuesta 2 \(deportivo\)/);
+  assert.match(cuerpo.error, /PDF/);
+  assert.equal(estado.listas[0].estado_revision, 'en_revision', 'la lista se aprobó igualmente');
+});
+
+test('no se aprueba una lista sin ninguna propuesta: 409', async () => {
+  estado.planes = [];
+
+  const { http, cuerpo } = await accion('aprobar');
+
+  assert.equal(http, 409);
+  assert.match(cuerpo.error, /ninguna propuesta/i);
+  assert.equal(estado.listas[0].estado_revision, 'en_revision');
+});
+
+test('rechazar y retirar no exigen el programa completo', async () => {
+  // Rechazar una lista incompleta es justamente lo que debe poder hacer el admin.
+  estado.planes = [];
+  assert.equal((await accion('rechazar', { motivo: 'Programa incompleto.' })).http, 200);
+
+  preparar('aprobada');
+  estado.planes = [];
+  assert.equal((await accion('retirar')).http, 200);
 });
 
 test('una lista en revisión se puede rechazar con motivo', async () => {

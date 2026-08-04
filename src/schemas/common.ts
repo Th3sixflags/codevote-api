@@ -98,28 +98,32 @@ export const urlImagenHttpsSchema = z
   .transform((valor) => (valor === '' ? null : valor));
 
 /**
- * Documento de respaldo de un plan de trabajo.
+ * Documento de respaldo de un plan de trabajo (la propuesta).
  *
  * Antes era `z.string().max(255)`, es decir, cualquier texto. Por eso en
  * producción apareció un plan con `archivo_url = 'aprobada'`: el formulario
- * ofrece un campo de URL libre y lo que se escriba se guarda tal cual. Solo se
- * admiten tres formas:
+ * ofrece un campo de URL libre y lo que se escriba se guarda tal cual.
  *
- *   - vacío o null (el plan aún no tiene documento),
- *   - la ruta que genera la propia subida de PDF: /api/uploads/planes/<archivo>.pdf,
- *   - una URL https:// válida (por ejemplo un documento alojado fuera).
+ * Después se admitió también una URL https:// externa, y eso deja el documento
+ * fuera del control de CodeVote: puede cambiar, caducar o exigir permisos que la
+ * administración no tiene cuando va a revisar la lista. Ahora el respaldo tiene
+ * que ser un PDF SUBIDO A CODEVOTE, así que solo se admiten dos formas:
+ *
+ *   - vacío o null (la propuesta aún no tiene documento),
+ *   - la ruta que genera la propia subida: /api/uploads/planes/<archivo>.pdf.
+ *
+ * Y esa ruta la escribe únicamente
+ * `POST /api/candidato/listas/:listaId/planes/archivo`, que es quien valida el
+ * tipo (application/pdf) y el tamaño (10 MB). Desde el portal, `archivo_url` ya
+ * no se acepta en el cuerpo de ninguna petición.
  */
-const RUTA_PDF_SUBIDO = /^\/api\/uploads\/planes\/[\w.-]+\.pdf$/i;
+export const RUTA_PDF_SUBIDO = /^\/api\/uploads\/planes\/[\w.-]+\.pdf$/i;
 
 export const archivoPlanSchema = z
   .union([z.string().max(255), z.null()])
-  .refine((valor) => {
-    if (valor === null || valor === '') return true;
-    if (RUTA_PDF_SUBIDO.test(valor)) return true;
-    try {
-      return new URL(valor).protocol === 'https:';
-    } catch {
-      return false;
-    }
-  }, 'El documento debe ser una URL https:// válida o un PDF subido desde el portal. Déjalo vacío si aún no tienes documento.')
+  .refine(
+    (valor) => valor === null || valor === '' || RUTA_PDF_SUBIDO.test(valor),
+    'El documento debe ser un PDF subido a CodeVote (/api/uploads/planes/<archivo>.pdf). '
+    + 'No se admiten enlaces externos: súbelo desde el Portal del candidato.'
+  )
   .transform((valor) => (valor === '' ? null : valor));

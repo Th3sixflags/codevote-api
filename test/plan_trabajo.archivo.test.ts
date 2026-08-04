@@ -40,8 +40,16 @@ test('no acepta una ruta de uploads que no sea PDF ni de otra carpeta', () => {
   assert.equal(archivoPlanSchema.safeParse('/api/uploads/otros/plan.pdf').success, false);
 });
 
-test('acepta una URL https externa', () => {
-  assert.equal(archivoPlanSchema.safeParse('https://drive.google.com/file/d/abc123/view').success, true);
+test('ya NO acepta una URL https externa', () => {
+  // El respaldo tiene que ser un PDF subido a CodeVote: un enlace externo puede
+  // cambiar, caducar o pedir permisos que la administración no tiene al revisar.
+  for (const valor of [
+    'https://drive.google.com/file/d/abc123/view',
+    'https://ejemplo.com/plan.pdf',
+    'https://uide.edu.ec/planes/lista-1.pdf',
+  ]) {
+    assert.equal(archivoPlanSchema.safeParse(valor).success, false, `debería rechazar "${valor}"`);
+  }
 });
 
 test('vacío y null significan "todavía sin documento" y se guardan como null', () => {
@@ -55,7 +63,7 @@ test('el plan se puede crear sin documento', () => {
 });
 
 test('respeta el límite de 255 caracteres de la columna', () => {
-  const larga = `https://ejemplo.com/${'a'.repeat(250)}.pdf`;
+  const larga = `/api/uploads/planes/${'a'.repeat(250)}.pdf`;
   assert.ok(larga.length > 255);
   assert.equal(archivoPlanSchema.safeParse(larga).success, false);
 });

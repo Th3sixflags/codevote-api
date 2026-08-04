@@ -8,6 +8,7 @@ import * as notificaciones from './notificacion.service.js';
 import { VISIBILIDAD_TOTAL, type VisibilidadListas } from '../repositories/lista_candidata.repository.js';
 import { procesoVisible } from '../utils/accesoCarrera.js';
 import { HttpError } from '../utils/httpError.js';
+import { verificarPropuestasCompletas } from '../utils/propuestasCompletas.js';
 import { CARGOS } from '../schemas/common.js';
 import { componerLista } from './candidato_portal.service.js';
 import { CrearListaDTO, ActualizarListaDTO } from '../schemas/lista_candidata.schema.js';
@@ -135,6 +136,12 @@ export async function aprobarLista(id: number) {
   const existente = await repo.findById(id);
   if (!existente) return null;
   verificarTransicion(existente.estado_revision, 'aprobada');
+
+  // Una lista APROBADA nunca puede contener propuestas sin PDF. El envío a
+  // revisión ya lo exige, pero la lista sigue siendo editable mientras está
+  // 'en_revision': sin esta segunda comprobación bastaría con añadir después una
+  // propuesta vacía para colarla.
+  verificarPropuestasCompletas(await planRepo.findByLista(id), 'aprobar la lista');
 
   const lista = await repo.setEstadoRevision(id, 'aprobada', null);
   // El responsable se entera del resultado sin tener que entrar a mirar. Como

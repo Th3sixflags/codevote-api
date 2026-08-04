@@ -6,6 +6,7 @@ import * as votacionRepo   from '../repositories/votacion.repository.js';
 import * as estudianteRepo from '../repositories/estudiante.repository.js';
 import * as asignacionRepo from '../repositories/asignacion_candidatura.repository.js';
 import { HttpError } from '../utils/httpError.js';
+import { verificarPropuestasCompletas } from '../utils/propuestasCompletas.js';
 import { PROMEDIO_MINIMO_POSTULACION } from '../config/reglas.js';
 import { CARGO_PRESIDENTE } from '../schemas/common.js';
 import {
@@ -257,10 +258,12 @@ export async function agregarPlan(cedula: string, listaId: number, data: Agregar
   verificarDueno(lista, cedula);
   verificarInscripcion(lista);
   verificarEditable(lista);
+  // Nace sin documento: el PDF se adjunta después con
+  // POST /api/candidato/listas/:listaId/planes/archivo, la única vía que puede
+  // escribir `archivo_url`.
   return planRepo.create({
     area: data.area,
     propuesta: data.propuesta,
-    archivo_url: data.archivo_url,
     fk_id_lista: listaId,
   });
 }
@@ -287,6 +290,13 @@ export async function enviarARevision(cedula: string, listaId: number) {
   if (integrantes.filter((i) => !i.es_responsable).length === 0) {
     throw new HttpError(409, 'Agrega al menos un integrante además del presidente antes de enviar la lista a revisión.');
   }
+
+  // El programa tiene que estar completo: al menos una propuesta y cada una con
+  // su área, su resumen y su PDF subido a CodeVote. Si falta algo, el 409 dice
+  // qué propuestas están incompletas.
+  const planes = await planRepo.findByLista(listaId);
+  verificarPropuestasCompletas(planes, 'enviar la lista a revisión');
+
   return listaRepo.setEstadoRevision(listaId, 'en_revision', null);
 }
 
