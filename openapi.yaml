@@ -41,6 +41,8 @@ tags:
   - name: Veedurías
   - name: Votaciones
   - name: Votos
+  - name: Recordatorios
+  - name: Sanciones
   - name: Notificaciones
   - name: Portal candidato
   - name: Perfil
@@ -2327,6 +2329,154 @@ paths:
               example: { error: 'Acceso denegado. Se requiere rol admin.' }
         '404': { $ref: '#/components/responses/NoEncontrado' }
 
+  /recordatorios:
+    get:
+      tags: [Recordatorios]
+      summary: Recordatorios programados (requiere rol admin)
+      description: >-
+        Envíos de correo que la administración programó a mano. Los avisos
+        automáticos del calendario —convocatoria al crear la papeleta, apertura,
+        última llamada antes del cierre y falta por no votar— NO aparecen aquí:
+        los dispara el servidor por su cuenta.
+      parameters:
+        - name: proceso
+          in: query
+          schema: { type: integer }
+          description: Filtra por proceso electoral.
+      responses:
+        '200':
+          description: Listado
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/RecordatorioProgramado' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+    post:
+      tags: [Recordatorios]
+      summary: Programa un envío de correo (requiere rol admin)
+      description: >-
+        El correo sale en la siguiente comprobación del servidor (cada minuto)
+        a partir de `programado_para`. Sin `fk_id_votacion` va a todo el padrón
+        del proceso; con él, solo al de esa papeleta.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecordatorioInput' }
+      responses:
+        '201':
+          description: Programado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RecordatorioProgramado' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
+
+  /recordatorios/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    delete:
+      tags: [Recordatorios]
+      summary: Cancela un recordatorio pendiente (requiere rol admin)
+      description: >-
+        Solo mientras no haya salido. Un recordatorio ya enviado se conserva
+        como registro de lo que se comunicó y responde 409.
+      responses:
+        '204': { description: Cancelado }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409':
+          description: El recordatorio ya se envió
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /sanciones:
+    get:
+      tags: [Sanciones]
+      summary: Faltas por no votar (requiere rol admin)
+      description: >-
+        Se registran solas al cerrar cada papeleta, para quienes no emitieron su
+        voto.
+
+
+        **Anonimato:** la ausencia se deduce de `codigo_voto`, que prueba QUIÉN
+        participó pero no QUÉ votó. La tabla `voto` no interviene, así que una
+        falta nunca revela ni relaciona el sentido de ningún voto.
+      parameters:
+        - name: proceso
+          in: query
+          schema: { type: integer }
+        - name: votacion
+          in: query
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Listado
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Sancion' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+
+  /sanciones/mias:
+    get:
+      tags: [Sanciones]
+      summary: Faltas propias del usuario autenticado
+      description: Cada quien ve solo las suyas; el listado completo es administrativo.
+      responses:
+        '200':
+          description: Listado
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Sancion' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+
+  /sanciones/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    patch:
+      tags: [Sanciones]
+      summary: Justifica o anula una falta (requiere rol admin)
+      description: >-
+        Una falta NUNCA se borra: ella y su resolución son historial electoral.
+        Tampoco se puede reactivar, solo justificar o anular.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [estado]
+              properties:
+                estado:      { type: string, enum: ["justificada", "anulada"] }
+                observacion: { type: string, maxLength: 250 }
+      responses:
+        '200':
+          description: Resuelta
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Sancion' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '422': { $ref: '#/components/responses/ValidacionFallida' }
+
   /notificaciones:
     get:
       tags: [Notificaciones]
@@ -3634,6 +3784,66 @@ components:
                 apellidos: "Apellido"
                 cargo: "Presidente"
                 es_responsable: true
+
+    RecordatorioInput:
+      type: object
+      additionalProperties: false
+      required: [fk_id_proceso, asunto, mensaje, programado_para]
+      properties:
+        fk_id_proceso:  { type: integer }
+        fk_id_votacion:
+          type: integer
+          nullable: true
+          description: Sin él, el correo va a todo el padrón del proceso.
+        asunto:         { type: string, minLength: 4, maxLength: 150 }
+        mensaje:        { type: string, minLength: 10, maxLength: 1000 }
+        programado_para:
+          type: string
+          description: 'Fecha y hora en hora de Ecuador: YYYY-MM-DDTHH:mm o YYYY-MM-DD HH:mm:ss.'
+          example: '2026-08-10T17:00'
+        solo_pendientes:
+          type: boolean
+          default: true
+          description: Con una papeleta indicada, envía solo a quienes aún no han votado.
+
+    RecordatorioProgramado:
+      type: object
+      properties:
+        id_recordatorio: { type: integer }
+        fk_id_proceso:   { type: integer }
+        fk_id_votacion:  { type: integer, nullable: true }
+        nombre_proceso:  { type: string }
+        titulo_papeleta: { type: string, nullable: true }
+        asunto:          { type: string }
+        mensaje:         { type: string }
+        programado_para: { type: string }
+        solo_pendientes: { type: boolean }
+        enviado_at:      { type: string, nullable: true }
+        destinatarios:   { type: integer, nullable: true }
+        error:           { type: string, nullable: true }
+        estado:
+          type: string
+          enum: ["pendiente", "enviado", "fallido"]
+          description: Derivado de enviado_at y error.
+
+    Sancion:
+      type: object
+      properties:
+        id_sancion:           { type: integer }
+        fk_cedula_estudiante: { type: string }
+        nombres:              { type: string }
+        apellidos:            { type: string }
+        correo_institucional: { type: string, format: email }
+        nombre_carrera:       { type: string, nullable: true }
+        fk_id_votacion:       { type: integer }
+        titulo_papeleta:      { type: string }
+        id_proceso:           { type: integer }
+        nombre_proceso:       { type: string }
+        motivo:               { type: string }
+        fecha_sancion:        { type: string }
+        estado:               { type: string, enum: ["activa", "justificada", "anulada"] }
+        observacion:          { type: string, nullable: true }
+        correo_enviado:       { type: boolean }
 
     PlanTrabajoInput:
       type: object
