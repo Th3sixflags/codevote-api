@@ -21,6 +21,7 @@ import veedorRoutes              from './veedor.routes.js';
 import veeduriaRoutes            from './veeduria.routes.js';
 import notificacionRoutes        from './notificacion.routes.js';
 import perfilRoutes              from './perfil.routes.js';
+import { recordatorioRoutes, sancionRoutes } from './recordatorio.routes.js';
 
 export function registerRoutes(app: Express) {
   // Autenticación
@@ -53,6 +54,10 @@ export function registerRoutes(app: Express) {
   // Veeduría
   app.use('/api/veedores',               veedorRoutes);
   app.use('/api/veedurias',              veeduriaRoutes);
+
+  // Comunicación electoral: recordatorios por correo y faltas por no votar
+  app.use('/api/recordatorios',          recordatorioRoutes);
+  app.use('/api/sanciones',              sancionRoutes);
 
   // Portal del estudiante
   app.use('/api/notificaciones',         notificacionRoutes);

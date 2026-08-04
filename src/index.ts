@@ -9,6 +9,7 @@ import { errorHandler }  from './middleware/errorHandler.js';
 import { registerRoutes } from './routes/index.js';
 import { openapiSpec } from './config/swagger.js';
 import { iniciarCierreProgramado } from './tareas/cierreProgramado.js';
+import { iniciarAvisosProgramados } from './tareas/avisosProgramados.js';
 import { DIRECTORIO_UPLOADS, prepararDirectorios } from './config/uploads.js';
 
 const app  = express();
@@ -97,4 +98,9 @@ app.listen(PORT, HOST, () => {
   // reconciliación —por si alguna venció con el servidor apagado— y sigue
   // comprobando cada minuto.
   iniciarCierreProgramado();
+
+  // Recordatorios por correo del calendario electoral: apertura de la votación,
+  // última llamada a quienes no han votado, faltas al cerrar y los envíos que la
+  // administración haya programado.
+  iniciarAvisosProgramados();
 });

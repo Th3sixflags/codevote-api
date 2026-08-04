@@ -3,6 +3,7 @@ import type { FiltroCarrera } from '../repositories/votacion.repository.js';
 import { HttpError } from '../utils/httpError.js';
 import { procesoVisible } from '../utils/accesoCarrera.js';
 import { cerrarPapeleta } from './cierre_votacion.service.js';
+import * as avisos from './avisos_electorales.service.js';
 import { CrearVotacionDTO, ActualizarVotacionDTO } from '../schemas/votacion.schema.js';
 
 export async function listarVotaciones() {
@@ -29,7 +30,20 @@ export async function crearVotacion(data: CrearVotacionDTO) {
       throw new HttpError(409, 'Ya existe una votación de esa carrera en este proceso electoral.');
     }
   }
-  return repo.create(data);
+  const votacion = await repo.create(data);
+
+  // Convocatoria: se avisa por correo al padrón que le corresponde esta papeleta
+  // (global o de una carrera). Va aquí y no al crear el proceso porque la
+  // carrera vive en la papeleta: hasta este momento no se sabe a quién le toca.
+  //
+  // Best-effort: es un aviso, no parte del acto de crear la papeleta. Si el
+  // correo falla, la papeleta queda creada igual y el fallo queda en el log.
+  if (votacion?.id_votacion) {
+    void avisos.avisarConvocatoria(Number(votacion.id_votacion))
+      .catch((err) => console.error('[avisos] no se pudo enviar la convocatoria', err));
+  }
+
+  return votacion;
 }
 
 export async function actualizarVotacion(id: number, data: ActualizarVotacionDTO) {
