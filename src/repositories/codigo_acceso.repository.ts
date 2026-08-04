@@ -17,17 +17,36 @@ export interface CodigoVigente {
 }
 
 /**
- * Cuenta que puede iniciar sesión, buscada por correo institucional O por
- * cédula: el formulario acepta cualquiera de los dos.
+ * Roles que entran con código al correo: el padrón electoral.
  *
- * Solo cuentas ACTIVAS. Una cuenta inactiva, egresada o graduada ya no forma
- * parte del padrón y no debe poder entrar.
+ * La administración queda FUERA a propósito y entra con correo y contraseña
+ * (ver auth.controller). Un panel administrativo no debe poder abrirse con solo
+ * tener acceso a un buzón.
+ */
+export const ROLES_CON_OTP = ['estudiante', 'candidato'] as const;
+
+/**
+ * Cuenta que puede iniciar sesión CON CÓDIGO, buscada por correo institucional
+ * o por cédula: el formulario acepta cualquiera de los dos.
+ *
+ * Dos filtros, ambos en el SQL:
+ *
+ *   - solo cuentas ACTIVAS: una inactiva, egresada o graduada ya no forma parte
+ *     del padrón y no debe poder entrar;
+ *   - solo roles del padrón: para una cuenta de administración esta consulta no
+ *     devuelve nada, exactamente igual que para una cédula inexistente.
+ *
+ * Que el filtro de rol viva aquí y no en el servicio es deliberado: así es
+ * IMPOSIBLE emitir un código para un admin, y la respuesta genérica que recibe
+ * quien lo intenta no es una rama especial que alguien pueda olvidar, sino la
+ * consecuencia natural de no encontrar la cuenta.
  */
 export async function buscarCuentaActiva(identificador: string) {
   const [rows] = await pool.query(
     `SELECT cedula, nombres, apellidos, correo_institucional, rol, foto_url
        FROM estudiante
       WHERE estado_academico = 'activo'
+        AND rol IN ('estudiante', 'candidato')
         AND (correo_institucional = ? OR cedula = ?)
       LIMIT 1`,
     [identificador, identificador]

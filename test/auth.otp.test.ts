@@ -74,6 +74,11 @@ function ejecutar(sqlCrudo: string, params: any[] = []): any {
   if (sql.includes('FROM estudiante') && sql.includes('correo_institucional = ? OR cedula = ?')) {
     if (!estado.cuentaActiva) return [];
     if (params[0] !== CORREO && params[0] !== CEDULA) return [];
+    // La consulta filtra por rol: para una cuenta de administración no devuelve
+    // nada, igual que para una cédula inexistente.
+    if (!/rol IN \('estudiante', 'candidato'\)/.test(sql)) {
+      throw new Error('la consulta de acceso ya no filtra por rol');
+    }
     return [{
       cedula: CEDULA, nombres: 'Ana', apellidos: 'Carpio',
       correo_institucional: CORREO, rol: 'estudiante', foto_url: null,
@@ -334,15 +339,14 @@ test('se aceptan espacios y guiones al pegar el código desde el correo', async 
   assert.equal((await verificar(pegado)).http, 200);
 });
 
-// --- Contraseña retirada ----------------------------------------------------
+// --- Solo el padrón entra con código ----------------------------------------
 
-test('el login por contraseña responde 410 mientras no se active el respaldo', async () => {
-  const { http, cuerpo } = await post('/login', {
-    correo_institucional: CORREO, password: 'loquesea',
-  });
+test('la consulta de acceso filtra por rol, no solo por cuenta activa', async () => {
+  await pedirCodigo();
 
-  assert.equal(http, 410);
-  assert.match(cuerpo.error, /\/api\/auth\/codigo/);
+  const consulta = estado.sentencias.find((s) => s.includes('FROM estudiante'))!;
+  assert.match(consulta, /rol IN \('estudiante', 'candidato'\)/, 'no excluye a la administración');
+  assert.match(consulta, /estado_academico = 'activo'/, 'no exige cuenta activa');
 });
 
 // --- Correo y enmascarado ---------------------------------------------------

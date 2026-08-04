@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { pool } from '../config/database.js';
 import * as service from '../services/auth.service.js';
+import { esAdministracion } from '../utils/accesoCarrera.js';
 import { solicitarCodigoSchema, verificarCodigoSchema } from '../schemas/auth.schema.js';
 
 /** IP real del cliente (Express ya resuelve X-Forwarded-For con trust proxy). */
@@ -33,21 +34,18 @@ export async function verificarCodigo(req: Request, res: Response) {
 }
 
 /**
- * POST /api/auth/login — inicio de sesión por contraseña.
+ * POST /api/auth/login — inicio de sesión con correo y contraseña.
  *
- * DESACTIVADO por defecto: el acceso es por código al correo. Se conserva como
- * puerta de emergencia por si el SMTP se cae y la administración necesita
- * entrar; se habilita con AUTH_PASSWORD_FALLBACK=true. Con la variable sin
- * definir responde 410 y explica cuál es el flujo vigente.
+ * Es la vía de la ADMINISTRACIÓN. El padrón (estudiantes y candidatos) entra
+ * con el código que recibe en su correo, no por aquí: un buzón comprometido no
+ * debe abrir el panel administrativo, y una contraseña que nadie usa a diario
+ * es una contraseña que se acaba reutilizando o anotando.
+ *
+ * Con AUTH_PASSWORD_FALLBACK=true se admite también a estudiantes y candidatos,
+ * como puerta de emergencia si el SMTP se cae en plena votación. Solo funciona
+ * para cuentas que conserven un hash de contraseña.
  */
 export async function loginConPassword(req: Request, res: Response) {
-  if (process.env.AUTH_PASSWORD_FALLBACK !== 'true') {
-    res.status(410).json({
-      error: 'El acceso con contraseña ya no está disponible. Pide tu código en /api/auth/codigo y canjéalo en /api/auth/verificar.',
-    });
-    return;
-  }
-
   const { correo_institucional, password } = req.body as { correo_institucional?: string; password?: string };
   if (!correo_institucional || !password) {
     res.status(400).json({ error: 'Correo institucional y password son requeridos.' });
@@ -62,9 +60,23 @@ export async function loginConPassword(req: Request, res: Response) {
   ) as [any[], any];
 
   const usuario = rows[0];
-  // Una cuenta sin contraseña (las creadas ya con OTP) nunca puede entrar por aquí.
-  if (!usuario?.password || !(await bcrypt.compare(password, usuario.password))) {
-    res.status(401).json({ error: 'Credenciales inválidas.' });
+
+  // Un ÚNICO mensaje para todos los rechazos: cuenta inexistente, contraseña
+  // equivocada, cuenta sin contraseña o rol que no entra por aquí. Distinguirlos
+  // permitiría averiguar qué correos existen y, peor, cuáles son de
+  // administración: justo las cuentas que más interesa no señalar.
+  const generico = 'Credenciales inválidas.';
+
+  // La comparación va ANTES del control de rol para que el tiempo de respuesta
+  // sea el mismo se rechace por lo que se rechace.
+  const passwordCorrecta = Boolean(usuario?.password)
+    && await bcrypt.compare(password, usuario.password);
+
+  const esAdmin = esAdministracion(usuario?.rol);
+  const permitido = esAdmin || process.env.AUTH_PASSWORD_FALLBACK === 'true';
+
+  if (!passwordCorrecta || !permitido) {
+    res.status(401).json({ error: generico });
     return;
   }
 
