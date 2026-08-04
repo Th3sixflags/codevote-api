@@ -1,4 +1,5 @@
 import { pool } from '../config/database.js';
+import { responsablesDelProceso, degradarResponsablesLiberados } from './archivado.repository.js';
 
 /**
  * Borrado en cascada CONTROLADO de registros que siguen siendo borradores.
@@ -50,6 +51,10 @@ export async function eliminarProcesoEnCascada(procesoId: number) {
   try {
     await conn.beginTransaction();
 
+    // 0. Quién dirigía candidaturas aquí: hay que liberarlos al terminar, y la
+    //    consulta debe hacerse ANTES de borrar las listas.
+    const responsables = await responsablesDelProceso(procesoId, conn);
+
     // 1. Dependencias de las listas del proceso.
     await conn.query(
       `DELETE vr FROM validacion_requisito vr
@@ -72,12 +77,26 @@ export async function eliminarProcesoEnCascada(procesoId: number) {
     );
     await conn.query('DELETE FROM lista_candidata WHERE fk_id_proceso = ?', [procesoId]);
 
-    // 2. Votaciones y cronogramas del proceso (sin actividad electoral).
+    // 2. Asignaciones de candidatura apuntadas a las papeletas del proceso.
+    //    Sin esto, el DELETE de `votacion` chocaba con la clave foránea y el
+    //    borrado de un borrador acababa en 409 sin motivo real.
+    await conn.query(
+      `DELETE a FROM asignacion_candidatura a
+       JOIN votacion v ON v.id_votacion = a.fk_id_votacion
+       WHERE v.fk_id_proceso = ?`,
+      [procesoId]
+    );
+
+    // 3. Votaciones y cronogramas del proceso (sin actividad electoral).
     await conn.query('DELETE FROM votacion WHERE fk_id_proceso = ?', [procesoId]);
     await conn.query('DELETE FROM cronograma WHERE fk_id_proceso = ?', [procesoId]);
 
-    // 3. El proceso.
+    // 4. El proceso.
     await conn.query('DELETE FROM proceso_electoral WHERE id_proceso = ?', [procesoId]);
+
+    // 5. Quien dirigía una de estas listas y no dirige ninguna otra vigente
+    //    vuelve a ser estudiante, y queda libre para postularse de nuevo.
+    await degradarResponsablesLiberados(responsables, conn);
 
     await conn.commit();
   } catch (err) {

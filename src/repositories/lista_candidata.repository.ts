@@ -13,7 +13,11 @@ const BASE_QUERY = `
     p.id_proceso, p.nombre_proceso, p.estado AS estado_proceso,
     vo.titulo_papeleta, vo.estado AS estado_votacion,
     vo.fk_id_carrera AS carrera_votacion, c.nombre_carrera,
-    EXISTS(SELECT 1 FROM voto v WHERE v.fk_id_lista = l.id_lista) AS tiene_votos
+    EXISTS(SELECT 1 FROM voto v WHERE v.fk_id_lista = l.id_lista) AS tiene_votos,
+    -- Archivada por pertenecer a un proceso archivado. Se deriva del proceso en
+    -- vez de duplicar el estado en la lista, así no pueden quedar desacompasados.
+    (p.archivado_at IS NOT NULL) AS archivada,
+    p.archivado_at
   FROM lista_candidata l
   JOIN proceso_electoral p ON p.id_proceso = l.fk_id_proceso
   LEFT JOIN votacion vo ON vo.id_votacion = l.fk_id_votacion
@@ -24,7 +28,12 @@ const BASE_QUERY = `
 function conBloqueo(row: any) {
   if (!row) return row;
   const { tiene_votos, ...lista } = row;
-  return { ...lista, ...calcularBloqueo({ votos: bandera(tiene_votos) }) };
+  return {
+    ...lista,
+    // MySQL devuelve los booleanos como 0/1.
+    archivada: Number(lista.archivada) === 1,
+    ...calcularBloqueo({ votos: bandera(tiene_votos) }),
+  };
 }
 
 /**
@@ -114,8 +123,10 @@ export async function setEstadoRevision(id: number, estado: string, motivo: stri
 
 /** La lista de la que un estudiante es responsable/dueño (o null). */
 export async function findByResponsable(cedula: string) {
+  // Un proceso archivado es historial: su lista ya no se gestiona desde el
+  // portal, aunque siga existiendo y visible en el listado administrativo.
   const [rows] = await pool.query(
-    BASE_QUERY + ' WHERE l.fk_cedula_responsable = ? LIMIT 1',
+    BASE_QUERY + ' WHERE l.fk_cedula_responsable = ? AND p.archivado_at IS NULL LIMIT 1',
     [cedula]
   ) as [any[], any];
   return conBloqueo(rows[0] ?? null);

@@ -1,4 +1,5 @@
 import * as repo from '../repositories/proceso_electoral.repository.js';
+import * as archivadoRepo from '../repositories/archivado.repository.js';
 import * as borradoRepo from '../repositories/borrado.repository.js';
 import type { FiltroCarrera } from '../repositories/proceso_electoral.repository.js';
 import * as notificaciones from './notificacion.service.js';
@@ -14,9 +15,12 @@ const ARCHIVABLES = ['finalizado', 'cancelado'];
  * el estudiante solo los globales y los de su propia carrera (ver FiltroCarrera).
  */
 export async function listarProcesos(estado?: string, filtro: FiltroCarrera = undefined) {
-  if (estado === 'actuales') return repo.findActuales(filtro);
-  if (estado === 'finalizados') return repo.findFinalizados(filtro);
-  if (estado === 'archivados') return repo.findArchivados(filtro);
+  // Se admiten singular y plural: ?estado=archivado y ?estado=archivados.
+  const clave = String(estado ?? '').toLowerCase().replace(/s$/, '');
+  if (clave === 'actuale') return repo.findActuales(filtro);
+  if (clave === 'finalizado') return repo.findFinalizados(filtro);
+  if (clave === 'archivado') return repo.findArchivados(filtro);
+  // Sin filtro: solo los NO archivados. El historial se pide expresamente.
   return repo.findAll(filtro);
 }
 
@@ -103,5 +107,11 @@ export async function archivarProceso(id: number) {
     throw new HttpError(409, 'Solo se pueden archivar procesos finalizados o cancelados. No se permite archivar un proceso activo.');
   }
 
-  return repo.archivar(id);
+  // Archivar no borra nada: el historial completo (papeletas, listas,
+  // integrantes, propuestas, votos, comprobantes y actas) se conserva. Lo que
+  // sí termina es la candidatura: se retiran las asignaciones del proceso y
+  // quien lo presidía recupera su rol de estudiante, de modo que pueda
+  // postularse de nuevo en un proceso futuro. Todo en una transacción.
+  await archivadoRepo.archivarYLiberar(id);
+  return repo.findById(id);
 }

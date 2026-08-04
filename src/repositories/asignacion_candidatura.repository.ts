@@ -30,18 +30,40 @@ export async function findByEstudiante(cedula: string) {
   return rows[0] ?? null;
 }
 
-/** Asignación ACTIVA de un estudiante, o null. */
+/**
+ * Asignación ACTIVA de un estudiante, o null.
+ *
+ * Un proceso archivado no cuenta aunque la fila siguiera marcada como activa:
+ * su candidatura terminó y no debe aparecer como asignación vigente ni
+ * habilitar el portal.
+ */
 export async function findActivaDeEstudiante(cedula: string) {
   const [rows] = await pool.query(
-    `${BASE_QUERY} WHERE a.fk_cedula_estudiante = ? AND a.estado = 'activa'`,
+    `${BASE_QUERY} WHERE a.fk_cedula_estudiante = ? AND a.estado = 'activa' AND p.archivado_at IS NULL`,
     [cedula]
   ) as [any[], any];
   return rows[0] ?? null;
 }
 
+/**
+ * Asigna una papeleta al estudiante.
+ *
+ * La tabla tiene UNIQUE(fk_cedula_estudiante): una persona ocupa como mucho una
+ * fila. Un INSERT a secas fallaba cuando ya existía una asignación anterior
+ * —aunque estuviera 'retirada' por haberse archivado su proceso—, así que quien
+ * ya había sido candidato no podía volver a serlo nunca.
+ *
+ * Con ON DUPLICATE KEY la fila se reutiliza: apunta a la papeleta nueva y
+ * vuelve a estado 'activa'. El historial de participación no se pierde, porque
+ * vive en `lista_candidata` y `candidato`, que el archivado conserva intactos.
+ */
 export async function create(cedula: string, votacionId: number) {
   await pool.query(
-    'INSERT INTO asignacion_candidatura (fk_cedula_estudiante, fk_id_votacion) VALUES (?, ?)',
+    `INSERT INTO asignacion_candidatura (fk_cedula_estudiante, fk_id_votacion, estado)
+     VALUES (?, ?, 'activa')
+     ON DUPLICATE KEY UPDATE fk_id_votacion = VALUES(fk_id_votacion),
+                             estado = 'activa',
+                             fecha_asignacion = NOW()`,
     [cedula, votacionId]
   );
   return findByEstudiante(cedula);

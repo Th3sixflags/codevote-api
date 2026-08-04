@@ -90,15 +90,17 @@ export async function listaPerteneceAVotacion(listaId: number, votacionId: numbe
  */
 export async function estadoDeVotacion(
   votacionId: number
-): Promise<{ votacion: string; proceso: string; carrera_votacion: number | null } | null> {
+): Promise<{ votacion: string; proceso: string; carrera_votacion: number | null; archivado: boolean } | null> {
   const [rows] = await pool.query(
-    `SELECT v.estado AS votacion, p.estado AS proceso, v.fk_id_carrera AS carrera_votacion
+    `SELECT v.estado AS votacion, p.estado AS proceso, v.fk_id_carrera AS carrera_votacion,
+            (p.archivado_at IS NOT NULL) AS archivado
      FROM votacion v
      JOIN proceso_electoral p ON p.id_proceso = v.fk_id_proceso
      WHERE v.id_votacion = ?`,
     [votacionId]
   ) as [any[], any];
-  return rows[0] ?? null;
+  const fila = rows[0];
+  return fila ? { ...fila, archivado: Number(fila.archivado) === 1 } : null;
 }
 
 /**

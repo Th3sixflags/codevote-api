@@ -563,7 +563,10 @@ paths:
         Sin filtro devuelve todos los NO archivados. Con ?estado=actuales
         devuelve los activos o próximos (no finalizados ni cancelados). Con
         ?estado=finalizados devuelve el historial (finalizados no archivados).
-        Con ?estado=archivados devuelve solo los archivados.
+        Con ?estado=archivados (o ?estado=archivado) devuelve SOLO los
+        archivados: el historial en modo lectura, con sus papeletas, listas,
+        resultados, ganador, participación y fechas. Un proceso archivado no
+        aparece en ninguna otra consulta.
 
 
         Segmentación por carrera: el proceso es general y la carrera se define en
@@ -578,7 +581,7 @@ paths:
           required: false
           schema:
             type: string
-            enum: [actuales, finalizados, archivados]
+            enum: [actuales, finalizados, archivados, actual, finalizado, archivado]
       responses:
         '200':
           description: Listado
@@ -646,11 +649,16 @@ paths:
       summary: Elimina un proceso en borrador (requiere rol admin)
       description: >-
         Solo elimina procesos SIN actividad electoral. En ese caso limpia en una
-        transacción sus dependencias de preparación (validaciones, candidatos,
-        planes, listas, votaciones y cronogramas). Si ya tiene votos,
-        comprobantes, actas o veedurías responde 409 con el motivo: hay que
-        cancelar o archivar. No se usa ON DELETE CASCADE en el esquema para que
-        la evidencia electoral quede siempre protegida por las claves foráneas.
+        transacción sus dependencias de preparación: validaciones, candidatos,
+        planes, listas, ASIGNACIONES DE CANDIDATURA, votaciones y cronogramas.
+        Además devuelve a `estudiante` a los responsables que no dirijan otra
+        candidatura vigente, dejándolos libres para postularse de nuevo.
+
+
+        Si ya tiene votos, comprobantes, actas o veedurías responde 409 con el
+        motivo: hay que cancelar o archivar. No se usa ON DELETE CASCADE en el
+        esquema para que la evidencia electoral quede siempre protegida por las
+        claves foráneas.
       responses:
         '204': { description: Eliminado junto con sus dependencias de borrador }
         '401': { $ref: '#/components/responses/NoAutenticado' }
@@ -695,10 +703,22 @@ paths:
       tags: [Procesos electorales]
       summary: Archiva un proceso (requiere rol admin)
       description: >-
-        Archiva (soft) un proceso finalizado o cancelado: deja de aparecer en
-        las consultas activas pero conserva votos, comprobantes, actas,
-        candidatos y auditorías para el historial. No se puede archivar un
-        proceso activo ni uno ya archivado.
+        Archiva (soft) un proceso finalizado o cancelado. NO borra nada:
+        papeletas, listas, integrantes, propuestas, votos, comprobantes y actas
+        se conservan como historial, consultable con ?estado=archivado.
+
+
+        Lo que sí termina es la candidatura. En la misma transacción se retiran
+        las asignaciones de candidatura de sus papeletas y quien presidía una de
+        sus listas recupera el rol `estudiante`, salvo que siga dirigiendo otra
+        candidatura vigente. Su lista deja de aparecer en GET
+        /candidato/mi-lista, el proceso deja de figurar como asignación activa,
+        y la persona queda libre para postularse en un proceso futuro. Las
+        listas se devuelven con `archivada: true`.
+
+
+        No se puede archivar un proceso activo ni uno ya archivado (409). Los
+        efectos son idempotentes: nada se repite.
       responses:
         '200':
           description: Proceso archivado

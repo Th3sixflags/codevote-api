@@ -20,6 +20,12 @@ export async function registrarVoto(data: CrearVotoDTO, cedula: string, filtro: 
   if (estado.proceso === 'finalizado' || estado.proceso === 'cancelado') {
     throw new HttpError(409, 'El proceso electoral no está activo.');
   }
+  // Un proceso archivado es historial de solo lectura. En la práctica ya estaría
+  // finalizado o cancelado —son los únicos estados archivables—, pero se
+  // comprueba aparte para que la regla sea explícita y no dependa de eso.
+  if (estado.archivado) {
+    throw new HttpError(409, 'El proceso electoral está archivado: es historial y no admite votos.');
+  }
 
   // Segmentación por carrera: cada papeleta puede ser global o de una carrera.
   // Solo los estudiantes de esa carrera pueden votarla. Se comprueba en el
