@@ -717,8 +717,19 @@ paths:
         listas se devuelven con `archivada: true`.
 
 
+        Se retiran TODAS las asignaciones de sus papeletas, sin importar el
+        estado de la lista ni si tiene votos: una lista rechazada, retirada o
+        con votos libera igual a su responsable, y nada de eso se borra.
+
+
+        El corte es `archivado_at`, no `estado`: un proceso archivado conserva
+        su estado anterior (finalizado o cancelado).
+
+
         No se puede archivar un proceso activo ni uno ya archivado (409). Los
-        efectos son idempotentes: nada se repite.
+        efectos son idempotentes: nada se repite. Al arrancar, el backend
+        reconcilia los procesos que se archivaron antes de que esto existiera y
+        quedaron con asignaciones activas o responsables con rol candidato.
       responses:
         '200':
           description: Proceso archivado

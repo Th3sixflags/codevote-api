@@ -90,16 +90,25 @@ export async function remove(cedula: string) {
 }
 
 /**
- * ¿El candidato ya tiene una lista que impide mover o retirar su asignación?
+ * ¿El candidato tiene una lista VIGENTE que impide mover o retirar su asignación?
+ *
  * Bloquean las listas enviadas a revisión o aprobadas, y cualquiera que ya haya
- * recibido votos (actividad que debe conservarse).
+ * recibido votos. Pero solo mientras su proceso siga vigente: una candidatura
+ * de un proceso archivado es historial y no puede impedir una asignación
+ * futura. Esta consulta no miraba el proceso, así que una lista retirada con
+ * votos de un proceso ya archivado bloqueaba a esa persona para siempre.
+ *
+ * El corte es `archivado_at IS NOT NULL`, no `estado = 'archivado'`: un proceso
+ * archivado conserva su estado anterior (finalizado o cancelado).
  */
 export async function listaQueBloquea(cedula: string) {
   const [rows] = await pool.query(
-    `SELECT l.id_lista, l.nombre_lista, l.estado_revision,
+    `SELECT l.id_lista, l.nombre_lista, l.estado_revision, p.nombre_proceso,
             EXISTS(SELECT 1 FROM voto vo WHERE vo.fk_id_lista = l.id_lista) AS tiene_votos
      FROM lista_candidata l
+     JOIN proceso_electoral p ON p.id_proceso = l.fk_id_proceso
      WHERE l.fk_cedula_responsable = ?
+       AND p.archivado_at IS NULL
        AND (l.estado_revision IN ('en_revision', 'aprobada')
             OR EXISTS(SELECT 1 FROM voto vo WHERE vo.fk_id_lista = l.id_lista))
      LIMIT 1`,

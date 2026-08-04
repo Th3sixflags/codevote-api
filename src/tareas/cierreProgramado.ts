@@ -1,4 +1,5 @@
 import { cerrarPapeletasVencidas } from '../services/cierre_votacion.service.js';
+import { reconciliarArchivados } from '../repositories/archivado.repository.js';
 
 /**
  * Cierre automático de papeletas vencidas.
@@ -50,6 +51,7 @@ export function iniciarCierreProgramado() {
   if (temporizador) return;
 
   void pasada('arranque');
+  void reconciliarCandidaturasArchivadas();
 
   temporizador = setInterval(() => void pasada('programada'), CADA_UN_MINUTO);
   // No mantiene vivo el proceso por sí solo: si Node no tiene nada más que
@@ -58,6 +60,28 @@ export function iniciarCierreProgramado() {
   temporizador.unref?.();
 
   console.info('[cierre] comprobación de papeletas vencidas activa (cada minuto, hora de Ecuador)');
+}
+
+/**
+ * Repara, una sola vez al arrancar, los procesos que se archivaron antes de que
+ * el archivado liberase la candidatura: quedaban asignaciones en 'activa' y
+ * responsables con rol 'candidato', y esas personas no podían volver a
+ * postularse. No toca listas, votos, comprobantes ni actas.
+ */
+async function reconciliarCandidaturasArchivadas() {
+  try {
+    const reparados = await reconciliarArchivados();
+    if (reparados.length === 0) return;
+    for (const p of reparados) {
+      console.info(
+        `[archivado] reconciliado "${p.nombre_proceso}" (proceso ${p.id_proceso}): ` +
+        `${p.asignacionesRetiradas} asignación(es) retirada(s), ` +
+        `${p.responsablesLiberados.length} responsable(s) liberado(s)`
+      );
+    }
+  } catch (err) {
+    console.error('[archivado] la reconciliación de archivados falló', err);
+  }
 }
 
 /** Detiene la comprobación periódica. Se usa en pruebas y al apagar. */

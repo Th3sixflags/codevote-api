@@ -48,8 +48,14 @@ export async function retirarAsignacionesDelProceso(procesoId: number, cx: Ejecu
  * Devuelve a 'estudiante' a quienes ya no dirigen ninguna candidatura vigente.
  *
  * Una candidatura cuenta como vigente si su proceso NO está archivado, o si la
- * persona conserva una asignación activa. Así, quien presidía dos listas a la
- * vez conserva el rol al archivarse solo una de ellas.
+ * persona conserva una asignación activa EN UN PROCESO NO ARCHIVADO. Así, quien
+ * presidía dos listas a la vez conserva el rol al archivarse solo una de ellas,
+ * y en cambio una fila 'activa' que quedó apuntando a un proceso ya archivado
+ * no retiene el rol: eso es justo lo que dejó a un candidato atrapado en
+ * producción.
+ *
+ * El corte es `archivado_at IS NOT NULL`, no `estado = 'archivado'`: un proceso
+ * archivado conserva su estado anterior (finalizado o cancelado).
  *
  * Los admin nunca se tocan.
  */
@@ -70,7 +76,11 @@ export async function degradarResponsablesLiberados(cedulas: string[], cx: Ejecu
         )
         AND NOT EXISTS (
           SELECT 1 FROM asignacion_candidatura a
-           WHERE a.fk_cedula_estudiante = e.cedula AND a.estado = 'activa'
+            JOIN votacion v2 ON v2.id_votacion = a.fk_id_votacion
+            JOIN proceso_electoral p2 ON p2.id_proceso = v2.fk_id_proceso
+           WHERE a.fk_cedula_estudiante = e.cedula
+             AND a.estado = 'activa'
+             AND p2.archivado_at IS NULL
         )`,
     cedulas
   ) as [any, any];
@@ -117,4 +127,84 @@ export async function archivarYLiberar(procesoId: number) {
   } finally {
     conn.release();
   }
+}
+
+/**
+ * Repara los procesos archivados que quedaron a medias.
+ *
+ * Antes de que archivar liberase la candidatura, un proceso podía archivarse
+ * dejando asignaciones en 'activa' y responsables con rol 'candidato'. Esta
+ * función recorre todos los procesos archivados y les aplica el mismo cierre,
+ * de modo que el estado converja sin tocar listas, votos, comprobantes ni actas.
+ *
+ * IDEMPOTENTE: se apoya en las mismas sentencias condicionadas, así que
+ * ejecutarla dos veces no cambia nada la segunda vez.
+ */
+export async function reconciliarArchivados() {
+  const [procesos] = await pool.query(
+    `SELECT DISTINCT p.id_proceso, p.nombre_proceso
+       FROM proceso_electoral p
+      WHERE p.archivado_at IS NOT NULL
+        AND (
+          EXISTS (
+            SELECT 1 FROM asignacion_candidatura a
+              JOIN votacion v ON v.id_votacion = a.fk_id_votacion
+             WHERE v.fk_id_proceso = p.id_proceso AND a.estado = 'activa'
+          )
+          OR EXISTS (
+            -- Un responsable con rol candidato solo cuenta si NO tiene otra
+            -- candidatura vigente: si volvió a postularse en un proceso nuevo,
+            -- su rol es correcto y este proceso no necesita reparación. Sin
+            -- este matiz, un proceso archivado se marcaría como pendiente en
+            -- cada arranque aunque no hubiera nada que cambiar.
+            SELECT 1 FROM lista_candidata l
+              JOIN estudiante e ON e.cedula = l.fk_cedula_responsable
+             WHERE l.fk_id_proceso = p.id_proceso
+               AND e.rol = 'candidato'
+               AND NOT EXISTS (
+                 SELECT 1 FROM lista_candidata l2
+                   JOIN proceso_electoral p2 ON p2.id_proceso = l2.fk_id_proceso
+                  WHERE l2.fk_cedula_responsable = e.cedula AND p2.archivado_at IS NULL
+               )
+               AND NOT EXISTS (
+                 SELECT 1 FROM asignacion_candidatura a2
+                   JOIN votacion v2 ON v2.id_votacion = a2.fk_id_votacion
+                   JOIN proceso_electoral p3 ON p3.id_proceso = v2.fk_id_proceso
+                  WHERE a2.fk_cedula_estudiante = e.cedula
+                    AND a2.estado = 'activa'
+                    AND p3.archivado_at IS NULL
+               )
+          )
+        )`
+  ) as [any[], any];
+
+  const reparados: Array<{ id_proceso: number; nombre_proceso: string; asignacionesRetiradas: number; responsablesLiberados: string[] }> = [];
+
+  for (const proceso of procesos) {
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      const responsables = await responsablesDelProceso(proceso.id_proceso, conn);
+      const asignacionesRetiradas = await retirarAsignacionesDelProceso(proceso.id_proceso, conn);
+      const responsablesLiberados = await degradarResponsablesLiberados(responsables, conn);
+      await conn.commit();
+      // Solo se informa si algo cambió de verdad, para que el log no repita
+      // procesos que ya estaban bien.
+      if (asignacionesRetiradas > 0 || responsablesLiberados.length > 0) {
+        reparados.push({
+          id_proceso: proceso.id_proceso,
+          nombre_proceso: proceso.nombre_proceso,
+          asignacionesRetiradas,
+          responsablesLiberados,
+        });
+      }
+    } catch (err) {
+      await conn.rollback();
+      console.error(`[archivado] no se pudo reconciliar el proceso ${proceso.id_proceso}`, err);
+    } finally {
+      conn.release();
+    }
+  }
+
+  return reparados;
 }

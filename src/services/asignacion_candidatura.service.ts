@@ -59,17 +59,27 @@ async function verificarSinListaComprometida(cedula: string, accion: string) {
   const lista = await repo.listaQueBloquea(cedula);
   if (!lista) return;
 
-  const motivo = Number(lista.tiene_votos) === 1
-    ? 'ya recibió votos'
-    : `está en estado "${lista.estado_revision}"`;
-  throw new HttpError(409, `No se puede ${accion} la asignación: su lista "${lista.nombre_lista}" ${motivo}. Primero hay que retirar o rechazar esa lista.`);
+  // El mensaje anterior pedía "retirar o rechazar esa lista", que no es la
+  // salida correcta: una lista con votos NO debe retirarse, es evidencia
+  // electoral. Lo que corresponde es cerrar y archivar su proceso; al hacerlo,
+  // la candidatura se libera sola.
+  throw new HttpError(
+    409,
+    `No se puede ${accion} la asignación: la candidatura "${lista.nombre_lista}" pertenece a un proceso vigente` +
+    `${lista.nombre_proceso ? ` ("${lista.nombre_proceso}")` : ''}. ` +
+    'Finalice y archive ese proceso antes de realizar una nueva asignación.'
+  );
 }
 
 /** Crea la asignación. Falla con 409 si ya tiene una. */
 export async function asignar(cedula: string, votacionId: number) {
-  const existente = await repo.findByEstudiante(cedula);
-  if (existente) {
-    throw new HttpError(409, `El candidato ya tiene una asignación (papeleta "${existente.titulo_papeleta}"). Modifícala o retírala antes de crear otra.`);
+  // Solo bloquea una asignación ACTIVA de un proceso vigente. Antes bastaba con
+  // que existiera cualquier fila —incluida una ya retirada por haberse
+  // archivado su proceso—, así que quien había sido candidato una vez no podía
+  // volver a serlo. La fila anterior se reutiliza (ver repo.create).
+  const activa = await repo.findActivaDeEstudiante(cedula);
+  if (activa) {
+    throw new HttpError(409, `El candidato ya tiene una asignación activa (papeleta "${activa.titulo_papeleta}"). Modifícala o retírala antes de crear otra.`);
   }
 
   await validarAsignacion(cedula, votacionId);

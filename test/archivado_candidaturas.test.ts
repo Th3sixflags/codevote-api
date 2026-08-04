@@ -64,7 +64,9 @@ function ejecutar(sqlCrudo: string, params: any[] = []): any {
       && !listas.some((l) => l.fk_cedula_responsable === cedula
           && !procesos.find((p) => p.id === l.fk_id_proceso)?.archivado)
       // …ni conserva una asignación activa.
-      && !asignaciones.some((a) => a.cedula === cedula && a.estado === 'activa'));
+      // Solo retiene el rol una asignación activa de un proceso NO archivado.
+      && !asignaciones.some((a) => a.cedula === cedula && a.estado === 'activa'
+          && !procesos.find((p) => p.id === PAPELETA_DE_PROCESO[a.votacion])?.archivado));
     degradadas.forEach((c: string) => { roles[c] = 'estudiante'; });
     return { affectedRows: degradadas.length };
   }
@@ -199,4 +201,56 @@ test('retirarAsignacionesDelProceso solo toca las activas de ese proceso', async
 test('degradar sin cédulas no consulta nada', async () => {
   const liberados = await degradarResponsablesLiberados([]);
   assert.deepEqual(liberados, []);
+});
+
+// --- El caso que apareció en producción -------------------------------------
+//
+//   proceso 7   -> estado 'cancelado' PERO con archivado_at
+//   lista 13    -> "Felix", retirada, con votos
+//   la persona  -> conservaba rol candidato y asignación activa
+//
+// El detalle que lo hacía escurridizo es que el proceso archivado conserva su
+// estado anterior: comprobar `estado = 'archivado'` no lo habría detectado.
+
+test('un proceso cancelado CON archivado_at libera igualmente la asignación', async () => {
+  procesos = [{ id: 7, archivado: false }];          // 'cancelado', aún sin sellar
+  listas = [{ id_lista: 13, fk_id_proceso: 7, fk_cedula_responsable: '1105830812' }];
+  asignaciones = [{ cedula: '1105830812', votacion: 1, estado: 'activa' }];
+  roles = { '1105830812': 'candidato' };
+  PAPELETA_DE_PROCESO[1] = 7;
+
+  const r = await archivarYLiberar(7);
+
+  assert.equal(r.asignacionesRetiradas, 1);
+  assert.equal(asignaciones[0].estado, 'retirada');
+  assert.equal(roles['1105830812'], 'estudiante');
+  PAPELETA_DE_PROCESO[1] = 1; // se restaura para el resto de pruebas
+});
+
+test('una lista retirada con votos también libera a su responsable', async () => {
+  // El estado de la lista y sus votos no intervienen: lo que manda es que su
+  // proceso quede archivado. Una lista con votos NO debe retirarse ni borrarse.
+  listas = [{ id_lista: 13, fk_id_proceso: 1, fk_cedula_responsable: '1710000017' }];
+  asignaciones = [{ cedula: '1710000017', votacion: 1, estado: 'activa' }];
+  roles = { '1710000017': 'candidato' };
+
+  const r = await archivarYLiberar(1);
+
+  assert.deepEqual(r.responsablesLiberados, ['1710000017']);
+  assert.equal(roles['1710000017'], 'estudiante');
+  assert.equal(listas.length, 1, 'la lista no se borra');
+});
+
+test('una asignación activa apuntando a un proceso YA archivado no retiene el rol', async () => {
+  // Es la situación que dejó a la persona atrapada: la fila seguía 'activa'
+  // pero su proceso estaba archivado, así que no debe contar como vigente.
+  procesos = [{ id: 1, archivado: false }, { id: 9, archivado: true }];
+  listas = [{ id_lista: 1, fk_id_proceso: 1, fk_cedula_responsable: '1710000017' }];
+  asignaciones = [{ cedula: '1710000017', votacion: 9, estado: 'activa' }];
+  roles = { '1710000017': 'candidato' };
+
+  await archivarYLiberar(1);
+
+  assert.equal(roles['1710000017'], 'estudiante',
+    'la asignación de un proceso archivado no debe impedir la liberación');
 });
