@@ -68,3 +68,12 @@ export function requireVotante(req: Request, res: Response, next: NextFunction) 
   }
   next();
 }
+
+/** Resultados públicos agregados: solo los estudiantes del padrón. */
+export function requireEstudiante(req: Request, res: Response, next: NextFunction) {
+  if (req.user?.rol !== 'estudiante') {
+    res.status(403).json({ error: 'Estos resultados están disponibles únicamente para estudiantes.' });
+    return;
+  }
+  next();
+}

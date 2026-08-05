@@ -2318,6 +2318,40 @@ paths:
               example: { error: 'Acceso denegado. Se requiere rol admin.' }
         '404': { $ref: '#/components/responses/NoEncontrado' }
 
+  /votos/resultados/{votacionId}/estudiante:
+    get:
+      tags: [Votos]
+      summary: Resultados agregados de una papeleta cerrada para estudiantes
+      description: >-
+        Permite a un estudiante consultar únicamente los resultados agregados
+        de una papeleta global o de su propia carrera cuando la votación ya
+        terminó. No devuelve identidad de votantes.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: votacionId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Resultados oficiales agregados
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ResultadosVotacion' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403':
+          description: Solo estudiantes pueden consultar esta vista
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409':
+          description: La votación todavía está abierta
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
   /uploads/imagen:
     post:
       tags: [Archivos]

@@ -43,3 +43,11 @@ export async function resultados(req: Request, res: Response) {
   const resultados = await service.obtenerResultados(Number(req.params.votacionId));
   res.json(resultados);
 }
+
+export async function resultadosEstudiante(req: Request, res: Response) {
+  const resultados = await service.obtenerResultadosEstudiante(
+    Number(req.params.votacionId),
+    await filtroCarreraDe(req),
+  );
+  res.json(resultados);
+}

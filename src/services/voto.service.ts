@@ -148,6 +148,14 @@ export async function obtenerResultados(votacionId: number) {
   const hayEmpate = enElMaximo.length > 1;
 
   return {
+    estado_efectivo: esOficial ? 'cerrada' : disponibilidadDeVoto({
+      estado: estado.votacion,
+      fecha_apertura: estado.fecha_apertura,
+      fecha_cierre: estado.fecha_cierre,
+      fecha_fin_votacion: estado.fecha_fin_votacion,
+      estado_proceso: estado.proceso,
+      archivado: estado.archivado,
+    }).estado_efectivo,
     resultados,
     resumen: {
       total_habilitados:        totalHabilitados,
@@ -161,4 +169,24 @@ export async function obtenerResultados(votacionId: number) {
       listas_empatadas:         hayEmpate ? enElMaximo.map(conPorcentaje) : [],
     },
   };
+}
+
+export async function obtenerResultadosEstudiante(votacionId: number, filtro: FiltroCarrera = undefined) {
+  const estado = await repo.estadoDeVotacion(votacionId);
+  if (!estado) throw new HttpError(404, 'La votación indicada no existe.');
+  if (!procesoVisible(estado.carrera_votacion, filtro)) {
+    throw new HttpError(404, 'La votación indicada no existe.');
+  }
+  const disponibilidad = disponibilidadDeVoto({
+    estado: estado.votacion,
+    fecha_apertura: estado.fecha_apertura,
+    fecha_cierre: estado.fecha_cierre,
+    fecha_fin_votacion: estado.fecha_fin_votacion,
+    estado_proceso: estado.proceso,
+    archivado: estado.archivado,
+  });
+  if (disponibilidad.estado_efectivo !== 'cerrada') {
+    throw new HttpError(409, 'Los resultados estarán disponibles cuando termine la votación.');
+  }
+  return obtenerResultados(votacionId);
 }

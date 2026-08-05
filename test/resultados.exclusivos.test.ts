@@ -142,13 +142,15 @@ test('ningún controlador ajeno al escrutinio devuelve campos de resultado', () 
   }
 });
 
-test('toda lectura de resultados exige requireAdmin en su ruta', () => {
+test('las lecturas administrativas exigen requireAdmin y la lectura estudiantil usa su guard', () => {
   for (const archivo of ['voto.routes.ts', 'acta_resultados.routes.ts']) {
     const texto = readFileSync(path.join(DIR_SRC, 'routes', archivo), 'utf8');
     const gets = texto.split('\n').filter((l) => l.includes("router.get("));
     assert.ok(gets.length > 0, `${archivo} no declara ninguna lectura`);
-    for (const linea of gets) {
+    for (const linea of gets.filter((l) => !l.includes('/estudiante'))) {
       assert.ok(linea.includes('requireAdmin'), `${archivo}: "${linea.trim()}" no exige requireAdmin`);
     }
   }
+  const voto = readFileSync(path.join(DIR_SRC, 'routes', 'voto.routes.ts'), 'utf8');
+  assert.match(voto, /resultados\/:votacionId\/estudiante.*requireEstudiante/);
 });
