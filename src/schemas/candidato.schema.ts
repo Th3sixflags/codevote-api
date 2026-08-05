@@ -1,10 +1,10 @@
 import { z } from 'zod';
-import { cedulaSchema, cargoSchema } from './common.js';
+import { cedulaSchema, cargoSchema, urlImagenHttpsSchema } from './common.js';
 
 export const crearCandidatoSchema = z.object({
   cargo:                 cargoSchema,
   cumple_requisitos:     z.boolean().optional(),
-  foto_url:              z.string().max(255).optional(),
+  foto_url:              urlImagenHttpsSchema.optional(),
   fk_cedula_estudiante:  cedulaSchema,
   fk_id_lista:           z.number().int().positive(),
 });

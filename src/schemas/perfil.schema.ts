@@ -1,8 +1,14 @@
 import { z } from 'zod';
+import { urlImagenHttpsSchema } from './common.js';
 
-// Foto de perfil: una URL http(s) válida, o cadena vacía para quitarla.
+/**
+ * Foto de perfil: una imagen subida a CodeVote o una URL https, igual que en el
+ * resto del sistema. Antes admitía cualquier URL válida —incluida http://—, lo
+ * que metía contenido mixto en una página servida por https.
+ * Cadena vacía o null quitan la foto.
+ */
 export const actualizarFotoSchema = z.object({
-  foto_url: z.union([z.string().url().max(255), z.literal('')]),
+  foto_url: urlImagenHttpsSchema,
 });
 
 // Cambio de contraseña propio: exige la contraseña actual y una nueva válida.

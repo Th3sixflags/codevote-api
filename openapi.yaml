@@ -24,6 +24,10 @@ info:
     cabecera `Authorization: Bearer <token>`. Las operaciones de escritura
     (POST/PATCH/DELETE) requieren rol `admin`.
 
+    **Imágenes:** los campos `foto_url` admiten una imagen subida a CodeVote
+    (`POST /uploads/imagen` devuelve la ruta) o una URL `https://` externa. El
+    PDF de las propuestas, en cambio, SOLO admite un archivo subido.
+
     **Fechas y estado de las papeletas:** las fechas viajan como
     `YYYY-MM-DD HH:mm:ss` en hora de Ecuador (America/Guayaquil), sin sufijo Z.
     Para saber si una papeleta admite votos hay que mirar `estado_efectivo` y
@@ -60,6 +64,7 @@ tags:
   - name: Veedurías
   - name: Votaciones
   - name: Votos
+  - name: Archivos
   - name: Recordatorios
   - name: Sanciones
   - name: Notificaciones
@@ -2368,6 +2373,68 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
               example: { error: 'Acceso denegado. Se requiere rol admin.' }
         '404': { $ref: '#/components/responses/NoEncontrado' }
+
+  /uploads/imagen:
+    post:
+      tags: [Archivos]
+      summary: Sube una imagen y devuelve su URL
+      description: >-
+        Endpoint único para las fotos de perfil, de una lista, de un proceso o de
+        una papeleta. Existe para que nadie tenga que alojar la imagen en otro
+        sitio y pegar una URL: se elige el archivo y se guarda la ruta que
+        devuelve este endpoint en el campo `foto_url` correspondiente.
+
+
+        **No asocia la imagen a nada.** Devuelve la URL y ya; quien la sube
+        decide después dónde la guarda (`PATCH /perfil/foto`, el formulario del
+        proceso, el de la lista...). Por eso basta con estar autenticado: no hay
+        todavía ningún registro del que comprobar la propiedad, y ese paso sí
+        tiene sus propios controles.
+
+
+        Formatos: **JPG, PNG y WEBP**, hasta **5 MB**. No se admite SVG a
+        propósito: puede llevar JavaScript dentro y se serviría desde el mismo
+        dominio que la aplicación. El nombre y la extensión del archivo guardado
+        los decide el servidor a partir del tipo, nunca del nombre que envía el
+        cliente.
+
+
+        El frontend reduce la imagen a 1024 px de lado mayor antes de subirla,
+        así que una foto de móvil llega en 150–300 KB en lugar de varios MB.
+
+
+        Las imágenes que no acaban referenciadas por ningún registro se eliminan
+        automáticamente 24 h después (ver services/limpieza_archivos).
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [imagen]
+              properties:
+                imagen:
+                  type: string
+                  format: binary
+                  description: Imagen JPG, PNG o WEBP (máximo 5 MB).
+      responses:
+        '201':
+          description: Imagen guardada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url:
+                    type: string
+                    description: Ruta pública. Es lo que se guarda en `foto_url`.
+                    example: /api/uploads/imagenes/8a1a82f8-3c1e-4a0d-9f2b-7c5e1d4a6b90.jpg
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '422':
+          description: Formato no admitido, supera los 5 MB, o falta el campo "imagen"
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
 
   /recordatorios:
     get:

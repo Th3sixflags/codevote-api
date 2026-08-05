@@ -3,8 +3,9 @@ import * as repo from '../repositories/estudiante.repository.js';
 import { HttpError } from '../utils/httpError.js';
 
 /** Actualiza la foto de perfil del usuario (cadena vacía = quitarla). */
-export async function actualizarFoto(cedula: string, fotoUrl: string) {
-  return repo.updateFoto(cedula, fotoUrl === '' ? null : fotoUrl);
+/** El esquema ya normaliza la cadena vacía a null ("sin foto"). */
+export async function actualizarFoto(cedula: string, fotoUrl: string | null) {
+  return repo.updateFoto(cedula, fotoUrl || null);
 }
 
 /**

@@ -22,6 +22,7 @@ import veeduriaRoutes            from './veeduria.routes.js';
 import notificacionRoutes        from './notificacion.routes.js';
 import perfilRoutes              from './perfil.routes.js';
 import { recordatorioRoutes, sancionRoutes } from './recordatorio.routes.js';
+import uploadRoutes                from './upload.routes.js';
 
 export function registerRoutes(app: Express) {
   // Autenticación
@@ -64,6 +65,11 @@ export function registerRoutes(app: Express) {
 
   // Portal del candidato
   app.use('/api/candidato',              candidatoPortalRoutes);
+
+  // Subida de imágenes (perfil, listas, procesos, papeletas). Se monta en la
+  // misma base que sirve los archivos: express.static solo atiende GET/HEAD, así
+  // que el POST llega hasta aquí.
+  app.use('/api/uploads',                uploadRoutes);
 
   // Perfil propio (foto, contraseña)
   app.use('/api/perfil',                 perfilRoutes);

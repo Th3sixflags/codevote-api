@@ -26,12 +26,14 @@ export const actualizarListaCandidatoSchema = z.object({
 export const agregarCandidatoSchema = z.object({
   cargo:                CARGO,
   fk_cedula_estudiante: cedulaSchema,
-  foto_url:             z.string().max(255).optional(),
+  // Mismo criterio que el resto de imágenes: subida a CodeVote o URL https.
+  // Antes era texto libre de 255 caracteres, así que cabía cualquier cosa.
+  foto_url:             urlImagenHttpsSchema.optional(),
 });
 
 export const actualizarCandidatoPortalSchema = z.object({
   cargo:    CARGO.optional(),
-  foto_url: z.string().max(255).optional(),
+  foto_url: urlImagenHttpsSchema.optional(),
 });
 
 /**

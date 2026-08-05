@@ -80,21 +80,34 @@ export function normalizarCargo(valor: unknown): unknown {
 export const cargoSchema = z.preprocess(normalizarCargo, z.enum(CARGOS));
 
 /**
- * URL de una imagen alojada externamente. Se exige HTTPS para no degradar la
- * seguridad de la página con contenido mixto (http dentro de un sitio https).
- * Se acepta cadena vacía o null para quitar la imagen; ambas se normalizan a
- * null para guardarlas de forma consistente en la base.
+ * Imagen de un perfil, una lista, un proceso o una papeleta.
+ *
+ * Se admiten dos formas:
+ *
+ *   - una imagen SUBIDA a CodeVote: /api/uploads/imagenes/<archivo>.{jpg,png,webp},
+ *     que es lo que devuelve POST /api/uploads/imagen. Es la vía normal desde
+ *     que hay selector de archivo: nadie tiene que buscar una URL ni alojar la
+ *     foto en otro sitio;
+ *   - una URL https:// externa, que se conserva porque los datos existentes la
+ *     usan y porque a veces la foto ya está publicada en otro sitio.
+ *
+ * Se exige HTTPS en el caso externo para no degradar la seguridad de la página
+ * con contenido mixto (http dentro de un sitio https). Cadena vacía y null
+ * significan "sin imagen" y ambas se normalizan a null.
  */
+export const RUTA_IMAGEN_SUBIDA = /^\/api\/uploads\/imagenes\/[\w.-]+\.(jpg|jpeg|png|webp)$/i;
+
 export const urlImagenHttpsSchema = z
   .union([z.string().max(255), z.null()])
   .refine((valor) => {
     if (valor === null || valor === '') return true;
+    if (RUTA_IMAGEN_SUBIDA.test(valor)) return true;
     try {
       return new URL(valor).protocol === 'https:';
     } catch {
       return false;
     }
-  }, 'La imagen debe ser una URL válida que inicie con https://')
+  }, 'La imagen debe ser una que hayas subido desde CodeVote o una URL que inicie con https://')
   .transform((valor) => (valor === '' ? null : valor));
 
 /**

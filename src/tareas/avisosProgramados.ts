@@ -2,6 +2,7 @@ import * as avisoRepo from '../repositories/aviso_electoral.repository.js';
 import * as recordatorioRepo from '../repositories/recordatorio.repository.js';
 import * as avisos from '../services/avisos_electorales.service.js';
 import { limpiarCaducados } from '../repositories/codigo_acceso.repository.js';
+import { limpiarArchivosHuerfanos } from '../services/limpieza_archivos.service.js';
 import { enviarCorreo } from '../config/correo.js';
 import * as notificaciones from '../services/notificacion.service.js';
 import { ahoraEnEcuador, formatearEnEcuador } from '../utils/zonaHoraria.js';
@@ -161,13 +162,32 @@ async function despacharRecordatorios() {
   }
 }
 
-/** Limpia los códigos de acceso caducados. La tabla es de paso, no un histórico. */
-let ultimaLimpieza = 0;
-async function limpiarCodigos() {
-  if (Date.now() - ultimaLimpieza < 6 * HORA) return;
-  ultimaLimpieza = Date.now();
+/**
+ * Mantenimiento periódico: códigos de acceso caducados y archivos huérfanos.
+ *
+ * Cada seis horas, no cada minuto: recorrer el directorio de subidas y consultar
+ * las columnas de archivos no es gratis, y ninguna de las dos cosas es urgente.
+ *
+ * Los archivos huérfanos importan más de lo que parece en un servidor pequeño:
+ * las imágenes se suben al ELEGIRLAS, así que cada formulario cancelado deja una
+ * en disco. Sin esta limpieza el goteo acaba llenando el disco, y un disco lleno
+ * tumba MySQL en plena votación.
+ */
+let ultimoMantenimiento = 0;
+async function mantenimiento() {
+  if (Date.now() - ultimoMantenimiento < 6 * HORA) return;
+  ultimoMantenimiento = Date.now();
+
   const borrados = await limpiarCaducados();
   if (borrados > 0) console.info(`[avisos] ${borrados} código(s) de acceso caducado(s) eliminado(s)`);
+
+  const archivos = await limpiarArchivosHuerfanos();
+  if (archivos.borrados > 0) {
+    const mb = (archivos.bytesLiberados / (1024 * 1024)).toFixed(1);
+    console.info(
+      `[limpieza] ${archivos.borrados} archivo(s) sin usar eliminado(s) de ${archivos.revisados} revisado(s) · ${mb} MB liberados`
+    );
+  }
 }
 
 async function pasada(motivo: 'arranque' | 'programada') {
@@ -178,7 +198,7 @@ async function pasada(motivo: 'arranque' | 'programada') {
     await avisarCierresProximos();
     await sancionarAusencias();
     await despacharRecordatorios();
-    await limpiarCodigos();
+    await mantenimiento();
   } catch (err) {
     // Nunca se propaga: un fallo puntual no debe tumbar el proceso ni impedir
     // que la siguiente pasada lo intente de nuevo.
