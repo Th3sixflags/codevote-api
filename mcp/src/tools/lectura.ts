@@ -34,9 +34,9 @@ export function registrarHerramientasLectura(servidor: McpServer, cliente: Clien
     {
       title: 'Estado del servidor MCP',
       description:
-        'Diagnóstico del propio servidor MCP: con qué identidad y rol está operando contra la API, ' +
-        'en qué modo (lectura/escritura), qué límites tiene y si la API responde. ' +
-        'Úsala primero cuando algo falle, para saber si el problema es de permisos, de política o de conexión.',
+        'Diagnóstico del propio servidor MCP: con qué identidad y rol está operando contra la API, cuántos ' +
+        'minutos le quedan a la sesión, en qué modo (lectura/escritura), qué límites tiene y si la API responde. ' +
+        'Úsala primero cuando algo falle, para saber si el problema es de permisos, de política o de sesión caducada.',
       annotations: SOLO_LECTURA,
     },
     async () =>
@@ -47,11 +47,8 @@ export function registrarHerramientasLectura(servidor: McpServer, cliente: Clien
         } catch (error) {
           salud = { alcanzable: false, detalle: (error as Error).message };
         }
-        const yo = cliente.identidad;
         return exito(config, {
-          identidad: yo
-            ? { nombre: `${yo.nombres} ${yo.apellidos}`, rol: yo.rol, cedula: yo.cedula }
-            : 'sesión por token preemitido (identidad no verificada)',
+          identidad: cliente.identidad,
           configuracion: configPublica(config),
           politica: resumenPolitica(config.modo),
           cupo_peticiones_restante: cliente.cupoDisponible,

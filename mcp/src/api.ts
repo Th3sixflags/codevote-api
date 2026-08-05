@@ -8,21 +8,17 @@
  * secreto del voto. Al pasar por la API, el MCP hereda esas reglas en vez de
  * reimplementarlas (y en vez de olvidarse de alguna).
  *
- * Sobre la sesión: las credenciales viven en el entorno del proceso MCP. El
- * modelo no las ve, no las pide y no puede pasarlas como argumento. El JWT se
- * guarda en memoria y tampoco se expone nunca en una respuesta de herramienta.
+ * Sobre la sesión: la API accede con un código de un solo uso enviado al correo
+ * institucional, así que el servidor MCP no puede autenticarse por su cuenta —
+ * nadie va a leerle el correo a un proceso. Recibe un JWT ya emitido por el
+ * entorno (`npm run token` lo genera) y lo usa tal cual. El token vive en
+ * memoria, el modelo no lo ve y no aparece en ninguna respuesta de herramienta.
  */
 import type { Config } from './config.js';
 import { autorizar, ErrorPolitica, type Metodo } from './politica.js';
 import { LimitadorLocal } from './rate-limit.js';
+import { leerToken, minutosRestantes, estaVencido, COMO_RENOVAR, type CargaJwt } from './jwt.js';
 import { log } from './logger.js';
-
-export interface Usuario {
-  cedula: string;
-  nombres: string;
-  apellidos: string;
-  rol: 'estudiante' | 'admin' | 'candidato';
-}
 
 export class ErrorApi extends Error {
   constructor(
@@ -42,62 +38,49 @@ interface OpcionesPeticion {
 }
 
 export class ClienteCodeVote {
-  private token?: string;
-  private usuario?: Usuario;
-  private loginEnCurso?: Promise<void>;
   private readonly limitador: LimitadorLocal;
+  private readonly sesion: CargaJwt;
 
   constructor(private readonly config: Config) {
     this.limitador = new LimitadorLocal(config.rateMax, config.rateWindowMs);
-    this.token = config.tokenFijo;
+    // Si el token está mal formado, que reviente aquí y no en la primera
+    // herramienta: el mensaje es mucho más útil en el arranque.
+    this.sesion = leerToken(config.token);
   }
 
-  /** Identidad efectiva del MCP. Nunca incluye el token. */
-  get identidad(): Usuario | undefined {
-    return this.usuario;
+  /** Identidad efectiva del MCP, leída del token. Nunca incluye el token. */
+  get identidad() {
+    return {
+      cedula: this.sesion.sub,
+      correo: this.sesion.email,
+      rol: this.sesion.rol,
+      minutos_para_caducar: minutosRestantes(this.sesion),
+    };
   }
 
   get cupoDisponible(): number {
     return this.limitador.disponibles;
   }
 
-  // ---------------------------------------------------------------- sesión --
-
-  private async iniciarSesion(): Promise<void> {
-    if (!this.config.credenciales) {
-      // Con token preemitido no hay forma de renovar: que falle claro.
-      throw new ErrorApi(
-        'La sesión expiró y el servidor se configuró con CODEVOTE_TOKEN (no renovable). Reinícialo con credenciales.',
-        401,
-      );
-    }
-    const { correo, password } = this.config.credenciales;
-    const respuesta = await this.enviar('POST', '/auth/login', {
-      cuerpo: { correo_institucional: correo, password },
-      sinAuth: true,
-    });
-    const datos = respuesta as { token?: string; usuario?: Usuario };
-    if (!datos.token) throw new ErrorApi('La API no devolvió un token en el login.', 502);
-    this.token = datos.token;
-    this.usuario = datos.usuario;
-    log.info(`sesión iniciada como rol=${datos.usuario?.rol ?? 'desconocido'}`);
-  }
-
-  /** Garantiza que hay token. Coalesce logins concurrentes en uno solo. */
-  private async asegurarSesion(): Promise<void> {
-    if (this.token) return;
-    this.loginEnCurso ??= this.iniciarSesion().finally(() => {
-      this.loginEnCurso = undefined;
-    });
-    await this.loginEnCurso;
-  }
-
-  /** Comprueba conectividad y credenciales al arrancar (fail fast). */
+  /**
+   * Comprueba antes de aceptar la primera herramienta que el token sirve y que
+   * la API responde. Un servidor que arranca "bien" y falla en la primera
+   * consulta es mucho más difícil de diagnosticar desde el cliente.
+   */
   async verificarArranque(): Promise<void> {
-    await this.asegurarSesion();
-    if (!this.usuario && this.token) {
-      // Con CODEVOTE_TOKEN no conocemos la identidad; se deduce del primer uso.
-      log.warn('token preemitido: la identidad del MCP no se pudo verificar en el arranque.');
+    if (estaVencido(this.sesion)) {
+      throw new ErrorApi(`El CODEVOTE_TOKEN ya caducó. ${COMO_RENOVAR}`, 401);
+    }
+
+    // Una consulta autenticada real: /health no lleva token y no probaría nada.
+    await this.pedir('GET', '/procesos-electorales');
+
+    const minutos = minutosRestantes(this.sesion);
+    log.info(`sesión activa como rol=${this.sesion.rol} (${this.sesion.email})`);
+    if (minutos !== null) {
+      const aviso = `el token caduca en ${minutos} min`;
+      if (minutos < 30) log.warn(`${aviso}. ${COMO_RENOVAR}`);
+      else log.info(aviso);
     }
   }
 
@@ -114,36 +97,28 @@ export class ClienteCodeVote {
       );
     }
 
-    await this.asegurarSesion();
-
     try {
       return (await this.enviar(metodo, ruta, opciones)) as T;
     } catch (error) {
-      // Un 401 casi siempre es el JWT expirado (la API los emite a 1h).
-      // Se renueva y se reintenta UNA vez: sin bucle, para no convertir un
-      // problema de credenciales en un ataque de fuerza bruta contra el login.
-      if (error instanceof ErrorApi && error.estado === 401 && this.config.credenciales) {
-        log.warn('401 de la API: renovando sesión y reintentando una vez.');
-        this.token = undefined;
-        await this.asegurarSesion();
-        return (await this.enviar(metodo, ruta, opciones)) as T;
+      // No hay renovación automática posible: el acceso exige un código enviado
+      // al correo y eso lo hace una persona. Lo único útil es decirlo claro.
+      if (error instanceof ErrorApi && error.estado === 401) {
+        throw new ErrorApi(`La sesión del MCP caducó o el token no es válido. ${COMO_RENOVAR}`, 401);
       }
       throw error;
     }
   }
 
-  private async enviar(
-    metodo: Metodo,
-    ruta: string,
-    opciones: OpcionesPeticion & { sinAuth?: boolean },
-  ): Promise<unknown> {
+  private async enviar(metodo: Metodo, ruta: string, opciones: OpcionesPeticion): Promise<unknown> {
     const url = new URL(this.config.apiUrl + ruta);
     for (const [clave, valor] of Object.entries(opciones.query ?? {})) {
       if (valor !== undefined && valor !== '') url.searchParams.set(clave, String(valor));
     }
 
-    const cabeceras: Record<string, string> = { Accept: 'application/json' };
-    if (!opciones.sinAuth && this.token) cabeceras.Authorization = `Bearer ${this.token}`;
+    const cabeceras: Record<string, string> = {
+      Accept: 'application/json',
+      Authorization: `Bearer ${this.config.token}`,
+    };
     if (opciones.cuerpo !== undefined) cabeceras['Content-Type'] = 'application/json';
 
     const abortador = new AbortController();
