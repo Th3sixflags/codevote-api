@@ -5,16 +5,10 @@ info:
   description: |
     API REST del sistema de votaciones estudiantiles CodeVote (UIDE).
 
-    **Autenticación, según el rol:**
-
-    - `estudiante` y `candidato`: código de 6 dígitos al correo institucional
-      (`POST /auth/codigo` + `POST /auth/verificar`). Sin contraseña.
-    - `admin`: correo y contraseña (`POST /auth/login`).
-
-    Ninguna de las dos vías revela el rol de una cuenta: pedir código para un
-    admin devuelve la misma respuesta que una cédula inexistente, y una cuenta
-    del padrón enviada a `/auth/login` recibe el mismo 401 que una contraseña
-    equivocada.
+    **Autenticación sin contraseña:** `estudiante`, `candidato` y `admin` usan un
+    código de 6 dígitos enviado al correo institucional (`POST /auth/codigo` +
+    `POST /auth/verificar`). El identificador puede ser el correo UIDE o la
+    cédula vinculada a ese correo.
 
     El candidato usa UNA sola sesión para todo: su JWT lleva `rol: candidato`,
     que le abre el portal de su lista sin quitarle el derecho a votar ni el
@@ -90,16 +84,13 @@ paths:
         entre envíos a la misma cuenta (429 si no se respeta).
 
 
-        **Solo para `estudiante` y `candidato`.** La administración entra con
-        correo y contraseña (`POST /auth/login`): un buzón comprometido no debe
-        abrir el panel administrativo.
+        Está disponible para `estudiante`, `candidato` y `admin`. Solo admite
+        correos del dominio `@uide.edu.ec` o una cédula ecuatoriana válida.
 
 
-        **La respuesta es siempre la misma exista o no la cuenta**, y también si
-        la cuenta es de administración: no se emite ningún código,
-        `correo_enmascarado` llega en `null` y ni el estado HTTP ni el mensaje
-        cambian. Así este endpoint no sirve para averiguar qué correos o cédulas
-        están registrados, ni cuáles son administrativos.
+        **La respuesta es siempre la misma exista o no la cuenta**: si no hay
+        una cuenta activa, `correo_enmascarado` llega en `null` y no se envía
+        nada. Así este endpoint no sirve para averiguar quién está registrado.
       requestBody:
         required: true
         content:
@@ -111,8 +102,8 @@ paths:
               properties:
                 identificador:
                   type: string
-                  description: Correo institucional o cédula de 10 dígitos.
-                  example: schininin@uide.edu.ec
+                  description: Correo @uide.edu.ec o cédula de 10 dígitos.
+                  example: stchinininca@uide.edu.ec
       responses:
         '200':
           description: Solicitud recibida (se haya enviado o no un código)
@@ -203,53 +194,6 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
-
-  /auth/login:
-    post:
-      tags: [Autenticación]
-      summary: Inicio de sesión de la administración (correo y contraseña)
-      security: []
-      description: >-
-        Vía de acceso del rol `admin`.
-
-
-        Una cuenta `estudiante` o `candidato` recibe **401 con el mismo mensaje
-        genérico** que una contraseña equivocada: el error no revela el rol. Su
-        vía es el código al correo (`/auth/codigo`).
-
-
-        `AUTH_PASSWORD_FALLBACK=true` admite también al padrón, como puerta de
-        emergencia si el SMTP se cae en plena votación; solo funciona para
-        cuentas que conserven un hash de contraseña.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [correo_institucional, password]
-              properties:
-                correo_institucional: { type: string, format: email }
-                password:             { type: string }
-      responses:
-        '200':
-          description: Autenticación correcta
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  token:   { type: string }
-                  usuario: { type: object }
-        '400': { $ref: '#/components/responses/SolicitudInvalida' }
-        '401':
-          description: >-
-            Credenciales inválidas, o cuenta del padrón sin el respaldo activado.
-            El mensaje es idéntico en ambos casos.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Error' }
-              example: { error: 'Credenciales inválidas.' }
 
   /facultades:
     get:
@@ -3127,38 +3071,6 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Estudiante' }
-        '401': { $ref: '#/components/responses/NoAutenticado' }
-        '422': { $ref: '#/components/responses/ValidacionFallida' }
-
-  /perfil/password:
-    patch:
-      tags: [Perfil]
-      summary: Cambia la contraseña del usuario autenticado
-      description: Exige la contraseña actual correcta antes de reemplazarla.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [password_actual, password_nueva]
-              properties:
-                password_actual: { type: string }
-                password_nueva:  { type: string, minLength: 6 }
-      responses:
-        '200':
-          description: Contraseña actualizada
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  mensaje: { type: string }
-        '400':
-          description: La contraseña actual es incorrecta
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Error' }
         '401': { $ref: '#/components/responses/NoAutenticado' }
         '422': { $ref: '#/components/responses/ValidacionFallida' }
 

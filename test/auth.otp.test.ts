@@ -74,11 +74,6 @@ function ejecutar(sqlCrudo: string, params: any[] = []): any {
   if (sql.includes('FROM estudiante') && sql.includes('correo_institucional = ? OR cedula = ?')) {
     if (!estado.cuentaActiva) return [];
     if (params[0] !== CORREO && params[0] !== CEDULA) return [];
-    // La consulta filtra por rol: para una cuenta de administración no devuelve
-    // nada, igual que para una cédula inexistente.
-    if (!/rol IN \('estudiante', 'candidato'\)/.test(sql)) {
-      throw new Error('la consulta de acceso ya no filtra por rol');
-    }
     return [{
       cedula: CEDULA, nombres: 'Ana', apellidos: 'Carpio',
       correo_institucional: CORREO, rol: 'estudiante', foto_url: null,
@@ -225,7 +220,7 @@ test('una cuenta inexistente responde exactamente igual: no revela el padrón', 
 });
 
 test('un identificador que no es correo ni cédula se rechaza: 422', async () => {
-  for (const valor of ['hola', '123', 'no-es-un-correo@', '9999999999']) {
+  for (const valor of ['hola', '123', 'no-es-un-correo@', 'persona@gmail.com', '9999999999']) {
     const { http } = await pedirCodigo(valor);
     assert.equal(http, 422, `"${valor}" pasó la validación`);
   }
@@ -339,14 +334,14 @@ test('se aceptan espacios y guiones al pegar el código desde el correo', async 
   assert.equal((await verificar(pegado)).http, 200);
 });
 
-// --- Solo el padrón entra con código ----------------------------------------
+// --- Todas las cuentas activas entran con código ----------------------------
 
-test('la consulta de acceso filtra por rol, no solo por cuenta activa', async () => {
+test('la consulta exige cuenta activa sin excluir ningún rol', async () => {
   await pedirCodigo();
 
   const consulta = estado.sentencias.find((s) => s.includes('FROM estudiante'))!;
-  assert.match(consulta, /rol IN \('estudiante', 'candidato'\)/, 'no excluye a la administración');
   assert.match(consulta, /estado_academico = 'activo'/, 'no exige cuenta activa');
+  assert.doesNotMatch(consulta, /rol IN/i, 'todavía excluye roles del acceso OTP');
 });
 
 // --- Correo y enmascarado ---------------------------------------------------

@@ -7,21 +7,10 @@ import { HttpError } from '../utils/httpError.js';
 /**
  * Inicio de sesión con código de un solo uso (OTP) enviado al correo.
  *
- * QUIÉN ENTRA POR AQUÍ: solo el padrón, es decir estudiantes y candidatos. El
- * votante escribe su correo institucional (o su cédula) y recibe un código de 6
- * dígitos. Es más simple para quien vota —no hay contraseña que recordar— y a la
- * vez demuestra que quien entra controla el buzón institucional.
- *
- * La ADMINISTRACIÓN no entra por aquí: usa correo y contraseña
- * (POST /api/auth/login). El filtro de rol vive en la consulta del repositorio,
- * de modo que para una cuenta admin este flujo se comporta exactamente igual que
- * para una cédula que no existe: no se emite código y la respuesta es la
- * genérica de siempre. Así nadie puede usar el login para descubrir qué cuentas
- * son administrativas.
- *
- * El candidato entra como cualquier votante y su JWT conserva `rol: candidato`,
- * que es lo que le abre el portal de su lista. Con esa misma sesión vota y
- * consulta elecciones: no tiene que volver a autenticarse para nada.
+ * QUIÉN ENTRA POR AQUÍ: todas las cuentas activas. Estudiantes, candidatos y
+ * administración escriben su correo institucional (o su cédula) y reciben un
+ * código de 6 dígitos. El JWT conserva el rol de la cuenta para dirigirla al
+ * panel que le corresponde sin crear vías de acceso diferentes.
  *
  * Defensas del flujo:
  *   1. El código se guarda hasheado (SHA-256), nunca en claro.

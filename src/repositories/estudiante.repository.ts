@@ -1,6 +1,5 @@
 import { pool } from '../config/database.js';
 import { CrearEstudianteDTO, ActualizarEstudianteDTO } from '../schemas/estudiante.schema.js';
-import bcrypt from 'bcryptjs';
 
 // Se incluye la asignación de candidatura (cuando existe) para que el panel
 // administrativo sepa en qué papeleta compite cada candidato.
@@ -70,40 +69,22 @@ export async function findByEmail(email: string) {
   return rows[0] ?? null;
 }
 
-/**
- * Crea la cuenta. Con el acceso por código al correo, la contraseña ya no hace
- * falta: si no se envía, la cuenta nace SIN contraseña y se entra pidiendo el
- * código. Si el administrador sí manda una (respaldo para la administración),
- * se guarda hasheada y se marca para que la persona la cambie al usarla.
- */
 export async function create(data: CrearEstudianteDTO) {
-  const hash = data.password ? await bcrypt.hash(data.password, 12) : null;
   await pool.query(
     `INSERT INTO estudiante (cedula, nombres, apellidos, correo_institucional, promedio, estado_academico, fk_id_carrera, password, rol, debe_cambiar_password)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [data.cedula, data.nombres, data.apellidos, data.correo_institucional, data.promedio ?? null, data.estado_academico ?? 'activo', data.fk_id_carrera ?? null, hash, data.rol ?? 'estudiante', hash ? 1 : 0]
+    [data.cedula, data.nombres, data.apellidos, data.correo_institucional, data.promedio ?? null, data.estado_academico ?? 'activo', data.fk_id_carrera ?? null, null, data.rol ?? 'estudiante', 0]
   );
   return findByCedula(data.cedula);
 }
 
 export async function update(cedula: string, data: ActualizarEstudianteDTO) {
-  const entradas = Object.entries(data).filter(([k, v]) => v !== undefined && k !== 'password');
+  const entradas = Object.entries(data).filter(([, v]) => v !== undefined);
   if (entradas.length > 0) {
     const sets = entradas.map(([k]) => `${k} = ?`).join(', ');
     const valores = entradas.map(([, v]) => v);
     await pool.query(`UPDATE estudiante SET ${sets} WHERE cedula = ?`, [...valores, cedula]);
   }
-  
-  if (data.password) {
-    // Si el administrador reinicia la contraseña, vuelve a ser temporal: la
-    // persona deberá cambiarla en su siguiente ingreso.
-    const hash = await bcrypt.hash(data.password, 12);
-    await pool.query(
-      'UPDATE estudiante SET password = ?, debe_cambiar_password = 1 WHERE cedula = ?',
-      [hash, cedula]
-    );
-  }
-  
   return findByCedula(cedula);
 }
 
@@ -117,23 +98,6 @@ export async function remove(cedula: string) {
 export async function updateFoto(cedula: string, fotoUrl: string | null) {
   await pool.query('UPDATE estudiante SET foto_url = ? WHERE cedula = ?', [fotoUrl, cedula]);
   return findByCedula(cedula);
-}
-
-/** Devuelve el hash de la contraseña (para verificar la actual al cambiarla). */
-export async function getPasswordHash(cedula: string): Promise<string | null> {
-  const [rows] = await pool.query('SELECT password FROM estudiante WHERE cedula = ?', [cedula]) as [any[], any];
-  return rows[0]?.password ?? null;
-}
-
-/**
- * Reemplaza la contraseña por un nuevo hash y limpia la marca de contraseña
- * temporal: la persona ya eligió una propia.
- */
-export async function updatePasswordHash(cedula: string, hash: string) {
-  await pool.query(
-    'UPDATE estudiante SET password = ?, debe_cambiar_password = 0 WHERE cedula = ?',
-    [hash, cedula]
-  );
 }
 
 /**

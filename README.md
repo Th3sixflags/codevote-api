@@ -12,7 +12,7 @@ Implementada con Node.js, TypeScript, Express 5 y MySQL bajo una arquitectura de
 2. **Validación Robusta**: Se optó por usar `Zod` para validar la estructura y tipos de datos de entrada (body) antes de tocar la lógica de negocio, devolviendo errores `422` descriptivos.
 3. **Seguridad**:
    - Autenticación mediante **JWT** (JSON Web Tokens).
-   - Encriptación de contraseñas de usuarios en la base de datos usando **Bcrypt**.
+   - Acceso sin contraseña mediante códigos de un solo uso enviados al correo institucional.
    - Middlewares personalizados para validación de roles (`requireAuth`, `requireAdmin`).
    - `express-rate-limit` global para prevenir ataques de fuerza bruta (máximo 100 peticiones cada 15 min).
 4. **Base de Datos (18 Tablas)**: Para reflejar fielmente la complejidad de un sistema de votaciones universitarias, el modelo EER incluye 18 tablas (estudiantes, carreras, facultades, procesos, actas, veedurías, etc.).
@@ -84,17 +84,16 @@ npm run dev
 ## Cómo obtener el Token JWT (Autenticación)
 
 Para utilizar los endpoints protegidos, primero debes autenticarte:
-1. Realiza una petición `POST` a `/api/auth/login`.
-2. En el body (formato JSON), envía las credenciales de un estudiante. Ejemplo:
+1. Solicita un código con `POST /api/auth/codigo` usando el correo UIDE o la cédula:
    ```json
    {
-       "correo_institucional": "schininin@uide.edu.ec",
-       "password": "password123"
+       "identificador": "stchinininca@uide.edu.ec"
    }
    ```
-   *(Nota: Todos los estudiantes del `seed.sql` tienen la contraseña `password123`)*
+2. Canjea el código recibido con `POST /api/auth/verificar` enviando el mismo
+   identificador y el código de 6 dígitos.
 3. La API devolverá un objeto JSON que incluye el atributo `"token"`.
-4. Copia ese token e inclúyelo en los **Headers** de tus siguientes peticiones:
+4. Incluye ese token en los **Headers** de las siguientes peticiones:
    `Authorization: Bearer <tu_token_aqui>`
 
 ## Tabla de Endpoints
@@ -103,14 +102,15 @@ La API expone **94 endpoints** (+ `/health`) sobre las 18 tablas del modelo.
 La especificación completa está en [`openapi.yaml`](./openapi.yaml).
 
 Convenciones:
-- Todos requieren `Authorization: Bearer <token>` salvo `/api/auth/login` y `/health`.
+- Todos requieren `Authorization: Bearer <token>` salvo `/api/auth/codigo`, `/api/auth/verificar` y `/health`.
 - `POST`, `PATCH` y `DELETE` requieren rol **admin**.
 - Cada recurso expone: `GET /` · `GET /:id` · `POST /` · `PATCH /:id` · `DELETE /:id`
 
 ### Autenticación y sistema
 | Método | Endpoint | Acceso |
 |--------|----------|--------|
-| POST | `/api/auth/login` | Público |
+| POST | `/api/auth/codigo` | Público |
+| POST | `/api/auth/verificar` | Público |
 | GET | `/health` | Público |
 
 ### Catálogos institucionales
@@ -287,7 +287,8 @@ docker run -d -p 3000:3000 --env-file .env codevote-api
 
 ## 4. Usuarios de prueba
 
-Todos los usuarios del seed usan la contraseña **`password123`**.
+Todos los usuarios acceden solicitando un código a su correo institucional; no
+hay contraseñas de demostración.
 
 | Correo | Rol | Notas |
 |--------|-----|-------|
@@ -296,14 +297,15 @@ Todos los usuarios del seed usan la contraseña **`password123`**.
 | `smendoza@uide.edu.ec` | candidato | Responsable/Presidenta de «Unidad Estudiantil» |
 | `cperez@uide.edu.ec` | estudiante | Integrante de una lista: **no** entra al portal |
 
-> Son credenciales de demostración presentes en el repositorio: no deben usarse
-> como cuentas reales ni considerarse seguras.
+> Son cuentas de demostración. El código solo se entrega al buzón institucional
+> vinculado a cada una.
 
 ## 5. Endpoints que consume el frontend
 
 | Método | Endpoint | Auth |
 |--------|----------|------|
-| POST | `/api/auth/login` | Público |
+| POST | `/api/auth/codigo` | Público |
+| POST | `/api/auth/verificar` | Público |
 | GET | `/api/procesos-electorales` | Token |
 | GET | `/api/procesos-electorales/:id` | Token |
 | GET | `/api/listas-candidatas/proceso/:id` | Token |

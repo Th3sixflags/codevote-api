@@ -7,6 +7,5 @@ import * as ctrl from '../controllers/perfil.controller.js';
 const router = Router();
 
 router.patch('/foto',     requireAuth, ctrl.actualizarFoto);
-router.patch('/password', requireAuth, ctrl.cambiarPassword);
 
 export default router;

@@ -71,6 +71,6 @@ export function registerRoutes(app: Express) {
   // que el POST llega hasta aquí.
   app.use('/api/uploads',                uploadRoutes);
 
-  // Perfil propio (foto, contraseña)
+  // Perfil propio (foto)
   app.use('/api/perfil',                 perfilRoutes);
 }

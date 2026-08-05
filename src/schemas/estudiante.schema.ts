@@ -5,17 +5,15 @@ export const crearEstudianteSchema = z.object({
   cedula:               cedulaSchema,
   nombres:              nombrePersonaSchema,
   apellidos:            nombrePersonaSchema,
-  correo_institucional: z.string().email('El correo institucional no tiene un formato válido.').max(120),
+  correo_institucional: z.string()
+    .email('El correo institucional no tiene un formato válido.')
+    .max(120)
+    .refine((correo) => correo.toLowerCase().endsWith('@uide.edu.ec'), 'Usa un correo institucional @uide.edu.ec.'),
   // `promedio` sobre 100. El .finite() descarta NaN e Infinity, que en JSON
   // llegarían como null pero por FormData podrían colarse.
   promedio:             z.number().finite().min(0, 'El promedio no puede ser negativo.').max(100, 'El promedio máximo es 100.').optional(),
   estado_academico:     z.enum(['activo', 'inactivo', 'egresado', 'graduado']).optional(),
   fk_id_carrera:        z.number().int().positive().optional(),
-  // OPCIONAL desde el cambio a inicio de sesión por código: la cuenta nace sin
-  // contraseña y se entra con el código que llega al correo institucional. Se
-  // mantiene el campo por si se quiere dejar una contraseña de respaldo para la
-  // administración (ver AUTH_PASSWORD_FALLBACK).
-  password:             z.string().min(6).optional(),
   rol:                  z.enum(['estudiante', 'admin', 'candidato']).optional(),
 });
 
