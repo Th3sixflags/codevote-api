@@ -188,6 +188,13 @@ async function mantenimiento() {
       `[limpieza] ${archivos.borrados} archivo(s) sin usar eliminado(s) de ${archivos.revisados} revisado(s) · ${mb} MB liberados`
     );
   }
+
+  const notificacionesBorradas = await notificaciones.limpiarLeidasAntiguas(
+    entero('DIAS_RETENCION_NOTIFICACIONES', 7)
+  );
+  if (notificacionesBorradas > 0) {
+    console.info(`[limpieza] ${notificacionesBorradas} notificación(es) leída(s) antigua(s) eliminada(s)`);
+  }
 }
 
 async function pasada(motivo: 'arranque' | 'programada') {

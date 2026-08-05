@@ -49,3 +49,14 @@ export async function crearParaVotantesDeProceso(procesoId: number, tipo: string
     [tipo, titulo, mensaje, procesoId]
   );
 }
+
+/** Elimina avisos ya vistos que superaron la ventana de retención. */
+export async function eliminarLeidasAntiguas(dias = 7): Promise<number> {
+  const diasSeguros = Math.max(1, Math.min(365, Math.floor(Number(dias) || 7)));
+  const [result] = await pool.query(
+    `DELETE FROM notificacion
+      WHERE leida = 1
+        AND fecha_creacion < DATE_SUB(NOW(), INTERVAL ${diasSeguros} DAY)`
+  ) as [any, any];
+  return Number(result.affectedRows ?? 0);
+}

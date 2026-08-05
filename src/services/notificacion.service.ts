@@ -72,3 +72,7 @@ export async function notificarResultadosDeProceso(procesoId: number, nombreProc
     console.error('[notificacion] no se pudo notificar resultados', err);
   }
 }
+
+export async function limpiarLeidasAntiguas(dias = 7) {
+  return repo.eliminarLeidasAntiguas(dias);
+}
