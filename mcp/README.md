@@ -41,16 +41,41 @@ bloqueo de borrado con evidencia) en vez de reimplementarlo.
 cd mcp && npm install && npm run build
 ```
 
-Configura el entorno a partir de `.env.example`:
+---
+
+## La sesión: por qué hay que generar un token
+
+CodeVote entra con un **código de un solo uso enviado al correo institucional**.
+No hay contraseñas. Eso significa que el servidor MCP **no puede autenticarse
+solo**: nadie va a leerle el correo a un proceso.
+
+La solución es dársele un JWT ya emitido. `npm run token` hace esa parte manual
+en un comando:
 
 ```bash
-cp .env.example .env
+npm run token
 ```
 
-Lo mínimo: `CODEVOTE_API_URL`, `CODEVOTE_EMAIL` y `CODEVOTE_PASSWORD`.
+Te pide el correo (o la cédula), te dice a qué buzón mandó el código, esperas los
+6 dígitos, y te imprime el token — copiado al portapapeles **sin salto de línea**,
+que es justo lo que rompe el JSON si se copia a mano.
 
-> Crea una **cuenta de servicio** para el MCP con el rol mínimo que necesites.
-> Si le das una cuenta admin, el MCP podrá ver todo lo que ve un admin.
+Si ya tienes la entrada en Claude Desktop, este lo escribe él solo:
+
+```bash
+npm run token -- --config
+```
+
+Otras opciones: `-i <correo|cédula>` para no teclearlo, `--api <url>` para apuntar
+a otra instancia (por defecto `https://codevote.lat/api`), `--help` para verlas.
+
+> **El token caduca** (por defecto en 1 h; depende de `JWT_EXPIRES_IN` en el
+> servidor). Cuando pase, `codevote_estado_servidor` te dirá cuántos minutos le
+> quedan y el error de cualquier herramienta te dirá qué hacer. Genera otro y
+> reinicia Claude: no hay renovación automática posible.
+
+> Usa una cuenta con el **rol mínimo** que necesites. Si le das una cuenta admin,
+> el MCP verá todo lo que ve un admin.
 
 ---
 
@@ -65,12 +90,11 @@ Edita `~/Library/Application Support/Claude/claude_desktop_config.json`
 {
   "mcpServers": {
     "codevote": {
-      "command": "node",
+      "command": "/opt/homebrew/bin/node",
       "args": ["/ruta/absoluta/a/codevote-api/mcp/dist/index.js"],
       "env": {
         "CODEVOTE_API_URL": "https://codevote.lat/api",
-        "CODEVOTE_EMAIL": "cuenta-mcp@uide.edu.ec",
-        "CODEVOTE_PASSWORD": "...",
+        "CODEVOTE_TOKEN": "el-que-imprime-npm-run-token",
         "CODEVOTE_MCP_MODE": "lectura"
       }
     }
@@ -78,20 +102,22 @@ Edita `~/Library/Application Support/Claude/claude_desktop_config.json`
 }
 ```
 
-Reinicia Claude Desktop. El servidor aparece en el icono de herramientas.
+Usa la **ruta absoluta de node** (`which node`): Claude Desktop no siempre hereda
+el `PATH` de tu terminal. Después reinícialo del todo (Cmd+Q, no solo cerrar la
+ventana). El servidor aparece en el icono de herramientas.
 
 ### Claude Code
 
 Desde la raíz del repositorio:
 
 ```bash
-claude mcp add codevote --env CODEVOTE_API_URL=https://codevote.lat/api --env CODEVOTE_EMAIL=cuenta-mcp@uide.edu.ec --env CODEVOTE_PASSWORD=... -- node ./mcp/dist/index.js
+claude mcp add codevote --env CODEVOTE_API_URL=https://codevote.lat/api --env CODEVOTE_TOKEN=... -- node ./mcp/dist/index.js
 ```
 
 ### MCP Inspector (para probar sin cliente)
 
 ```bash
-npm run inspector
+CODEVOTE_TOKEN=... npm run inspector
 ```
 
 ---
@@ -203,5 +229,5 @@ Con la API corriendo en `localhost:3000` y la base de ejemplo cargada:
 npm test
 ```
 
-22 pruebas: política de acceso (lista negra, path traversal, modos), redacción, y
+25 pruebas: política de acceso (lista negra, path traversal, modos), redacción, lectura del token, y
 las capacidades reales del servidor levantándolo por stdio como haría Claude.

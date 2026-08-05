@@ -29,12 +29,10 @@ const esquemaEntorno = z.object({
   // --- Conexión con la API ---
   CODEVOTE_API_URL: z.string().url().default('http://localhost:3000/api'),
 
-  // Credenciales de servicio. El servidor inicia sesión por su cuenta: ni la
-  // contraseña ni el JWT salen nunca hacia el modelo.
-  CODEVOTE_EMAIL: z.string().email().optional(),
-  CODEVOTE_PASSWORD: z.string().min(1).optional(),
-  // Alternativa: un JWT ya emitido (útil en CI o para pruebas cortas).
-  CODEVOTE_TOKEN: z.string().min(10).optional(),
+  // Sesión. La API accede por código de un solo uso al correo institucional, así
+  // que el servidor MCP no puede autenticarse por su cuenta: recibe un JWT ya
+  // emitido. Se genera con «npm run token». El token no se expone al modelo.
+  CODEVOTE_TOKEN: z.string().min(10),
 
   // --- Política ---
   CODEVOTE_MCP_MODE: z.enum(['lectura', 'escritura']).default('lectura'),
@@ -60,8 +58,7 @@ const esquemaEntorno = z.object({
 
 export interface Config {
   apiUrl: string;
-  credenciales?: { correo: string; password: string };
-  tokenFijo?: string;
+  token: string;
   modo: Modo;
   redactarPii: boolean;
   timeoutMs: number;
@@ -102,13 +99,6 @@ export function cargarConfig(entorno: NodeJS.ProcessEnv = process.env): Config {
     );
   }
 
-  const tieneCredenciales = Boolean(e.CODEVOTE_EMAIL && e.CODEVOTE_PASSWORD);
-  if (!tieneCredenciales && !e.CODEVOTE_TOKEN) {
-    throw new Error(
-      'Faltan credenciales: define CODEVOTE_EMAIL + CODEVOTE_PASSWORD (recomendado) o CODEVOTE_TOKEN.',
-    );
-  }
-
   // El transporte HTTP sin autenticación es un servidor MCP abierto: cualquier
   // proceso local (o remoto si se expone el puerto) podría usar la sesión.
   if (e.CODEVOTE_MCP_TRANSPORT === 'http' && !e.CODEVOTE_MCP_HTTP_TOKEN) {
@@ -120,10 +110,9 @@ export function cargarConfig(entorno: NodeJS.ProcessEnv = process.env): Config {
 
   return {
     apiUrl,
-    credenciales: tieneCredenciales
-      ? { correo: e.CODEVOTE_EMAIL!, password: e.CODEVOTE_PASSWORD! }
-      : undefined,
-    tokenFijo: e.CODEVOTE_TOKEN,
+    // Se limpia por si se copió con saltos de línea o espacios al pegarlo en la
+    // configuración del cliente MCP: es el error más habitual.
+    token: e.CODEVOTE_TOKEN.trim(),
     modo: e.CODEVOTE_MCP_MODE,
     redactarPii: e.CODEVOTE_MCP_REDACT_PII,
     timeoutMs: e.CODEVOTE_MCP_TIMEOUT_MS,
@@ -149,7 +138,7 @@ export function configPublica(config: Config) {
     api_url: config.apiUrl,
     modo: config.modo,
     transporte: config.transporte,
-    autenticacion: config.credenciales ? 'credenciales de servicio' : 'token preemitido',
+    autenticacion: 'JWT preemitido (acceso por código al correo)',
     redaccion_pii: config.redactarPii,
     limites: {
       timeout_ms: config.timeoutMs,

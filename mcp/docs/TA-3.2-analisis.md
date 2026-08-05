@@ -44,6 +44,33 @@ API esté arriba, y las herramientas que componen varias consultas hacen varias
 peticiones HTTP en lugar de un `JOIN`. Se asume a cambio de no duplicar la
 superficie de seguridad.
 
+### 1.2 Cómo se autentica un agente contra un sistema sin contraseñas
+
+CodeVote eliminó las contraseñas: se entra con un **código de un solo uso
+enviado al correo institucional**. Es más seguro para las personas, pero rompe
+el supuesto habitual de una integración automatizada — que existan unas
+credenciales que el proceso pueda presentar por su cuenta. Aquí no las hay:
+autenticarse requiere leer un correo, y eso es irreductiblemente humano.
+
+Las tres salidas posibles y por qué se eligió la tercera:
+
+| Opción | Problema |
+|---|---|
+| Reabrir una vía de contraseña solo para el MCP | Crea la excepción que el rediseño de autenticación acababa de cerrar. Una puerta trasera sigue siendo una puerta |
+| Exponer el OTP como herramienta MCP | El código de acceso entraría al contexto del modelo y quedaría en el historial de la conversación |
+| **Inyectar un JWT ya emitido por el entorno** | La sesión caduca y hay que renovarla a mano |
+
+Se eligió la tercera. El servidor recibe el token por variable de entorno
+(`npm run token` lo genera pidiendo el código y canjeándolo en la terminal), lo
+lee para saber con qué rol opera y cuándo caduca, y **no intenta renovarlo**: un
+401 se informa y se para, no dispara reintentos.
+
+Ese "defecto" es en realidad una propiedad de seguridad. Un agente cuya sesión
+no se renueva sola tiene una ventana de acceso acotada por diseño: si el token
+se filtra, caduca. Y obliga a que una persona intervenga periódicamente, lo que
+en un sistema electoral es exactamente lo que se quiere — el acceso automatizado
+no debe ser permanente ni desatendido.
+
 ---
 
 ## 2. Análisis de transporte
@@ -232,7 +259,7 @@ modelo de lenguaje**. Eso añade amenazas que no existen en una API normal.
 | A3 | Filtración de PII al contexto | Cédulas y correos entran al historial del modelo, se guardan y pueden reenviarse |
 | A4 | Ruptura del secreto del voto | Alguien intenta correlacionar votante y voto |
 | A5 | Escritura destructiva | El modelo borra un proceso, cierra una papeleta o emite un voto |
-| A6 | Filtración de credenciales | El JWT o la contraseña aparecen en una respuesta o en un log |
+| A6 | Filtración de la sesión | El JWT aparece en una respuesta de herramienta o en un log |
 | A7 | Agotamiento de recursos | Un bucle de llamadas satura la API o llena el contexto |
 | A8 | SSRF / manipulación de rutas | Se induce al MCP a llamar a un host o una ruta no prevista |
 | A9 | Acceso no autorizado al MCP | Otro proceso o una web usa el servidor MCP |
@@ -247,7 +274,8 @@ modelo de lenguaje**. Eso añade amenazas que no existen en una API normal.
 | **Validación de forma de la ruta** — se rechazan `..`, `%2e%2e`, esquemas y caracteres de control | `politica.ts` | A8 |
 | **`redirect: 'error'` en fetch** — un redirect no puede llevar el JWT a otro host | `api.ts` | A8, A6 |
 | **TLS obligatorio fuera de localhost** — el proceso no arranca con `http://` remoto salvo excepción explícita | `config.ts` | A6 |
-| **Credenciales fuera del alcance del modelo** — vienen del entorno; el login lo hace el servidor; el JWT vive en memoria y no aparece en ninguna respuesta | `api.ts` | A6, A2 |
+| **Sesión fuera del alcance del modelo** — el JWT viene del entorno, vive en memoria y no aparece en ninguna respuesta de herramienta | `api.ts` | A6, A2 |
+| **Sin renovación automática de sesión** — un 401 no dispara reintentos ni logins; se informa y se para | `api.ts` | A7, A9 |
 | **Redacción de secretos** — contraseñas, tokens y hashes de comprobante se ocultan **siempre**, en cualquier modo | `redact.ts` | A6, A4 |
 | **Enmascarado de PII** — cédulas (`******0009`) y correos (`s********@uide.edu.ec`) | `redact.ts` | A3 |
 | **Agregación forzada del padrón** — la herramienta no devuelve registros individuales | `tools/lectura.ts` | A3 |
@@ -285,7 +313,7 @@ cambio futuro en la API lo expusiera por descuido.
 
 ### 5.1 Verificación
 
-`mcp/test/humo.test.ts` — **22 pruebas, 22 correctas** contra la API real con la
+`mcp/test/humo.test.ts` — **25 pruebas, 25 correctas** contra la API real con la
 base de ejemplo:
 
 - **Política**: votar prohibido incluso en modo escritura; ningún `DELETE` pasa;
@@ -314,11 +342,15 @@ petición sin `initialize` previo → 400; y una sesión completa (initialize �
    defensa que sí es estructural es que, aunque el modelo obedezca a un texto
    malicioso, la lista negra y el modo lectura le impiden ejecutar nada
    destructivo.
-3. **Las credenciales están en el entorno del proceso.** Quien pueda leer la
-   configuración del cliente MCP las ve. Para producción corresponde un gestor
-   de secretos y una cuenta de servicio con el rol mínimo, no la cuenta personal
-   del administrador.
-4. **El rol del MCP determina lo que ve.** Con una cuenta admin el modelo accede
+3. **El JWT está en el entorno del proceso.** Quien pueda leer la configuración
+   del cliente MCP lo ve. Para producción corresponde un gestor de secretos y
+   una cuenta con el rol mínimo, no la cuenta personal del administrador.
+4. **La sesión caduca y hay que renovarla a mano.** Es consecuencia directa del
+   acceso por OTP (§1.2): al no haber contraseña, no hay forma de que el
+   servidor renueve solo. Visto como control es más una ventaja que un defecto
+   —la sesión de un agente no se perpetúa sola— pero operativamente obliga a
+   generar un token nuevo cada vez que expira.
+5. **El rol del MCP determina lo que ve.** Con una cuenta admin el modelo accede
    a todo lo que ve un admin. El principio de mínimo privilegio se aplica
    eligiendo bien la cuenta, no dentro del MCP.
 

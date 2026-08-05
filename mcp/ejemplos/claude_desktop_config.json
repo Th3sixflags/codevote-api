@@ -1,13 +1,13 @@
 {
-  "_comentario": "Copia este bloque en claude_desktop_config.json. En macOS está en ~/Library/Application Support/Claude/, en Windows en %APPDATA%\\Claude\\. Cambia la ruta absoluta y las credenciales, y reinicia Claude Desktop.",
+  "_comentario": "Copia este bloque en claude_desktop_config.json. En macOS está en ~/Library/Application Support/Claude/, en Windows en %APPDATA%\\Claude\\. Ajusta la ruta absoluta y pega el token que imprime «npm run token», o deja que lo escriba él con «npm run token -- --config». Después reinicia Claude Desktop.",
+  "_nota_command": "Usa la ruta absoluta de node (which node): Claude Desktop no siempre hereda el PATH de tu terminal.",
   "mcpServers": {
     "codevote": {
-      "command": "node",
+      "command": "/opt/homebrew/bin/node",
       "args": ["/ruta/absoluta/a/codevote-api/mcp/dist/index.js"],
       "env": {
         "CODEVOTE_API_URL": "https://codevote.lat/api",
-        "CODEVOTE_EMAIL": "cuenta-mcp@uide.edu.ec",
-        "CODEVOTE_PASSWORD": "REEMPLAZAR",
+        "CODEVOTE_TOKEN": "REEMPLAZAR",
         "CODEVOTE_MCP_MODE": "lectura",
         "CODEVOTE_MCP_REDACT_PII": "true",
         "CODEVOTE_MCP_LOG_LEVEL": "info"

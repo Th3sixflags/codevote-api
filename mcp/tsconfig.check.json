@@ -1,0 +1,11 @@
+{
+  // El build solo compila src/ (es lo que se publica en dist/). Este perfil
+  // añade los scripts y las pruebas para que también se revisen de tipos, sin
+  // emitir nada ni alterar la estructura de dist/.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "."
+  },
+  "include": ["src", "scripts", "test"]
+}

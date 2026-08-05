@@ -8,8 +8,10 @@
     "codevote-mcp": "dist/index.js"
   },
   "scripts": {
+    "token": "node --import tsx scripts/token.ts",
     "dev": "node --env-file-if-exists=.env --import tsx --watch src/index.ts",
     "build": "tsc",
+    "check": "tsc -p tsconfig.check.json",
     "start": "node --env-file-if-exists=.env dist/index.js",
     "test": "node --import tsx --test test/*.test.ts",
     "inspector": "npx -y @modelcontextprotocol/inspector node --env-file-if-exists=.env dist/index.js"

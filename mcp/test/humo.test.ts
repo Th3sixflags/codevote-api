@@ -13,20 +13,55 @@
  */
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { createHmac } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { autorizar, ErrorPolitica } from '../src/politica.js';
 import { redactar, enmascararCedula, enmascararCorreo } from '../src/redact.js';
+import { leerToken, minutosRestantes } from '../src/jwt.js';
 
 const RAIZ = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+
+/**
+ * El acceso real es por código al correo y eso no se automatiza. Para las
+ * pruebas se firma un JWT con el mismo secreto que usa la API local: es
+ * equivalente a haber canjeado un código, sin depender del buzón de nadie.
+ */
+function secretoDeLaApi(): string {
+  if (process.env.JWT_SECRET) return process.env.JWT_SECRET;
+  try {
+    const env = readFileSync(resolve(RAIZ, '..', '.env'), 'utf8');
+    const linea = env.split('\n').find((l) => l.startsWith('JWT_SECRET='));
+    if (linea) return linea.slice('JWT_SECRET='.length).trim();
+  } catch {
+    /* sin .env: se avisa abajo */
+  }
+  throw new Error(
+    'No se encontró JWT_SECRET. Define la variable o deja el .env de la API en la carpeta superior.',
+  );
+}
+
+function firmarJwt(carga: Record<string, unknown>, secreto: string): string {
+  const base64 = (valor: object) => Buffer.from(JSON.stringify(valor)).toString('base64url');
+  const cabecera = base64({ alg: 'HS256', typ: 'JWT' });
+  const cuerpo = base64(carga);
+  const firma = createHmac('sha256', secreto).update(`${cabecera}.${cuerpo}`).digest('base64url');
+  return `${cabecera}.${cuerpo}.${firma}`;
+}
+
+const ahora = Math.floor(Date.now() / 1000);
+const TOKEN_ADMIN = firmarJwt(
+  { sub: '1710000009', email: 'admin@uide.edu.ec', rol: 'admin', iat: ahora, exp: ahora + 3600 },
+  secretoDeLaApi(),
+);
 
 const ENTORNO_BASE = {
   ...process.env,
   CODEVOTE_API_URL: process.env.CODEVOTE_API_URL ?? 'http://localhost:3000/api',
-  CODEVOTE_EMAIL: process.env.CODEVOTE_EMAIL ?? 'schininin@uide.edu.ec',
-  CODEVOTE_PASSWORD: process.env.CODEVOTE_PASSWORD ?? 'password123',
+  CODEVOTE_TOKEN: TOKEN_ADMIN,
   CODEVOTE_MCP_LOG_LEVEL: 'error',
 };
 
@@ -107,6 +142,29 @@ describe('redacción', () => {
   });
 });
 
+describe('lectura del token', () => {
+  test('extrae rol, cuenta y caducidad', () => {
+    const carga = leerToken(TOKEN_ADMIN);
+    assert.equal(carga.rol, 'admin');
+    assert.equal(carga.sub, '1710000009');
+    const minutos = minutosRestantes(carga);
+    assert.ok(minutos !== null && minutos > 50 && minutos <= 60);
+  });
+
+  test('un token con saltos de línea o basura se rechaza con un mensaje claro', () => {
+    assert.throws(() => leerToken('no-es-un-jwt'), /forma de JWT/);
+    assert.throws(() => leerToken('aaa.bbb.ccc'), /no se pudo leer/);
+  });
+
+  test('el servidor no arranca sin CODEVOTE_TOKEN', async () => {
+    const { cargarConfig } = await import('../src/config.js');
+    assert.throws(
+      () => cargarConfig({ CODEVOTE_API_URL: 'http://localhost:3000/api' } as NodeJS.ProcessEnv),
+      /CODEVOTE_TOKEN/,
+    );
+  });
+});
+
 // ------------------------------------------------------ integración: stdio --
 
 describe('servidor MCP en modo lectura', () => {
@@ -135,9 +193,10 @@ describe('servidor MCP en modo lectura', () => {
     assert.equal(escritura.length, 0, `se registraron herramientas de escritura: ${escritura.map((t) => t.name)}`);
   });
 
-  test('estado_servidor informa la identidad y la política', async () => {
+  test('estado_servidor informa la identidad, la caducidad y la política', async () => {
     const salida = json((await cliente.callTool({ name: 'codevote_estado_servidor' })) as any);
     assert.equal(salida.datos.identidad.rol, 'admin');
+    assert.equal(typeof salida.datos.identidad.minutos_para_caducar, 'number');
     assert.equal(salida.datos.configuracion.modo, 'lectura');
     assert.equal(salida.datos.politica.escritura_activa, false);
     // El token jamás debe aparecer en una respuesta de herramienta.
@@ -186,7 +245,7 @@ describe('servidor MCP en modo lectura', () => {
 
   test('el recurso de política declara las rutas prohibidas', async () => {
     const recurso = await cliente.readResource({ uri: 'codevote://politica-de-seguridad' });
-    const contenido = JSON.parse(recurso.contents[0]!.text as string);
+    const contenido = JSON.parse((recurso.contents[0] as { text: string }).text);
     assert.ok(contenido.politica.rutas_prohibidas_siempre.some((r: any) => r.operacion.includes('votos')));
   });
 
