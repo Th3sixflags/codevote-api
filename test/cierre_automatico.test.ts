@@ -28,6 +28,10 @@ interface Papeleta {
   titulo_papeleta: string;
   estado: string;
   id_proceso: number;
+  /** Cierre propio de la papeleta. Puede vencer antes que el del proceso. */
+  fecha_cierre?: string | null;
+  /** Simula que el UPDATE de cierre no prospera (fallo o carrera perdida). */
+  noSeCierra?: boolean;
 }
 
 interface Proceso {
@@ -64,15 +68,23 @@ function ejecutar(sqlCrudo: string, params: any[] = []): any {
   const sql = sqlCrudo.replace(/\s+/g, ' ').trim();
   estado.sentencias.push(sql);
 
-  // Papeletas vencidas y aún abiertas.
-  if (sql.includes('FROM votacion v') && sql.includes("v.estado = 'abierta'")) {
+  // Papeletas vencidas y aún sin cerrar. Vencen por el plazo del proceso o por
+  // el cierre propio de la papeleta, lo que ocurra primero; y se recogen
+  // también las que siguen 'pendiente', para que su proceso pueda finalizar.
+  //
+  // Se reconoce por el principio del SELECT y no por "v.estado <> 'cerrada'":
+  // esa condición aparece también dentro del NOT EXISTS de la finalización del
+  // proceso, y este bloque se la habría quedado.
+  if (sql.startsWith('SELECT v.id_votacion, v.titulo_papeleta, v.fk_id_carrera')) {
     const corte = params[0];
     return estado.papeletas
       .filter((v) => {
         const p = procesoDe(v.id_proceso);
-        return v.estado === 'abierta'
+        const vencePorProceso = Boolean(p.fecha_fin_votacion) && p.fecha_fin_votacion <= corte;
+        const vencePorPapeleta = Boolean(v.fecha_cierre) && v.fecha_cierre! <= corte;
+        return v.estado !== 'cerrada'
           && p.estado !== 'cancelado'
-          && p.fecha_fin_votacion <= corte;
+          && (vencePorProceso || vencePorPapeleta);
       })
       .map((v) => ({
         id_votacion: v.id_votacion, titulo_papeleta: v.titulo_papeleta,
@@ -104,10 +116,11 @@ function ejecutar(sqlCrudo: string, params: any[] = []): any {
     return { affectedRows: v ? 1 : 0 };
   }
 
-  // Cierre atómico: solo prospera si seguía abierta.
+  // Cierre atómico: solo prospera si NO estaba ya cerrada (vale desde
+  // 'abierta' y desde 'pendiente').
   if (sql.startsWith("UPDATE votacion SET estado = 'cerrada'")) {
     const v = estado.papeletas.find((x) => x.id_votacion === Number(params[0]));
-    if (!v || v.estado !== 'abierta') return { affectedRows: 0 };
+    if (!v || v.estado === 'cerrada' || v.noSeCierra) return { affectedRows: 0 };
     v.estado = 'cerrada';
     return { affectedRows: 1 };
   }
@@ -217,7 +230,9 @@ test('al arrancar con una papeleta vencida, se cierra en la primera pasada', asy
 test('la consulta compara contra la hora de Ecuador, no contra NOW()', async () => {
   await cerrarPapeletasVencidas();
 
-  const consulta = estado.sentencias.find((s) => s.includes("v.estado = 'abierta'"))!;
+  const consulta = estado.sentencias.find(
+    (s) => s.startsWith('SELECT v.id_votacion, v.titulo_papeleta, v.fk_id_carrera')
+  )!;
   assert.match(consulta, /p\.fecha_fin_votacion <= \?/, 'el corte no viaja como parámetro');
   assert.ok(!/NOW\(\)/.test(consulta), 'usa NOW(), que depende de la zona de MySQL');
 });
@@ -282,12 +297,31 @@ test('cerradas todas las papeletas de un proceso vencido, el proceso finaliza', 
   assert.equal(procesoDe(1).estado, 'finalizado');
 });
 
-test('con una papeleta aún abierta el proceso NO finaliza', async () => {
+test('una papeleta pendiente de un proceso vencido también se cierra', async () => {
+  // Nunca llegó a abrirse (el servidor estuvo apagado toda su ventana), pero
+  // tiene que quedar cerrada: mientras no lo esté, su proceso no puede
+  // finalizar y se queda colgado para siempre. Su acta sale con el escrutinio
+  // real, que es lo que de verdad ocurrió.
   estado.papeletas.push({ id_votacion: 2, titulo_papeleta: 'Carrera', estado: 'pendiente', id_proceso: 1 });
 
   await cerrarPapeletasVencidas();
 
   assert.equal(papeleta(1).estado, 'cerrada');
+  assert.equal(papeleta(2).estado, 'cerrada', 'una papeleta pendiente y vencida se quedó sin cerrar');
+  assert.equal(procesoDe(1).estado, 'finalizado');
+});
+
+test('si una papeleta no llega a cerrarse, el proceso NO finaliza', async () => {
+  // Es la garantía de `finalizarSiTodoCerrado`: basta con que quede UNA sin
+  // cerrar —aquí porque su UPDATE falla— para que el proceso siga en curso.
+  estado.papeletas.push({
+    id_votacion: 2, titulo_papeleta: 'Carrera', estado: 'abierta', id_proceso: 1, noSeCierra: true,
+  });
+
+  await cerrarPapeletasVencidas();
+
+  assert.equal(papeleta(1).estado, 'cerrada');
+  assert.equal(papeleta(2).estado, 'abierta');
   assert.equal(procesoDe(1).estado, 'votacion', 'finalizó con una papeleta sin cerrar');
 });
 

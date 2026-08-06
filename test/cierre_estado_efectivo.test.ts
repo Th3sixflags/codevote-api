@@ -90,9 +90,38 @@ test('antes de la apertura el estado efectivo es pendiente', () => {
   assert.equal(d.motivo_no_disponible, 'La votación todavía no ha abierto.');
 });
 
-test('una papeleta pendiente no se vota aunque su ventana ya empezara', () => {
+test('pasada la hora de apertura la papeleta abre, aunque la columna diga pendiente', () => {
+  // El fallo que esto cubre: NINGÚN camino del código escribía 'abierta'. La
+  // papeleta se creaba 'pendiente' y ahí se quedaba, así que una votación
+  // programada para las 18:00 no abría a las 18:00 ni nunca. La fecha manda,
+  // igual que en el cierre; la tarea de apertura sincroniza la columna después.
   const d = disponibilidadDeVoto({ ...ABIERTA, estado: 'pendiente' }, AHORA);
+
+  assert.equal(d.estado_efectivo, 'abierta');
+  assert.equal(d.puede_votar, true);
+  assert.equal(d.motivo_no_disponible, null);
+});
+
+test('una papeleta pendiente cuya hora aún no llega sigue pendiente', () => {
+  const d = disponibilidadDeVoto(
+    { ...ABIERTA, estado: 'pendiente', fecha_apertura: '2026-08-04 18:00:00' }, AHORA
+  );
+
   assert.equal(d.estado_efectivo, 'pendiente');
+  assert.equal(d.puede_votar, false);
+});
+
+test('justo en la hora de apertura la papeleta ya está abierta', () => {
+  const d = disponibilidadDeVoto({ ...ABIERTA, estado: 'pendiente', fecha_apertura: AHORA }, AHORA);
+  assert.equal(d.puede_votar, true);
+});
+
+test('un cierre manual gana sobre la fecha de apertura ya cumplida', () => {
+  // Cerrar antes de tiempo debe seguir siendo posible: el estado 'cerrada' se
+  // comprueba antes que la apertura por fecha.
+  const d = disponibilidadDeVoto({ ...ABIERTA, estado: 'cerrada' }, AHORA);
+  assert.equal(d.estado_efectivo, 'cerrada');
+  assert.equal(d.puede_votar, false);
 });
 
 // --- Proceso cancelado o archivado ------------------------------------------

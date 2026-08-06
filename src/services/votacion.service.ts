@@ -79,7 +79,10 @@ export async function actualizarVotacion(id: number, data: ActualizarVotacionDTO
   // por la MISMA función que el cierre automático, para que emita el acta,
   // avise a la administración y registre el escrutinio igual que aquel. Si no,
   // una papeleta cerrada a mano quedaría sin acta ni aviso.
-  const cierraAhora = data.estado === 'cerrada' && existente.estado === 'abierta';
+  // Vale también desde 'pendiente': cancelar una papeleta que aún no abrió es
+  // una decisión legítima, y debe dejar el mismo rastro (acta y aviso) que
+  // cualquier otro cierre.
+  const cierraAhora = data.estado === 'cerrada' && existente.estado !== 'cerrada';
 
   if (cierraAhora) {
     // El orden importa: `cerrarPapeleta` cierra con un UPDATE condicionado a

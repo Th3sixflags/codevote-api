@@ -12,7 +12,20 @@ export interface PapeletaVencida {
 }
 
 /**
- * Papeletas abiertas cuyo proceso ya pasó su `fecha_fin_votacion`.
+ * Papeletas sin cerrar que ya vencieron, por cualquiera de sus dos plazos.
+ *
+ * Vence con el `fecha_fin_votacion` del proceso o con el `fecha_cierre` de la
+ * propia papeleta, lo que ocurra primero. Antes solo se miraba el del proceso,
+ * así que una papeleta que cerraba antes que su proceso se quedaba abierta en la
+ * base: la API ya la daba por cerrada (ver utils/estadoVotacion.ts, que sí mira
+ * los dos), pero nunca llegaba a emitirse su acta. Ahora las dos reglas
+ * coinciden.
+ *
+ * Se recogen también las que siguen en 'pendiente'. Una papeleta cuya ventana
+ * entera pasó con el servidor apagado nunca llegó a abrirse, pero tiene que
+ * quedar cerrada igualmente: mientras no lo esté, `finalizarSiTodoCerrado` no
+ * puede dar por terminado su proceso y este se queda colgado para siempre. Su
+ * acta saldrá con cero votos, que es exactamente lo que ocurrió.
  *
  * El corte llega como parámetro —la hora de Ecuador calculada en Node— en vez
  * de usar `NOW()`: así la comparación no depende de la zona horaria de la
@@ -29,12 +42,14 @@ export async function papeletasVencidas(corteEnEcuador: string): Promise<Papelet
        FROM votacion v
        JOIN proceso_electoral p ON p.id_proceso = v.fk_id_proceso
        LEFT JOIN carrera c ON c.id_carrera = v.fk_id_carrera
-      WHERE v.estado = 'abierta'
-        AND p.fecha_fin_votacion IS NOT NULL
-        AND p.fecha_fin_votacion <= ?
+      WHERE v.estado <> 'cerrada'
+        AND (
+             (p.fecha_fin_votacion IS NOT NULL AND p.fecha_fin_votacion <= ?)
+          OR (v.fecha_cierre       IS NOT NULL AND v.fecha_cierre       <= ?)
+        )
         AND p.estado <> 'cancelado'
       ORDER BY p.fecha_fin_votacion, v.id_votacion`,
-    [corteEnEcuador]
+    [corteEnEcuador, corteEnEcuador]
   ) as [any[], any];
   return rows as PapeletaVencida[];
 }
@@ -42,13 +57,17 @@ export async function papeletasVencidas(corteEnEcuador: string): Promise<Papelet
 /**
  * Cierra la papeleta y dice si el cierre lo hizo ESTA llamada.
  *
- * El `AND estado = 'abierta'` es la garantía de idempotencia: si otra ejecución
+ * El `AND estado <> 'cerrada'` es la garantía de idempotencia: si otra ejecución
  * (o el cierre manual) llegó antes, `affectedRows` vale 0 y quien llama sabe
  * que no debe volver a emitir el acta, la notificación ni el correo.
+ *
+ * Se admite cerrar desde 'pendiente' y no solo desde 'abierta': una papeleta
+ * cuya ventana pasó entera sin que el servidor estuviera vivo nunca llegó a
+ * abrirse, y aun así debe quedar cerrada para que su proceso pueda finalizar.
  */
 export async function cerrarSiSigueAbierta(votacionId: number): Promise<boolean> {
   const [resultado] = await pool.query(
-    `UPDATE votacion SET estado = 'cerrada' WHERE id_votacion = ? AND estado = 'abierta'`,
+    `UPDATE votacion SET estado = 'cerrada' WHERE id_votacion = ? AND estado <> 'cerrada'`,
     [votacionId]
   ) as [any, any];
   return resultado.affectedRows > 0;

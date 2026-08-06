@@ -1,8 +1,9 @@
 import { cerrarPapeletasVencidas } from '../services/cierre_votacion.service.js';
+import { abrirPapeletasProgramadas } from '../services/apertura_votacion.service.js';
 import { reconciliarArchivados } from '../repositories/archivado.repository.js';
 
 /**
- * Cierre automático de papeletas vencidas.
+ * Ciclo de vida automático de las papeletas: APERTURA y CIERRE.
  *
  * Se comprueba cada minuto, que es la granularidad con la que se programan las
  * votaciones. Se usa `setInterval` en vez de una librería de cron porque no
@@ -11,8 +12,13 @@ import { reconciliarArchivados } from '../repositories/archivado.repository.js';
  * horaria no la decide el planificador sino la comparación, que se hace
  * siempre en hora de Ecuador (ver utils/zonaHoraria.ts).
  *
+ * Las dos mitades van en la MISMA pasada y en este orden —primero abrir, luego
+ * cerrar— porque el cierre solo recoge papeletas que ya están abiertas. Con dos
+ * temporizadores distintos, una papeleta cuya ventana entera cupiera entre dos
+ * pasadas podría abrirse y quedarse sin cerrar hasta el minuto siguiente.
+ *
  * Al arrancar se ejecuta una reconciliación: si el servidor estuvo apagado
- * mientras vencía una votación, se cierra en cuanto vuelve.
+ * mientras una votación tenía que abrir o cerrar, se corrige en cuanto vuelve.
  */
 
 const CADA_UN_MINUTO = 60_000;
@@ -28,6 +34,17 @@ async function pasada(motivo: 'arranque' | 'programada') {
   }
   enCurso = true;
   try {
+    // Primero abrir: el cierre solo recoge papeletas ya abiertas.
+    const abiertas = await abrirPapeletasProgramadas();
+    if (abiertas.length > 0) {
+      console.info(
+        `[apertura] (${motivo}) ${abiertas.length} papeleta(s) abierta(s): ` +
+        abiertas.map((a) => a.titulo_papeleta).join(', ')
+      );
+    } else if (motivo === 'arranque') {
+      console.info('[apertura] (arranque) no había papeletas pendientes de abrir');
+    }
+
     const cerradas = await cerrarPapeletasVencidas();
     if (cerradas.length > 0) {
       console.info(
@@ -40,13 +57,13 @@ async function pasada(motivo: 'arranque' | 'programada') {
   } catch (err) {
     // Nunca se propaga: un fallo puntual no debe tumbar el proceso ni impedir
     // que la siguiente pasada lo intente de nuevo.
-    console.error('[cierre] la comprobación falló', err);
+    console.error('[papeletas] la comprobación falló', err);
   } finally {
     enCurso = false;
   }
 }
 
-/** Arranca la reconciliación inicial y la comprobación periódica. */
+/** Arranca la reconciliación inicial y la comprobación periódica (apertura y cierre). */
 export function iniciarCierreProgramado() {
   if (temporizador) return;
 
@@ -59,7 +76,7 @@ export function iniciarCierreProgramado() {
   // ordenado).
   temporizador.unref?.();
 
-  console.info('[cierre] comprobación de papeletas vencidas activa (cada minuto, hora de Ecuador)');
+  console.info('[papeletas] apertura y cierre automáticos activos (cada minuto, hora de Ecuador)');
 }
 
 /**

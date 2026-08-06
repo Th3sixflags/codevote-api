@@ -99,7 +99,20 @@ export function disponibilidadDeVoto(
     return cerrada('La votación ha finalizado.');
   }
 
-  if (estado === 'pendiente' || !yaPaso(papeleta.fecha_apertura, ahora)) {
+  // La apertura la decide la FECHA, igual que el cierre, y NO el estado guardado.
+  //
+  // Antes bastaba con que la columna dijese 'pendiente' para que la papeleta
+  // siguiera cerrada. El problema: ningún camino del código escribía nunca
+  // 'abierta' —se creaba en 'pendiente' y ahí se quedaba—, así que una votación
+  // programada para las 18:00 no abría a las 18:00 ni nunca. Y como el cierre
+  // automático solo mira papeletas en estado 'abierta', tampoco llegaba a
+  // cerrarse ni a emitir acta, y su proceso no podía finalizar.
+  //
+  // Ahora 'pendiente' significa solo "todavía no le toca": en cuanto pasa
+  // `fecha_apertura` la papeleta está abierta, la tarea de apertura sincroniza
+  // la columna en el siguiente minuto y ambas cosas dicen lo mismo. Para
+  // retrasar una apertura se mueve la fecha, que es lo que de verdad la define.
+  if (!yaPaso(papeleta.fecha_apertura, ahora)) {
     return {
       estado_efectivo: 'pendiente',
       puede_votar: false,
