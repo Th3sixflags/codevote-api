@@ -63,7 +63,7 @@ function plantilla(titulo: string, cuerpo: string, boton?: { texto: string; url:
       </p>
       <p style="font-size:12px;color:#8a8184;text-align:center;word-break:break-all">${boton.url}</p>` : ''}
       <hr style="border:0;border-top:1px solid #e7e1dd;margin:24px 0">
-      <p style="font-size:12px;color:#8a8184">CodeVote · Comisión Electoral Universitaria (UIDE)</p>
+      <p style="font-size:12px;color:#8a8184">CodeVote · Plataforma de Votaciones Institucionales</p>
     </div>`;
 }
 
@@ -91,7 +91,7 @@ export function componerConvocatoria(p: PapeletaParaAviso) {
     '',
     'Te avisaremos de nuevo cuando la votación esté abierta.',
     '',
-    'CodeVote · Comisión Electoral Universitaria (UIDE)',
+    'CodeVote · Plataforma de Votaciones Institucionales',
   ].filter((l) => l !== '').join('\n');
 
   const html = plantilla(
@@ -124,7 +124,7 @@ export function componerApertura(p: PapeletaParaAviso) {
     '',
     'Tu voto es secreto: se guarda sin tu cédula y nadie puede saber qué elegiste.',
     '',
-    'CodeVote · Comisión Electoral Universitaria (UIDE)',
+    'CodeVote · Plataforma de Votaciones Institucionales',
   ].join('\n');
 
   const html = plantilla(
@@ -155,7 +155,7 @@ export function componerCierreProximo(p: PapeletaParaAviso, horas: number) {
     '',
     'No votar queda registrado como falta en el padrón electoral.',
     '',
-    'CodeVote · Comisión Electoral Universitaria (UIDE)',
+    'CodeVote · Plataforma de Votaciones Institucionales',
   ].join('\n');
 
   const html = plantilla(
@@ -184,7 +184,7 @@ export function componerSancion(p: PapeletaParaAviso) {
     'Puedes consultar tus faltas en:',
     `${URL_APP}/perfil`,
     '',
-    'CodeVote · Comisión Electoral Universitaria (UIDE)',
+    'CodeVote · Plataforma de Votaciones Institucionales',
   ].join('\n');
 
   const html = plantilla(

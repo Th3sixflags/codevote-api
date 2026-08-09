@@ -23,6 +23,8 @@ import notificacionRoutes        from './notificacion.routes.js';
 import perfilRoutes              from './perfil.routes.js';
 import { recordatorioRoutes, sancionRoutes } from './recordatorio.routes.js';
 import uploadRoutes                from './upload.routes.js';
+import institucionRoutes from './institucion.routes.js';
+import superadminRoutes from './superadmin.routes.js';
 
 export function registerRoutes(app: Express) {
   // Autenticación
@@ -73,4 +75,10 @@ export function registerRoutes(app: Express) {
 
   // Perfil propio (foto)
   app.use('/api/perfil',                 perfilRoutes);
+
+  // Gestión de instituciones (super admin)
+  app.use('/api/instituciones', institucionRoutes);
+
+  // Super admin
+  app.use('/api/superadmin', superadminRoutes);
 }

@@ -1,6 +1,6 @@
-# CodeVote API
+# CodeVote API — Plataforma de Votaciones Institucionales
 
-API REST para el sistema de votaciones universitarias CodeVote. 
+API REST para el sistema de votaciones institucionales CodeVote. 
 Implementada con Node.js, TypeScript, Express 5 y MySQL bajo una arquitectura de 3 capas.
 
 ## Decisiones de Diseño

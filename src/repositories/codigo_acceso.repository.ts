@@ -28,7 +28,7 @@ export interface CodigoVigente {
  */
 export async function buscarCuentaActiva(identificador: string) {
   const [rows] = await pool.query(
-    `SELECT cedula, nombres, apellidos, correo_institucional, rol, foto_url
+    `SELECT cedula, nombres, apellidos, correo_institucional, rol, foto_url, fk_id_institucion
        FROM estudiante
       WHERE estado_academico = 'activo'
         AND (correo_institucional = ? OR cedula = ?)

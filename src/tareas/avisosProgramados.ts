@@ -133,7 +133,7 @@ async function despacharRecordatorios() {
 
       const enviados = await avisos.enviarATodos(destinatarios, {
         asunto: recordatorio.asunto,
-        texto: `${recordatorio.mensaje}${pie}\n\nCodeVote · Comisión Electoral Universitaria (UIDE)`,
+        texto: `${recordatorio.mensaje}${pie}\n\nCodeVote · Plataforma de Votaciones Institucionales`,
         html: `
           <div style="font-family:system-ui,-apple-system,'Segoe UI',sans-serif;max-width:520px;margin:0 auto;color:#201d1f">
             <h1 style="font-size:19px;color:#4b0d2b;margin:0 0 16px">${recordatorio.asunto}</h1>
@@ -144,7 +144,7 @@ async function despacharRecordatorios() {
                         text-decoration:none;font-weight:600">Ir a CodeVote</a>
             </p>
             <hr style="border:0;border-top:1px solid #e7e1dd;margin:24px 0">
-            <p style="font-size:12px;color:#8a8184">CodeVote · Comisión Electoral Universitaria (UIDE)</p>
+            <p style="font-size:12px;color:#8a8184">CodeVote · Plataforma de Votaciones Institucionales</p>
           </div>`,
       });
 

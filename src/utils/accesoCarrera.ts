@@ -12,11 +12,11 @@ import { VISIBILIDAD_TOTAL, type VisibilidadListas } from '../repositories/lista
  * imaginarios habrían pasado unos controles y no otros. Si algún día se añade
  * un rol nuevo, va en el ENUM y aquí, y todo el sistema lo reconoce igual.
  */
-export const ROLES = ['estudiante', 'admin', 'candidato'] as const;
+export const ROLES = ['estudiante', 'admin', 'candidato', 'superadmin'] as const;
 export type Rol = (typeof ROLES)[number];
 
 /** Roles con visibilidad total sobre todos los procesos y listas. */
-const ROLES_ADMINISTRACION: readonly string[] = ['admin'];
+const ROLES_ADMINISTRACION: readonly string[] = ['admin', 'superadmin'];
 
 export function esAdministracion(rol: unknown): boolean {
   return ROLES_ADMINISTRACION.includes(String(rol ?? '').toLowerCase());

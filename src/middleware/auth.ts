@@ -5,7 +5,8 @@ import { esAdministracion } from '../utils/accesoCarrera.js';
 export interface JwtPayload {
   sub:   string;
   email: string;
-  rol:   'estudiante' | 'admin' | 'candidato';
+  rol:   'estudiante' | 'admin' | 'candidato' | 'superadmin';
+  fk_id_institucion?: number;
 }
 
 declare global {
@@ -73,6 +74,14 @@ export function requireVotante(req: Request, res: Response, next: NextFunction) 
 export function requireEstudiante(req: Request, res: Response, next: NextFunction) {
   if (req.user?.rol !== 'estudiante') {
     res.status(403).json({ error: 'Estos resultados están disponibles únicamente para estudiantes.' });
+    return;
+  }
+  next();
+}
+
+export function requireSuperAdmin(req: Request, res: Response, next: NextFunction) {
+  if (req.user?.rol !== 'superadmin') {
+    res.status(403).json({ error: 'Acceso denegado. Se requiere rol superadmin.' });
     return;
   }
   next();

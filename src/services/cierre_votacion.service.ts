@@ -124,7 +124,7 @@ export function componerCorreoDeCierre(datos: {
     'Los resultados oficiales ya están disponibles:',
     URL_RESULTADOS,
     '',
-    'CodeVote · Comisión Electoral Universitaria (UIDE)',
+    'CodeVote · Plataforma de Votaciones Institucionales',
   ].join('\n');
 
   return {

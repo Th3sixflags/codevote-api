@@ -7,8 +7,7 @@ export const crearEstudianteSchema = z.object({
   apellidos:            nombrePersonaSchema,
   correo_institucional: z.string()
     .email('El correo institucional no tiene un formato válido.')
-    .max(120)
-    .refine((correo) => correo.toLowerCase().endsWith('@uide.edu.ec'), 'Usa un correo institucional @uide.edu.ec.'),
+    .max(120),
   // `promedio` sobre 100. El .finite() descarta NaN e Infinity, que en JSON
   // llegarían como null pero por FormData podrían colarse.
   promedio:             z.number().finite().min(0, 'El promedio no puede ser negativo.').max(100, 'El promedio máximo es 100.').optional(),

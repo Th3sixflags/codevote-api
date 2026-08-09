@@ -18,12 +18,11 @@ export const identificadorSchema = z
   .refine(
     (valor) => {
       if (valor.includes('@')) {
-        return z.string().email().safeParse(valor).success
-          && valor.toLowerCase().endsWith('@uide.edu.ec');
+        return z.string().email().safeParse(valor).success;
       }
       return esCedulaEcuatorianaValida(valor);
     },
-    'Escribe un correo institucional @uide.edu.ec o tu cédula de 10 dígitos.'
+    'Escribe un correo electrónico válido o tu cédula de 10 dígitos.'
   );
 
 export const solicitarCodigoSchema = z.object({

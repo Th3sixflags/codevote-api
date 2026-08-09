@@ -52,7 +52,7 @@ function hashesIguales(a: string, b: string): boolean {
 
 /**
  * Enmascara el correo para confirmarle a la persona a qué buzón fue el código
- * sin mostrarlo entero a quien mira la pantalla: ana.perez@uide.edu.ec -> a******z@uide.edu.ec
+ * sin mostrarlo entero a quien mira la pantalla: ana.perez@correo.edu → a******z@correo.edu
  */
 export function enmascararCorreo(correo: string): string {
   const [usuario, dominio] = String(correo).split('@');
@@ -75,7 +75,7 @@ export function componerCorreoDeCodigo(datos: { nombres: string; codigo: string;
     'Si no fuiste tú quien lo pidió, ignora este mensaje: sin el código nadie',
     'puede entrar a tu cuenta.',
     '',
-    'CodeVote · Comisión Electoral Universitaria (UIDE)',
+    'CodeVote · Plataforma de Votaciones Institucionales',
   ].join('\n');
 
   const html = `
@@ -93,7 +93,7 @@ export function componerCorreoDeCodigo(datos: { nombres: string; codigo: string;
         Si no fuiste tú quien lo pidió, ignora este mensaje: sin el código nadie puede entrar a tu cuenta.
       </p>
       <hr style="border:0;border-top:1px solid #e7e1dd;margin:24px 0">
-      <p style="font-size:12px;color:#8a8184">CodeVote · Comisión Electoral Universitaria (UIDE)</p>
+      <p style="font-size:12px;color:#8a8184">CodeVote · Plataforma de Votaciones Institucionales</p>
     </div>`;
 
   return { asunto: `${datos.codigo} es tu código de acceso a CodeVote`, texto, html };
@@ -204,7 +204,7 @@ export async function verificarCodigo(
   }
 
   const token = jwt.sign(
-    { sub: cuenta.cedula, email: cuenta.correo_institucional, rol: cuenta.rol },
+    { sub: cuenta.cedula, email: cuenta.correo_institucional, rol: cuenta.rol, fk_id_institucion: cuenta.fk_id_institucion ?? undefined },
     process.env.JWT_SECRET!,
     { expiresIn: (process.env.JWT_EXPIRES_IN ?? '8h') as any }
   );
