@@ -7,6 +7,32 @@ export async function listar(req: Request, res: Response) {
   res.json(instituciones);
 }
 
+export async function obtenerMiConfiguracion(req: Request, res: Response) {
+  const institucionId = req.user?.fk_id_institucion;
+  if (!institucionId) {
+    res.status(403).json({ error: 'El usuario no pertenece a ninguna institución.' });
+    return;
+  }
+  
+  const institucion = await service.obtenerPorId(institucionId);
+  
+  if (!institucion.activo) {
+    res.status(403).json({ error: 'La institución se encuentra suspendida.' });
+    return;
+  }
+
+  res.json({
+    id_institucion: institucion.id_institucion,
+    nombre: institucion.nombre,
+    slug: institucion.slug,
+    tipo: institucion.tipo,
+    logo_url: institucion.logo_url,
+    colores_json: institucion.colores_json,
+    config_json: institucion.config_json,
+    activa: Boolean(institucion.activo)
+  });
+}
+
 export async function obtenerPorId(req: Request, res: Response) {
   const id = Number(req.params.id);
   const institucion = await service.obtenerPorId(id);

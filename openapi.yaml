@@ -68,6 +68,32 @@ tags:
   - name: Sistema
 
 paths:
+  /instituciones/mi-configuracion:
+    get:
+      tags: [Instituciones]
+      summary: Obtiene la configuración de la institución del usuario autenticado
+      description: >-
+        Devuelve la información de la institución a la que pertenece el usuario (tomada del JWT).
+        Si el usuario no tiene institución asignada o está suspendida, retorna 403.
+      responses:
+        '200':
+          description: Configuración de la institución
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id_institucion: { type: integer }
+                  nombre: { type: string }
+                  slug: { type: string }
+                  tipo: { type: string }
+                  logo_url: { type: string, nullable: true }
+                  colores_json: { type: object, nullable: true }
+                  config_json: { type: object, nullable: true }
+                  activa: { type: boolean }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/SinPermiso' }
+
   /auth/codigo:
     post:
       tags: [Autenticación]

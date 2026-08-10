@@ -4,7 +4,10 @@ import * as ctrl from '../controllers/institucion.controller.js';
 
 const router = Router();
 
-// Todas las rutas de instituciones son exclusivas de superadmin
+// Ruta pública (autenticada) para que el usuario consulte su propia institución
+router.get('/mi-configuracion', requireAuth, ctrl.obtenerMiConfiguracion);
+
+// Todas las demás rutas de instituciones son exclusivas de superadmin
 router.use(requireAuth, requireSuperAdmin);
 
 router.get('/', ctrl.listar);
