@@ -9,6 +9,7 @@ router.use(requireAuth, requireSuperAdmin);
 
 router.get('/', ctrl.listar);
 router.post('/', ctrl.crear);
+router.get('/slug/:slug', ctrl.obtenerPorSlug);
 router.get('/:id', ctrl.obtenerPorId);
 router.patch('/:id', ctrl.actualizar);
 router.patch('/:id/toggle', ctrl.toggleActivo);

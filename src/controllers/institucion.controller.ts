@@ -13,6 +13,12 @@ export async function obtenerPorId(req: Request, res: Response) {
   res.json(institucion);
 }
 
+export async function obtenerPorSlug(req: Request, res: Response) {
+  const slug = req.params.slug as string;
+  const institucion = await service.obtenerPorSlug(slug);
+  res.json(institucion);
+}
+
 export async function crear(req: Request, res: Response) {
   const data = crearInstitucionSchema.parse(req.body);
   const institucion = await service.crear(data);

@@ -68,46 +68,60 @@ function condicionCarrera(filtro: FiltroCarrera): { sql: string; params: any[] }
   };
 }
 
+/**
+ * Filtro de aislamiento por institución (multi-tenant):
+ *  - undefined -> sin filtro (superadmin o cuando no aplica).
+ *  - number    -> solo procesos de esa institución.
+ */
+function condicionInstitucion(institucionId?: number): { sql: string; params: any[] } {
+  if (institucionId === undefined) return { sql: '', params: [] };
+  return { sql: ' AND p.fk_id_institucion = ?', params: [institucionId] };
+}
+
 /** Listado general: excluye los archivados (que solo se ven en el historial). */
-export async function findAll(filtro: FiltroCarrera = undefined) {
-  const { sql, params } = condicionCarrera(filtro);
+export async function findAll(filtro: FiltroCarrera = undefined, institucionId?: number) {
+  const carrera = condicionCarrera(filtro);
+  const inst = condicionInstitucion(institucionId);
   const [rows] = await pool.query(
-    `${BASE_QUERY} WHERE p.archivado_at IS NULL${sql} ORDER BY p.fecha_inicio_votacion DESC`,
-    params
+    `${BASE_QUERY} WHERE p.archivado_at IS NULL${carrera.sql}${inst.sql} ORDER BY p.fecha_inicio_votacion DESC`,
+    [...carrera.params, ...inst.params]
   );
   return (rows as any[]).map(conBloqueo);
 }
 
 /** Procesos activos o próximos (todo lo que no está finalizado, cancelado ni archivado). */
-export async function findActuales(filtro: FiltroCarrera = undefined) {
-  const { sql, params } = condicionCarrera(filtro);
+export async function findActuales(filtro: FiltroCarrera = undefined, institucionId?: number) {
+  const carrera = condicionCarrera(filtro);
+  const inst = condicionInstitucion(institucionId);
   const [rows] = await pool.query(
     `${BASE_QUERY}
-     WHERE p.estado NOT IN ('finalizado', 'cancelado') AND p.archivado_at IS NULL${sql}
+     WHERE p.estado NOT IN ('finalizado', 'cancelado') AND p.archivado_at IS NULL${carrera.sql}${inst.sql}
      ORDER BY p.fecha_inicio_votacion ASC`,
-    params
+    [...carrera.params, ...inst.params]
   );
   return (rows as any[]).map(conBloqueo);
 }
 
 /** Procesos finalizados NO archivados, del más reciente al más antiguo (historial). */
-export async function findFinalizados(filtro: FiltroCarrera = undefined) {
-  const { sql, params } = condicionCarrera(filtro);
+export async function findFinalizados(filtro: FiltroCarrera = undefined, institucionId?: number) {
+  const carrera = condicionCarrera(filtro);
+  const inst = condicionInstitucion(institucionId);
   const [rows] = await pool.query(
     `${BASE_QUERY}
-     WHERE p.estado = 'finalizado' AND p.archivado_at IS NULL${sql}
+     WHERE p.estado = 'finalizado' AND p.archivado_at IS NULL${carrera.sql}${inst.sql}
      ORDER BY p.fecha_fin_votacion DESC`,
-    params
+    [...carrera.params, ...inst.params]
   );
   return (rows as any[]).map(conBloqueo);
 }
 
 /** Procesos archivados (conservados solo para historial y auditoría). */
-export async function findArchivados(filtro: FiltroCarrera = undefined) {
-  const { sql, params } = condicionCarrera(filtro);
+export async function findArchivados(filtro: FiltroCarrera = undefined, institucionId?: number) {
+  const carrera = condicionCarrera(filtro);
+  const inst = condicionInstitucion(institucionId);
   const [rows] = await pool.query(
-    `${BASE_QUERY} WHERE p.archivado_at IS NOT NULL${sql} ORDER BY p.archivado_at DESC`,
-    params
+    `${BASE_QUERY} WHERE p.archivado_at IS NOT NULL${carrera.sql}${inst.sql} ORDER BY p.archivado_at DESC`,
+    [...carrera.params, ...inst.params]
   );
   return (rows as any[]).map(conBloqueo);
 }
@@ -154,12 +168,12 @@ export async function tieneVotacionVisible(procesoId: number, filtro: FiltroCarr
   return rows.length > 0;
 }
 
-export async function create(data: CrearProcesoDTO) {
+export async function create(data: CrearProcesoDTO & { fk_id_institucion?: number }) {
   const [result] = await pool.query(
     `INSERT INTO proceso_electoral
        (nombre_proceso, tipo_proceso, fecha_convocatoria, fecha_inicio_votacion, fecha_fin_votacion,
-        estado, descripcion, fk_id_carrera, fecha_inicio_inscripcion, fecha_fin_inscripcion, fecha_posesion, foto_url)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        estado, descripcion, fk_id_carrera, fecha_inicio_inscripcion, fecha_fin_inscripcion, fecha_posesion, foto_url, fk_id_institucion)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       data.nombre_proceso, data.tipo_proceso, data.fecha_convocatoria,
       data.fecha_inicio_votacion, data.fecha_fin_votacion,
@@ -169,6 +183,7 @@ export async function create(data: CrearProcesoDTO) {
       data.fecha_fin_inscripcion ?? null,
       data.fecha_posesion ?? null,
       data.foto_url ?? null,
+      data.fk_id_institucion ?? null,
     ]
   ) as [any, any];
   return findById(result.insertId);

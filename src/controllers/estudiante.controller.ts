@@ -3,8 +3,10 @@ import { crearEstudianteSchema, actualizarEstudianteSchema } from '../schemas/es
 import * as service from '../services/estudiante.service.js';
 import { esAdministracion } from '../utils/accesoCarrera.js';
 
-export async function listar(_req: Request, res: Response) {
-  const estudiantes = await service.listarEstudiantes();
+export async function listar(req: Request, res: Response) {
+  // Multi-tenant: cada admin solo ve los miembros de su institución.
+  const institucionId = req.user?.fk_id_institucion;
+  const estudiantes = await service.listarEstudiantes(institucionId);
   res.json(estudiantes);
 }
 

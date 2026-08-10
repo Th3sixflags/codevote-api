@@ -2,6 +2,17 @@ import { RowDataPacket, ResultSetHeader } from 'mysql2';
 import { pool } from '../config/database.js';
 import { CrearInstitucionDTO, ActualizarInstitucionDTO } from '../schemas/institucion.schema.js';
 
+/** Convierte un nombre a un slug URL-safe: minúsculas, sin acentos, espacios → guiones. */
+function slugificar(nombre: string): string {
+  return nombre
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')  // quitar acentos
+    .replace(/[^a-z0-9\s-]/g, '')                       // solo alfanuméricos
+    .trim()
+    .replace(/\s+/g, '-')                                // espacios → guiones
+    .replace(/-+/g, '-');                                // múltiples guiones → uno
+}
+
 export async function findAll() {
   const [rows] = await pool.query<RowDataPacket[]>('SELECT * FROM institucion ORDER BY nombre');
   return rows;
@@ -12,15 +23,22 @@ export async function findById(id: number) {
   return rows[0] ?? null;
 }
 
+export async function findBySlug(slug: string) {
+  const [rows] = await pool.query<RowDataPacket[]>('SELECT * FROM institucion WHERE slug = ?', [slug]);
+  return rows[0] ?? null;
+}
+
 export async function create(data: CrearInstitucionDTO) {
+  const slug = data.slug || slugificar(data.nombre);
   const query = `
     INSERT INTO institucion (
-      nombre, tipo, logo_url, descripcion, email_contacto,
-      telefono, direccion, sitio_web, dominio_email, config
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      nombre, slug, tipo, logo_url, descripcion, email_contacto,
+      telefono, direccion, sitio_web, dominio_email, colores_json, config_json
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
   const values = [
     data.nombre,
+    slug,
     data.tipo ?? 'universidad',
     data.logo_url ?? null,
     data.descripcion ?? null,
@@ -29,7 +47,8 @@ export async function create(data: CrearInstitucionDTO) {
     data.direccion ?? null,
     data.sitio_web ?? null,
     data.dominio_email ?? null,
-    data.config ? JSON.stringify(data.config) : null,
+    data.colores_json ? JSON.stringify(data.colores_json) : null,
+    data.config_json ? JSON.stringify(data.config_json) : null,
   ];
   const [result] = await pool.query<ResultSetHeader>(query, values);
   return result.insertId;
@@ -40,6 +59,7 @@ export async function update(id: number, data: ActualizarInstitucionDTO) {
   const values: any[] = [];
 
   if (data.nombre !== undefined) { updates.push('nombre = ?'); values.push(data.nombre); }
+  if (data.slug !== undefined) { updates.push('slug = ?'); values.push(data.slug); }
   if (data.tipo !== undefined) { updates.push('tipo = ?'); values.push(data.tipo); }
   if (data.logo_url !== undefined) { updates.push('logo_url = ?'); values.push(data.logo_url); }
   if (data.descripcion !== undefined) { updates.push('descripcion = ?'); values.push(data.descripcion); }
@@ -48,7 +68,8 @@ export async function update(id: number, data: ActualizarInstitucionDTO) {
   if (data.direccion !== undefined) { updates.push('direccion = ?'); values.push(data.direccion); }
   if (data.sitio_web !== undefined) { updates.push('sitio_web = ?'); values.push(data.sitio_web); }
   if (data.dominio_email !== undefined) { updates.push('dominio_email = ?'); values.push(data.dominio_email); }
-  if (data.config !== undefined) { updates.push('config = ?'); values.push(data.config ? JSON.stringify(data.config) : null); }
+  if (data.colores_json !== undefined) { updates.push('colores_json = ?'); values.push(data.colores_json ? JSON.stringify(data.colores_json) : null); }
+  if (data.config_json !== undefined) { updates.push('config_json = ?'); values.push(data.config_json ? JSON.stringify(data.config_json) : null); }
 
   if (updates.length === 0) return 0;
 

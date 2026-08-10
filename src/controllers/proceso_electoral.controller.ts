@@ -7,8 +7,11 @@ export async function listar(req: Request, res: Response) {
   // Filtro opcional: ?estado=actuales | finalizados | archivados.
   // Además se filtra por carrera: el estudiante solo ve los procesos globales y
   // los de su propia carrera; la administración ve todos.
+  // Multi-tenant: cada usuario solo ve los procesos de su institución;
+  // el superadmin (sin fk_id_institucion) ve todos.
   const estado = typeof req.query.estado === 'string' ? req.query.estado : undefined;
-  const procesos = await service.listarProcesos(estado, await filtroCarreraDe(req));
+  const institucionId = req.user?.fk_id_institucion;
+  const procesos = await service.listarProcesos(estado, await filtroCarreraDe(req), institucionId);
   res.json(procesos);
 }
 
@@ -25,7 +28,7 @@ export async function obtener(req: Request, res: Response) {
 
 export async function crear(req: Request, res: Response) {
   const data  = crearProcesoSchema.parse(req.body);
-  const nuevo = await service.crearProceso(data);
+  const nuevo = await service.crearProceso(data, req.user?.fk_id_institucion);
   res.status(201).json(nuevo);
 }
 

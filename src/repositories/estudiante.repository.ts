@@ -44,8 +44,10 @@ function conAsignacion(row: any) {
   };
 }
 
-export async function findAll() {
-  const [rows] = await pool.query(BASE_QUERY + ' ORDER BY e.apellidos, e.nombres');
+export async function findAll(institucionId?: number) {
+  const filtro = institucionId !== undefined ? ' WHERE e.fk_id_institucion = ?' : '';
+  const params = institucionId !== undefined ? [institucionId] : [];
+  const [rows] = await pool.query(BASE_QUERY + filtro + ' ORDER BY e.apellidos, e.nombres', params);
   return (rows as any[]).map(conAsignacion);
 }
 

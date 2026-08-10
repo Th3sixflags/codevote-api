@@ -1,8 +1,8 @@
 import * as repo from '../repositories/estudiante.repository.js';
 import { CrearEstudianteDTO, ActualizarEstudianteDTO } from '../schemas/estudiante.schema.js';
 
-export async function listarEstudiantes() {
-  return repo.findAll();
+export async function listarEstudiantes(institucionId?: number) {
+  return repo.findAll(institucionId);
 }
 
 export async function obtenerEstudiante(cedula: string) {

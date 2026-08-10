@@ -86,3 +86,26 @@ export function requireSuperAdmin(req: Request, res: Response, next: NextFunctio
   }
   next();
 }
+
+/**
+ * Garantiza que un admin solo acceda a recursos de su propia institución.
+ * Superadmin pasa siempre. Compara req.user.fk_id_institucion con el
+ * parámetro de la URL o del cuerpo de la petición.
+ *
+ * Se usa DESPUÉS de requireAuth + requireAdmin.
+ */
+export function requireInstitutionAccess(req: Request, res: Response, next: NextFunction) {
+  // Superadmin accede a todo
+  if (req.user?.rol === 'superadmin') {
+    next();
+    return;
+  }
+
+  // Para admin/estudiante/candidato: debe tener institución asignada
+  if (!req.user?.fk_id_institucion) {
+    res.status(403).json({ error: 'Tu cuenta no tiene una institución asignada.' });
+    return;
+  }
+
+  next();
+}

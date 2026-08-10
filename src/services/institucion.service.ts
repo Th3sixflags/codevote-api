@@ -12,6 +12,12 @@ export async function obtenerPorId(id: number) {
   return inst;
 }
 
+export async function obtenerPorSlug(slug: string) {
+  const inst = await repo.findBySlug(slug);
+  if (!inst) throw new HttpError(404, 'Institución no encontrada.');
+  return inst;
+}
+
 export async function crear(data: CrearInstitucionDTO) {
   const id = await repo.create(data);
   return await obtenerPorId(id);

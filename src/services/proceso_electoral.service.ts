@@ -14,14 +14,14 @@ const ARCHIVABLES = ['finalizado', 'cancelado'];
  * Lista los procesos visibles para quien consulta: la administración ve todos y
  * el estudiante solo los globales y los de su propia carrera (ver FiltroCarrera).
  */
-export async function listarProcesos(estado?: string, filtro: FiltroCarrera = undefined) {
+export async function listarProcesos(estado?: string, filtro: FiltroCarrera = undefined, institucionId?: number) {
   // Se admiten singular y plural: ?estado=archivado y ?estado=archivados.
   const clave = String(estado ?? '').toLowerCase().replace(/s$/, '');
-  if (clave === 'actuale') return repo.findActuales(filtro);
-  if (clave === 'finalizado') return repo.findFinalizados(filtro);
-  if (clave === 'archivado') return repo.findArchivados(filtro);
+  if (clave === 'actuale') return repo.findActuales(filtro, institucionId);
+  if (clave === 'finalizado') return repo.findFinalizados(filtro, institucionId);
+  if (clave === 'archivado') return repo.findArchivados(filtro, institucionId);
   // Sin filtro: solo los NO archivados. El historial se pide expresamente.
-  return repo.findAll(filtro);
+  return repo.findAll(filtro, institucionId);
 }
 
 /**
@@ -35,8 +35,8 @@ export async function obtenerProceso(id: number, filtro: FiltroCarrera = undefin
   return proceso;
 }
 
-export async function crearProceso(data: CrearProcesoDTO) {
-  return repo.create(data);
+export async function crearProceso(data: CrearProcesoDTO, institucionId?: number) {
+  return repo.create({ ...data, fk_id_institucion: institucionId });
 }
 
 export async function actualizarProceso(id: number, data: ActualizarProcesoDTO) {
