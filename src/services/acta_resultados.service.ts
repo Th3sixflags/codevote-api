@@ -14,7 +14,7 @@ export async function listarPorVotacion(id: number, institucionId?: number) {
   return repo.findByVotacion(id, institucionId);
 }
 
-export async function crearActaResultados(data: CrearActaResultadosDTO) {
+export async function crearActaResultados(data: CrearActaResultadosDTO, institucionId?: number) {
   return repo.create(data);
 }
 

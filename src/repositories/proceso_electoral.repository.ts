@@ -138,8 +138,12 @@ export async function archivar(id: number) {
   return findById(id);
 }
 
-export async function findById(id: number) {
-  const [rows] = await pool.query(`${BASE_QUERY} WHERE p.id_proceso = ?`, [id]) as [any[], any];
+export async function findById(id: number, institucionId?: number) {
+  const condicion = institucionId !== undefined
+    ? `${BASE_QUERY} WHERE p.id_proceso = ? AND p.fk_id_institucion = ?`
+    : `${BASE_QUERY} WHERE p.id_proceso = ?`;
+  const params = institucionId !== undefined ? [id, institucionId] : [id];
+  const [rows] = await pool.query(condicion, params) as [any[], any];
   return conBloqueo(rows[0] ?? null);
 }
 

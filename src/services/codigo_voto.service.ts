@@ -64,7 +64,7 @@ export async function verificarMiComprobante(id: number, cedula: string) {
 
 // Crear y actualizar también responden con el comprobante, así que pasan por la
 // misma lista blanca: la cédula viaja en el body de entrada, pero no vuelve.
-export async function crearCodigoVoto(data: CrearCodigoVotoDTO) {
+export async function crearCodigoVoto(data: CrearCodigoVotoDTO, institucionId?: number) {
   const nuevo = await repo.create(data);
   return nuevo ? aComprobanteAnonimo(nuevo) : null;
 }

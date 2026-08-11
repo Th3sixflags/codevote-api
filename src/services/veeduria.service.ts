@@ -14,7 +14,7 @@ export async function listarPorVotacion(id: number, institucionId?: number) {
   return repo.findByVotacion(id, institucionId);
 }
 
-export async function crearVeeduria(data: CrearVeeduriaDTO) {
+export async function crearVeeduria(data: CrearVeeduriaDTO, institucionId?: number) {
   return repo.create(data);
 }
 

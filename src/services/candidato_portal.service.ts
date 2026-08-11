@@ -331,7 +331,7 @@ export async function buscarIntegrantes(cedula: string, texto: string, instituci
   // Filtrar los que no cumplen los demás requisitos en memoria (promedio, membresia, etc.)
   const filtrados = encontrados.filter(estudiante => {
     try {
-      validarRequisitosCandidato(estudiante, config, carreraCompatible, null);
+      validarRequisitosCandidato(estudiante, config, carreraCompatible, undefined);
       return true;
     } catch {
       return false;
