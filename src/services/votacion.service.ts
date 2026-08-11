@@ -1,4 +1,5 @@
 import * as repo from '../repositories/votacion.repository.js';
+import * as repoProceso from '../repositories/proceso_electoral.repository.js';
 import type { FiltroCarrera } from '../repositories/votacion.repository.js';
 import { HttpError } from '../utils/httpError.js';
 import { procesoVisible } from '../utils/accesoCarrera.js';
@@ -7,24 +8,29 @@ import { cerrarPapeleta } from './cierre_votacion.service.js';
 import * as avisos from './avisos_electorales.service.js';
 import { CrearVotacionDTO, ActualizarVotacionDTO } from '../schemas/votacion.schema.js';
 
-export async function listarVotaciones() {
-  return repo.findAll();
+export async function listarVotaciones(institucionId?: number) {
+  return repo.findAll(institucionId);
 }
 
 /** Devuelve la votación solo si su papeleta corresponde a quien consulta. */
-export async function obtenerVotacion(id: number, filtro: FiltroCarrera = undefined) {
-  const votacion = await repo.findById(id);
+export async function obtenerVotacion(id: number, filtro: FiltroCarrera = undefined, institucionId?: number) {
+  const votacion = await repo.findById(id, institucionId);
   if (!votacion) return null;
   if (!procesoVisible(votacion.fk_id_carrera, filtro)) return null;
   return votacion;
 }
 
 /** Papeletas del proceso visibles para quien consulta (ver FiltroCarrera). */
-export async function listarPorProceso(procesoId: number, filtro: FiltroCarrera = undefined) {
-  return repo.findByProceso(procesoId, filtro);
+export async function listarPorProceso(procesoId: number, filtro: FiltroCarrera = undefined, institucionId?: number) {
+  return repo.findByProceso(procesoId, filtro, institucionId);
 }
 
-export async function crearVotacion(data: CrearVotacionDTO) {
+export async function crearVotacion(data: CrearVotacionDTO, institucionId?: number) {
+  if (institucionId !== undefined) {
+    const proceso = await repoProceso.findById(data.fk_id_proceso, institucionId);
+    if (!proceso) throw new HttpError(403, 'No tienes permiso para agregar papeletas a este proceso electoral.');
+  }
+
   // No puede haber dos papeletas de la misma carrera en un mismo proceso.
   if (data.fk_id_carrera != null) {
     if (await repo.existeCarreraEnProceso(data.fk_id_proceso, data.fk_id_carrera)) {
@@ -47,9 +53,14 @@ export async function crearVotacion(data: CrearVotacionDTO) {
   return votacion;
 }
 
-export async function actualizarVotacion(id: number, data: ActualizarVotacionDTO) {
-  const existente = await repo.findById(id);
+export async function actualizarVotacion(id: number, data: ActualizarVotacionDTO, institucionId?: number) {
+  const existente = await repo.findById(id, institucionId);
   if (!existente) return null;
+  
+  if (data.fk_id_proceso && data.fk_id_proceso !== existente.fk_id_proceso && institucionId !== undefined) {
+    const procesoNuevo = await repoProceso.findById(data.fk_id_proceso, institucionId);
+    if (!procesoNuevo) throw new HttpError(403, 'El proceso destino pertenece a otra institución.');
+  }
 
   // Al cambiar la carrera (o el proceso) se vuelve a comprobar la unicidad.
   const carreraFinal = data.fk_id_carrera !== undefined ? data.fk_id_carrera : existente.fk_id_carrera;
@@ -109,8 +120,8 @@ export async function actualizarVotacion(id: number, data: ActualizarVotacionDTO
  * comprobantes, actas o veedurías se rechaza con 409 y el motivo: esa evidencia
  * debe conservarse (el proceso puede cancelarse o archivarse en su lugar).
  */
-export async function eliminarVotacion(id: number) {
-  const existente = await repo.findById(id);
+export async function eliminarVotacion(id: number, institucionId?: number) {
+  const existente = await repo.findById(id, institucionId);
   if (!existente) return false;
 
   if (!existente.puede_eliminar) {

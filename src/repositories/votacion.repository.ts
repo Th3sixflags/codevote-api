@@ -20,6 +20,11 @@ function condicionCarrera(filtro: FiltroCarrera): { sql: string; params: any[] }
   return { sql: ' AND (v.fk_id_carrera IS NULL OR v.fk_id_carrera = ?)', params: [filtro] };
 }
 
+function condicionInstitucion(institucionId?: number): { sql: string; params: any[] } {
+  if (institucionId === undefined) return { sql: '', params: [] };
+  return { sql: ' AND p.fk_id_institucion = ?', params: [institucionId] };
+}
+
 // Se traen el estado del proceso, su fin de votación y la marca de archivado
 // porque son lo que decide el estado EFECTIVO de la papeleta (ver
 // utils/estadoVotacion.ts): sin ellos habría que consultarlos aparte en cada
@@ -67,16 +72,24 @@ function conBloqueo(row: any, ahora = ahoraEnEcuador()) {
   };
 }
 
-export async function findAll() {
-  const [rows] = await pool.query(BASE_QUERY + ' ORDER BY v.fecha_apertura DESC');
+export async function findAll(institucionId?: number) {
+  const inst = condicionInstitucion(institucionId);
+  const [rows] = await pool.query(
+    `${BASE_QUERY}${inst.sql ? ` WHERE 1=1 ${inst.sql}` : ''} ORDER BY v.fecha_apertura DESC`,
+    inst.params
+  );
   // Un solo corte para todo el listado: si se calculara por fila, dos papeletas
   // que vencen en el mismo instante podrían salir con estados distintos.
   const ahora = ahoraEnEcuador();
   return (rows as any[]).map((fila) => conBloqueo(fila, ahora));
 }
 
-export async function findById(id: number) {
-  const [rows] = await pool.query(BASE_QUERY + ' WHERE v.id_votacion = ?', [id]) as [any[], any];
+export async function findById(id: number, institucionId?: number) {
+  const inst = condicionInstitucion(institucionId);
+  const [rows] = await pool.query(
+    `${BASE_QUERY} WHERE v.id_votacion = ?${inst.sql}`,
+    [id, ...inst.params]
+  ) as [any[], any];
   return conBloqueo(rows[0] ?? null);
 }
 
@@ -86,11 +99,12 @@ export async function findById(id: number) {
  *  - null      -> solo las papeletas globales.
  *  - number    -> las globales + la de esa carrera.
  */
-export async function findByProceso(procesoId: number, filtro: FiltroCarrera = undefined) {
+export async function findByProceso(procesoId: number, filtro: FiltroCarrera = undefined, institucionId?: number) {
   const { sql, params } = condicionCarrera(filtro);
+  const inst = condicionInstitucion(institucionId);
   const [rows] = await pool.query(
-    `${BASE_QUERY} WHERE v.fk_id_proceso = ?${sql} ORDER BY v.fecha_apertura`,
-    [procesoId, ...params]
+    `${BASE_QUERY} WHERE v.fk_id_proceso = ?${sql}${inst.sql} ORDER BY v.fecha_apertura`,
+    [procesoId, ...params, ...inst.params]
   );
   const ahora = ahoraEnEcuador();
   return (rows as any[]).map((fila) => conBloqueo(fila, ahora));

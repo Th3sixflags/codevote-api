@@ -2,13 +2,13 @@ import { Request, Response } from 'express';
 import { crearVeeduriaSchema, actualizarVeeduriaSchema } from '../schemas/veeduria.schema.js';
 import * as service from '../services/veeduria.service.js';
 
-export async function listar(_req: Request, res: Response) {
-  const registros = await service.listarVeeduria();
+export async function listar(req: Request, res: Response) {
+  const registros = await service.listarVeeduria(req.user?.fk_id_institucion);
   res.json(registros);
 }
 
 export async function obtener(req: Request, res: Response) {
-  const registro = await service.obtenerVeeduria(Number(req.params.id));
+  const registro = await service.obtenerVeeduria(Number(req.params.id), req.user?.fk_id_institucion);
   if (!registro) {
     res.status(404).json({ error: 'Veeduría no encontrada.' });
     return;
@@ -17,19 +17,19 @@ export async function obtener(req: Request, res: Response) {
 }
 
 export async function listarPorVotacion(req: Request, res: Response) {
-  const registros = await service.listarPorVotacion(Number(req.params.votacionId));
+  const registros = await service.listarPorVotacion(Number(req.params.votacionId), req.user?.fk_id_institucion);
   res.json(registros);
 }
 
 export async function crear(req: Request, res: Response) {
   const data  = crearVeeduriaSchema.parse(req.body);
-  const nuevo = await service.crearVeeduria(data);
+  const nuevo = await service.crearVeeduria(data, req.user?.fk_id_institucion);
   res.status(201).json(nuevo);
 }
 
 export async function actualizar(req: Request, res: Response) {
   const data        = actualizarVeeduriaSchema.parse(req.body);
-  const actualizado = await service.actualizarVeeduria(Number(req.params.id), data);
+  const actualizado = await service.actualizarVeeduria(Number(req.params.id), data, req.user?.fk_id_institucion);
   if (!actualizado) {
     res.status(404).json({ error: 'Veeduría no encontrada.' });
     return;
@@ -38,7 +38,7 @@ export async function actualizar(req: Request, res: Response) {
 }
 
 export async function eliminar(req: Request, res: Response) {
-  const eliminado = await service.eliminarVeeduria(Number(req.params.id));
+  const eliminado = await service.eliminarVeeduria(Number(req.params.id), req.user?.fk_id_institucion);
   if (!eliminado) {
     res.status(404).json({ error: 'Veeduría no encontrada.' });
     return;

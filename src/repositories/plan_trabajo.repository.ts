@@ -7,20 +7,30 @@ const BASE_QUERY = `
     p.fk_id_lista, l.nombre_lista
   FROM plan_trabajo p
   JOIN lista_candidata l ON l.id_lista = p.fk_id_lista
+  JOIN proceso_electoral pr ON pr.id_proceso = l.fk_id_proceso
 `;
 
-export async function findAll() {
-  const [rows] = await pool.query(BASE_QUERY + ' ORDER BY p.id_plan');
+function condicionInstitucion(institucionId?: number): { sql: string; params: any[] } {
+  if (institucionId === undefined) return { sql: '', params: [] };
+  return { sql: ' AND pr.fk_id_institucion = ?', params: [institucionId] };
+}
+
+export async function findAll(institucionId?: number) {
+  const inst = condicionInstitucion(institucionId);
+  const where = inst.sql ? ` WHERE 1=1${inst.sql}` : '';
+  const [rows] = await pool.query(`${BASE_QUERY}${where} ORDER BY p.id_plan`, inst.params);
   return rows as any[];
 }
 
-export async function findById(id: number) {
-  const [rows] = await pool.query(BASE_QUERY + ' WHERE p.id_plan = ?', [id]) as [any[], any];
+export async function findById(id: number, institucionId?: number) {
+  const inst = condicionInstitucion(institucionId);
+  const [rows] = await pool.query(`${BASE_QUERY} WHERE p.id_plan = ?${inst.sql}`, [id, ...inst.params]) as [any[], any];
   return rows[0] ?? null;
 }
 
-export async function findByLista(id: number) {
-  const [rows] = await pool.query(BASE_QUERY + ' WHERE p.fk_id_lista = ?', [id]);
+export async function findByLista(id: number, institucionId?: number) {
+  const inst = condicionInstitucion(institucionId);
+  const [rows] = await pool.query(`${BASE_QUERY} WHERE p.fk_id_lista = ?${inst.sql}`, [id, ...inst.params]);
   return rows as any[];
 }
 
@@ -30,7 +40,7 @@ export async function create(data: CrearPlanTrabajoDTO) {
      VALUES (?, ?, ?, ?)`,
     [data.area, data.propuesta, data.archivo_url ?? null, data.fk_id_lista]
   ) as [any, any];
-  return findById(result.insertId);
+  return findById(result.insertId); // Se asume que el contexto validó la lista antes.
 }
 
 export async function update(id: number, data: ActualizarPlanTrabajoDTO) {
@@ -49,7 +59,15 @@ export async function remove(id: number) {
 }
 
 /** Plan con datos de su lista y proceso (para verificar dueño y estados). */
-export async function findByIdConLista(id: number) {
+export async function findByIdConLista(id: number, institucionId?: number) {
+  let where = ' WHERE pl.id_plan = ?';
+  const params: any[] = [id];
+  
+  if (institucionId !== undefined) {
+    where += ' AND p.fk_id_institucion = ?';
+    params.push(institucionId);
+  }
+
   const [rows] = await pool.query(
     `SELECT pl.id_plan, pl.fk_id_lista,
             l.fk_cedula_responsable, l.estado_revision, l.fk_id_proceso,
@@ -57,8 +75,8 @@ export async function findByIdConLista(id: number) {
      FROM plan_trabajo pl
      JOIN lista_candidata l ON l.id_lista = pl.fk_id_lista
      JOIN proceso_electoral p ON p.id_proceso = l.fk_id_proceso
-     WHERE pl.id_plan = ?`,
-    [id]
+     ${where}`,
+    params
   ) as [any[], any];
   return rows[0] ?? null;
 }

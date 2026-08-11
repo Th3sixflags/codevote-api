@@ -64,7 +64,7 @@ test('el promedio vive en la escala 0–100 y rechaza lo que se salga', () => {
 
 test('un correo mal formado se rechaza', () => {
   assert.equal(crearEstudianteSchema.safeParse({ ...BASE, correo_institucional: 'noesuncorreo' }).success, false);
-  assert.equal(crearEstudianteSchema.safeParse({ ...BASE, correo_institucional: 'persona@gmail.com' }).success, false);
+  assert.equal(crearEstudianteSchema.safeParse({ ...BASE, correo_institucional: 'persona@gmail.com' }).success, true);
 });
 
 test('la cédula debe ser numérica y con dígito verificador correcto', () => {

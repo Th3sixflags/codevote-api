@@ -220,10 +220,15 @@ test('una cuenta inexistente responde exactamente igual: no revela el padrón', 
 });
 
 test('un identificador que no es correo ni cédula se rechaza: 422', async () => {
-  for (const valor of ['hola', '123', 'no-es-un-correo@', 'persona@gmail.com', '9999999999']) {
+  for (const valor of ['hola', '123', 'no-es-un-correo@', '9999999999']) {
     const { http } = await pedirCodigo(valor);
     assert.equal(http, 422, `"${valor}" pasó la validación`);
   }
+});
+
+test('un identificador que no es correo institucional se acepta ahora por la flexibilización', async () => {
+  const res = await pedirCodigo('persona@gmail.com');
+  assert.equal(res.http, 200, '"persona@gmail.com" pasó la validación');
 });
 
 test('no se puede pedir otro código antes de la espera mínima', async () => {

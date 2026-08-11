@@ -5,9 +5,11 @@ const COLUMNAS = 'id_notificacion, fk_cedula_estudiante, tipo, titulo, mensaje, 
 /** Notificaciones de un estudiante, de la más reciente a la más antigua. */
 export async function findByEstudiante(cedula: string) {
   const [rows] = await pool.query(
-    `SELECT ${COLUMNAS} FROM notificacion
-     WHERE fk_cedula_estudiante = ?
-     ORDER BY fecha_creacion DESC, id_notificacion DESC`,
+    `SELECT n.id_notificacion, n.fk_cedula_estudiante, n.tipo, n.titulo, n.mensaje, n.leida, n.fecha_creacion
+     FROM notificacion n
+     JOIN estudiante e ON e.cedula = n.fk_cedula_estudiante
+     WHERE n.fk_cedula_estudiante = ?
+     ORDER BY n.fecha_creacion DESC, n.id_notificacion DESC`,
     [cedula]
   );
   return rows as any[];
@@ -16,7 +18,10 @@ export async function findByEstudiante(cedula: string) {
 /** Una notificación, solo si pertenece al estudiante indicado. */
 export async function findByIdYEstudiante(id: number, cedula: string) {
   const [rows] = await pool.query(
-    `SELECT ${COLUMNAS} FROM notificacion WHERE id_notificacion = ? AND fk_cedula_estudiante = ?`,
+    `SELECT n.id_notificacion, n.fk_cedula_estudiante, n.tipo, n.titulo, n.mensaje, n.leida, n.fecha_creacion
+     FROM notificacion n
+     JOIN estudiante e ON e.cedula = n.fk_cedula_estudiante
+     WHERE n.id_notificacion = ? AND n.fk_cedula_estudiante = ?`,
     [id, cedula]
   ) as [any[], any];
   return rows[0] ?? null;

@@ -22,23 +22,23 @@ function aComprobanteAnonimo(registro: any) {
   };
 }
 
-export async function listarCodigoVoto() {
-  const registros = await repo.findAll();
+export async function listarCodigoVoto(institucionId?: number) {
+  const registros = await repo.findAll(institucionId);
   return registros.map(aComprobanteAnonimo);
 }
 
-export async function obtenerCodigoVoto(id: number) {
-  const registro = await repo.findById(id);
+export async function obtenerCodigoVoto(id: number, institucionId?: number) {
+  const registro = await repo.findById(id, institucionId);
   return registro ? aComprobanteAnonimo(registro) : null;
 }
 
-export async function listarPorVotacion(id: number) {
-  const registros = await repo.findByVotacion(id);
+export async function listarPorVotacion(id: number, institucionId?: number) {
+  const registros = await repo.findByVotacion(id, institucionId);
   return registros.map(aComprobanteAnonimo);
 }
 
-export async function listarPorEstudiante(cedula: string) {
-  return repo.findByEstudiante(cedula);
+export async function listarPorEstudiante(cedula: string, institucionId?: number) {
+  return repo.findByEstudiante(cedula, institucionId);
 }
 
 /**
@@ -69,15 +69,15 @@ export async function crearCodigoVoto(data: CrearCodigoVotoDTO) {
   return nuevo ? aComprobanteAnonimo(nuevo) : null;
 }
 
-export async function actualizarCodigoVoto(id: number, data: ActualizarCodigoVotoDTO) {
-  const existente = await repo.findById(id);
+export async function actualizarCodigoVoto(id: number, data: ActualizarCodigoVotoDTO, institucionId?: number) {
+  const existente = await repo.findById(id, institucionId);
   if (!existente) return null;
   const actualizado = await repo.update(id, data);
   return actualizado ? aComprobanteAnonimo(actualizado) : null;
 }
 
-export async function eliminarCodigoVoto(id: number) {
-  const existente = await repo.findById(id);
+export async function eliminarCodigoVoto(id: number, institucionId?: number) {
+  const existente = await repo.findById(id, institucionId);
   if (!existente) return false;
   await repo.remove(id);
   return true;

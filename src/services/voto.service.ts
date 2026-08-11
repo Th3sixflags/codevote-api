@@ -10,13 +10,13 @@ export async function yaVoto(votacionId: number, cedula: string) {
   return repo.yaVotoEstudiante(votacionId, cedula);
 }
 
-export async function registrarVoto(data: CrearVotoDTO, cedula: string, filtro: FiltroCarrera = undefined) {
+export async function registrarVoto(data: CrearVotoDTO, cedula: string, filtro: FiltroCarrera = undefined, institucionId?: number) {
   // Integridad electoral: solo se acepta el voto si la votación está ABIERTA y
   // su proceso está activo. Sin esto, una llamada directa a la API permitiría
   // votar en votaciones cerradas o pendientes (el frontend ya lo bloquea, pero
   // el backend debe hacerlo por su cuenta).
-  const estado = await repo.estadoDeVotacion(data.fk_id_votacion);
-  if (!estado) throw new HttpError(404, 'La votación indicada no existe.');
+  const estado = await repo.estadoDeVotacion(data.fk_id_votacion, institucionId);
+  if (!estado) throw new HttpError(404, 'La votación indicada no existe o pertenece a otra institución.');
 
   // La FECHA se comprueba aquí directamente, no se confía en `votacion.estado`.
   //
@@ -100,9 +100,9 @@ interface OpcionResultado {
  * una persona con su voto: los votos se cuentan de `voto` (que es anónima) y
  * la participación de `codigo_voto` (que prueba que alguien votó, pero no qué).
  */
-export async function obtenerResultados(votacionId: number) {
-  const estado = await repo.estadoDeVotacion(votacionId);
-  if (!estado) throw new HttpError(404, 'La votación indicada no existe.');
+export async function obtenerResultados(votacionId: number, institucionId?: number) {
+  const estado = await repo.estadoDeVotacion(votacionId, institucionId);
+  if (!estado) throw new HttpError(404, 'La votación indicada no existe o pertenece a otra institución.');
 
   const carreraVotacion = estado.carrera_votacion == null ? null : Number(estado.carrera_votacion);
 
@@ -171,9 +171,9 @@ export async function obtenerResultados(votacionId: number) {
   };
 }
 
-export async function obtenerResultadosEstudiante(votacionId: number, filtro: FiltroCarrera = undefined) {
-  const estado = await repo.estadoDeVotacion(votacionId);
-  if (!estado) throw new HttpError(404, 'La votación indicada no existe.');
+export async function obtenerResultadosEstudiante(votacionId: number, filtro: FiltroCarrera = undefined, institucionId?: number) {
+  const estado = await repo.estadoDeVotacion(votacionId, institucionId);
+  if (!estado) throw new HttpError(404, 'La votación indicada no existe o pertenece a otra institución.');
   if (!procesoVisible(estado.carrera_votacion, filtro)) {
     throw new HttpError(404, 'La votación indicada no existe.');
   }
@@ -188,5 +188,5 @@ export async function obtenerResultadosEstudiante(votacionId: number, filtro: Fi
   if (disponibilidad.estado_efectivo !== 'cerrada') {
     throw new HttpError(409, 'Los resultados estarán disponibles cuando termine la votación.');
   }
-  return obtenerResultados(votacionId);
+  return obtenerResultados(votacionId, institucionId);
 }

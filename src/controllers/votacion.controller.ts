@@ -3,14 +3,14 @@ import { crearVotacionSchema, actualizarVotacionSchema } from '../schemas/votaci
 import * as service from '../services/votacion.service.js';
 import { filtroCarreraDe } from '../utils/accesoCarrera.js';
 
-export async function listar(_req: Request, res: Response) {
-  const votaciones = await service.listarVotaciones();
+export async function listar(req: Request, res: Response) {
+  const votaciones = await service.listarVotaciones(req.user?.fk_id_institucion);
   res.json(votaciones);
 }
 
 export async function obtener(req: Request, res: Response) {
   // Una papeleta de otra carrera se responde como no encontrada.
-  const votacion = await service.obtenerVotacion(Number(req.params.id), await filtroCarreraDe(req));
+  const votacion = await service.obtenerVotacion(Number(req.params.id), await filtroCarreraDe(req), req.user?.fk_id_institucion);
   if (!votacion) {
     res.status(404).json({ error: 'Votación no encontrada.' });
     return;
@@ -20,19 +20,19 @@ export async function obtener(req: Request, res: Response) {
 
 export async function listarPorProceso(req: Request, res: Response) {
   // El estudiante recibe solo las papeletas globales y la de su carrera.
-  const votaciones = await service.listarPorProceso(Number(req.params.procesoId), await filtroCarreraDe(req));
+  const votaciones = await service.listarPorProceso(Number(req.params.procesoId), await filtroCarreraDe(req), req.user?.fk_id_institucion);
   res.json(votaciones);
 }
 
 export async function crear(req: Request, res: Response) {
   const data  = crearVotacionSchema.parse(req.body);
-  const nueva = await service.crearVotacion(data);
+  const nueva = await service.crearVotacion(data, req.user?.fk_id_institucion);
   res.status(201).json(nueva);
 }
 
 export async function actualizar(req: Request, res: Response) {
   const data        = actualizarVotacionSchema.parse(req.body);
-  const actualizada = await service.actualizarVotacion(Number(req.params.id), data);
+  const actualizada = await service.actualizarVotacion(Number(req.params.id), data, req.user?.fk_id_institucion);
   if (!actualizada) {
     res.status(404).json({ error: 'Votación no encontrada.' });
     return;
@@ -41,7 +41,7 @@ export async function actualizar(req: Request, res: Response) {
 }
 
 export async function eliminar(req: Request, res: Response) {
-  const eliminada = await service.eliminarVotacion(Number(req.params.id));
+  const eliminada = await service.eliminarVotacion(Number(req.params.id), req.user?.fk_id_institucion);
   if (!eliminada) {
     res.status(404).json({ error: 'Votación no encontrada.' });
     return;

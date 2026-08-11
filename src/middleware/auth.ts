@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { esAdministracion } from '../utils/accesoCarrera.js';
+import { pool } from '../config/database.js';
 
 export interface JwtPayload {
   sub:   string;
@@ -94,7 +95,7 @@ export function requireSuperAdmin(req: Request, res: Response, next: NextFunctio
  *
  * Se usa DESPUÉS de requireAuth + requireAdmin.
  */
-export function requireInstitutionAccess(req: Request, res: Response, next: NextFunction) {
+export async function requireInstitutionAccess(req: Request, res: Response, next: NextFunction) {
   // Superadmin accede a todo
   if (req.user?.rol === 'superadmin') {
     next();
@@ -107,5 +108,18 @@ export function requireInstitutionAccess(req: Request, res: Response, next: Next
     return;
   }
 
-  next();
+  try {
+    const [rows] = await pool.query('SELECT activo FROM institucion WHERE id_institucion = ?', [req.user.fk_id_institucion]) as [any[], any];
+    if (rows.length === 0) {
+      res.status(403).json({ error: 'Institución no encontrada.' });
+      return;
+    }
+    if (!rows[0].activo) {
+      res.status(403).json({ error: 'La institución se encuentra suspendida. No puedes operar en sus módulos.' });
+      return;
+    }
+    next();
+  } catch (err) {
+    next(err);
+  }
 }

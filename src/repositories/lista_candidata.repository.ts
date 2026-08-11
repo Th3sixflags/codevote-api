@@ -75,17 +75,26 @@ function condicionCarrera(filtro: FiltroCarrera): { sql: string; params: any[] }
   return { sql: ' AND (vo.fk_id_carrera IS NULL OR vo.fk_id_carrera = ?)', params: [filtro] };
 }
 
-/** Condición completa: carrera de la papeleta + estado de revisión. */
-function condicionVisibilidad(vis: VisibilidadListas): { sql: string; params: any[] } {
-  const { sql, params } = condicionCarrera(vis.filtro);
-  if (!vis.soloAprobadas) return { sql, params };
+function condicionInstitucion(institucionId?: number): { sql: string; params: any[] } {
+  if (institucionId === undefined) return { sql: '', params: [] };
+  return { sql: ' AND p.fk_id_institucion = ?', params: [institucionId] };
+}
+
+function condicionVisibilidad(vis: VisibilidadListas, institucionId?: number): { sql: string; params: any[] } {
+  const { sql: sqlC, params: paramsC } = condicionCarrera(vis.filtro);
+  const { sql: sqlI, params: paramsI } = condicionInstitucion(institucionId);
+  
+  const baseSql = sqlC + sqlI;
+  const baseParams = [...paramsC, ...paramsI];
+  
+  if (!vis.soloAprobadas) return { sql: baseSql, params: baseParams };
   if (vis.cedula) {
     return {
-      sql: `${sql} AND (l.estado_revision = 'aprobada' OR l.fk_cedula_responsable = ?)`,
-      params: [...params, vis.cedula],
+      sql: `${baseSql} AND (l.estado_revision = 'aprobada' OR l.fk_cedula_responsable = ?)`,
+      params: [...baseParams, vis.cedula],
     };
   }
-  return { sql: `${sql} AND l.estado_revision = 'aprobada'`, params };
+  return { sql: `${baseSql} AND l.estado_revision = 'aprobada'`, params: baseParams };
 }
 
 /** ¿Esta fila de lista es visible para quien consulta? (mismo criterio que el SQL). */
@@ -95,8 +104,8 @@ export function listaVisible(lista: any, vis: VisibilidadListas): boolean {
   return !!vis.cedula && lista?.fk_cedula_responsable === vis.cedula;
 }
 
-export async function findAll(vis: VisibilidadListas = VISIBILIDAD_TOTAL) {
-  const { sql, params } = condicionVisibilidad(vis);
+export async function findAll(vis: VisibilidadListas = VISIBILIDAD_TOTAL, institucionId?: number) {
+  const { sql, params } = condicionVisibilidad(vis, institucionId);
   const where = sql ? ` WHERE 1=1${sql}` : '';
   const [rows] = await pool.query(`${BASE_QUERY}${where} ORDER BY l.fecha_inscripcion DESC`, params);
   return (rows as any[]).map(conBloqueo);
@@ -106,13 +115,17 @@ export async function findAll(vis: VisibilidadListas = VISIBILIDAD_TOTAL) {
  * Sin filtro alguno: uso INTERNO (portal del candidato, acciones de admin). Lo
  * que se devuelva a quien consulta pasa además por `listaVisible`.
  */
-export async function findById(id: number) {
-  const [rows] = await pool.query(BASE_QUERY + ' WHERE l.id_lista = ?', [id]) as [any[], any];
+export async function findById(id: number, institucionId?: number) {
+  const inst = condicionInstitucion(institucionId);
+  const [rows] = await pool.query(
+    `${BASE_QUERY} WHERE l.id_lista = ?${inst.sql}`,
+    [id, ...inst.params]
+  ) as [any[], any];
   return conBloqueo(rows[0] ?? null);
 }
 
-export async function findByProceso(procesoId: number, vis: VisibilidadListas = VISIBILIDAD_TOTAL) {
-  const { sql, params } = condicionVisibilidad(vis);
+export async function findByProceso(procesoId: number, vis: VisibilidadListas = VISIBILIDAD_TOTAL, institucionId?: number) {
+  const { sql, params } = condicionVisibilidad(vis, institucionId);
   const [rows] = await pool.query(
     `${BASE_QUERY} WHERE l.fk_id_proceso = ?${sql} ORDER BY l.nombre_lista`,
     [procesoId, ...params]
@@ -121,8 +134,8 @@ export async function findByProceso(procesoId: number, vis: VisibilidadListas = 
 }
 
 /** Listas que compiten en una papeleta concreta. */
-export async function findByVotacion(votacionId: number, vis: VisibilidadListas = VISIBILIDAD_TOTAL) {
-  const { sql, params } = condicionVisibilidad(vis);
+export async function findByVotacion(votacionId: number, vis: VisibilidadListas = VISIBILIDAD_TOTAL, institucionId?: number) {
+  const { sql, params } = condicionVisibilidad(vis, institucionId);
   const [rows] = await pool.query(
     `${BASE_QUERY} WHERE l.fk_id_votacion = ?${sql} ORDER BY l.nombre_lista`,
     [votacionId, ...params]
@@ -170,12 +183,13 @@ export async function setEstadoRevision(id: number, estado: string, motivo: stri
 // --- Soporte del portal del candidato -------------------------------------
 
 /** La lista de la que un estudiante es responsable/dueño (o null). */
-export async function findByResponsable(cedula: string) {
+export async function findByResponsable(cedula: string, institucionId?: number) {
+  const inst = condicionInstitucion(institucionId);
   // Un proceso archivado es historial: su lista ya no se gestiona desde el
   // portal, aunque siga existiendo y visible en el listado administrativo.
   const [rows] = await pool.query(
-    BASE_QUERY + ' WHERE l.fk_cedula_responsable = ? AND p.archivado_at IS NULL LIMIT 1',
-    [cedula]
+    `${BASE_QUERY} WHERE l.fk_cedula_responsable = ? AND p.archivado_at IS NULL${inst.sql} LIMIT 1`,
+    [cedula, ...inst.params]
   ) as [any[], any];
   return conBloqueo(rows[0] ?? null);
 }

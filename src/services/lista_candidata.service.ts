@@ -15,8 +15,8 @@ import { CrearListaDTO, ActualizarListaDTO } from '../schemas/lista_candidata.sc
 
 // Doble filtro para estudiantes y candidatos: la carrera de la papeleta y el
 // estado de revisión (solo las aprobadas). La administración las ve todas.
-export async function listarListas(vis: VisibilidadListas = VISIBILIDAD_TOTAL) {
-  return repo.findAll(vis);
+export async function listarListas(vis: VisibilidadListas = VISIBILIDAD_TOTAL, institucionId?: number) {
+  return repo.findAll(vis, institucionId);
 }
 
 /**
@@ -28,8 +28,8 @@ export async function listarListas(vis: VisibilidadListas = VISIBILIDAD_TOTAL) {
  * revisión, se responde como NO ENCONTRADA (404): así el acceso directo por ID
  * no revela ni siquiera que existe.
  */
-export async function obtenerLista(id: number, vis: VisibilidadListas = VISIBILIDAD_TOTAL) {
-  const lista = await repo.findById(id);
+export async function obtenerLista(id: number, vis: VisibilidadListas = VISIBILIDAD_TOTAL, institucionId?: number) {
+  const lista = await repo.findById(id, institucionId);
   if (!lista) return null;
   if (!procesoVisible(lista.carrera_votacion, vis.filtro)) return null;
   if (!repo.listaVisible(lista, vis)) return null;
@@ -41,27 +41,27 @@ export async function obtenerLista(id: number, vis: VisibilidadListas = VISIBILI
   return componerLista(lista, integrantes, planes);
 }
 
-export async function listarPorProceso(procesoId: number, vis: VisibilidadListas = VISIBILIDAD_TOTAL) {
-  return repo.findByProceso(procesoId, vis);
+export async function listarPorProceso(procesoId: number, vis: VisibilidadListas = VISIBILIDAD_TOTAL, institucionId?: number) {
+  return repo.findByProceso(procesoId, vis, institucionId);
 }
 
 /**
  * Crea una lista dentro de una papeleta. El proceso se deriva de la votación,
  * así la lista nunca queda asociada a un proceso que no corresponde.
  */
-export async function crearLista(data: CrearListaDTO) {
-  const votacion = await votacionRepo.findById(data.fk_id_votacion);
-  if (!votacion) throw new HttpError(404, 'La votación indicada no existe.');
+export async function crearLista(data: CrearListaDTO, institucionId?: number) {
+  const votacion = await votacionRepo.findById(data.fk_id_votacion, institucionId);
+  if (!votacion) throw new HttpError(404, 'La votación indicada no existe o pertenece a otra institución.');
   return repo.create(data, votacion.id_proceso);
 }
 
 /** Listas que compiten en una papeleta, según lo que pueda ver quien consulta. */
-export async function listarPorVotacion(votacionId: number, vis: VisibilidadListas = VISIBILIDAD_TOTAL) {
-  return repo.findByVotacion(votacionId, vis);
+export async function listarPorVotacion(votacionId: number, vis: VisibilidadListas = VISIBILIDAD_TOTAL, institucionId?: number) {
+  return repo.findByVotacion(votacionId, vis, institucionId);
 }
 
-export async function actualizarLista(id: number, data: ActualizarListaDTO) {
-  const existente = await repo.findById(id);
+export async function actualizarLista(id: number, data: ActualizarListaDTO, institucionId?: number) {
+  const existente = await repo.findById(id, institucionId);
   if (!existente) return null;
   return repo.update(id, data);
 }
@@ -72,8 +72,8 @@ export async function actualizarLista(id: number, data: ActualizarListaDTO) {
  * retirarla. Si es borrador, se limpian en una transacción sus dependencias de
  * preparación: validaciones de requisitos, candidatos y planes de trabajo.
  */
-export async function eliminarLista(id: number) {
-  const existente = await repo.findById(id);
+export async function eliminarLista(id: number, institucionId?: number) {
+  const existente = await repo.findById(id, institucionId);
   if (!existente) return false;
 
   if (!existente.puede_eliminar) {
@@ -132,8 +132,8 @@ function verificarTransicion(actual: string, destino: string) {
   );
 }
 
-export async function aprobarLista(id: number) {
-  const existente = await repo.findById(id);
+export async function aprobarLista(id: number, institucionId?: number) {
+  const existente = await repo.findById(id, institucionId);
   if (!existente) return null;
   verificarTransicion(existente.estado_revision, 'aprobada');
 
@@ -155,8 +155,8 @@ export async function aprobarLista(id: number) {
   return lista;
 }
 
-export async function rechazarLista(id: number, motivo: string) {
-  const existente = await repo.findById(id);
+export async function rechazarLista(id: number, motivo: string, institucionId?: number) {
+  const existente = await repo.findById(id, institucionId);
   if (!existente) return null;
   verificarTransicion(existente.estado_revision, 'rechazada');
 
@@ -170,8 +170,8 @@ export async function rechazarLista(id: number, motivo: string) {
   return lista;
 }
 
-export async function retirarLista(id: number) {
-  const existente = await repo.findById(id);
+export async function retirarLista(id: number, institucionId?: number) {
+  const existente = await repo.findById(id, institucionId);
   if (!existente) return null;
   verificarTransicion(existente.estado_revision, 'retirada');
   return repo.setEstadoRevision(id, 'retirada', existente.motivo_rechazo ?? null);
@@ -189,8 +189,8 @@ export async function retirarLista(id: number) {
  * asignación y vuelve a 'estudiante' si no administra otra candidatura. Todo
  * ocurre dentro de una transacción (ver repositorio).
  */
-export async function transferirResponsable(listaId: number, nuevaCedula: string) {
-  const lista = await repo.findById(listaId);
+export async function transferirResponsable(listaId: number, nuevaCedula: string, institucionId?: number) {
+  const lista = await repo.findById(listaId, institucionId);
   if (!lista) return null;
 
   if (lista.fk_id_votacion == null) {
@@ -237,5 +237,5 @@ export async function transferirResponsable(listaId: number, nuevaCedula: string
   );
   // Se devuelve el detalle completo (responsable + integrantes) para que el
   // frontend refresque la vista sin una segunda llamada.
-  return obtenerLista(listaId);
+  return obtenerLista(listaId, VISIBILIDAD_TOTAL, institucionId);
 }

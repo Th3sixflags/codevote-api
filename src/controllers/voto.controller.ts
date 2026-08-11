@@ -15,7 +15,7 @@ export async function votar(req: Request, res: Response) {
 
   try {
     // El filtro de carrera se resuelve aquí y se valida en el servicio.
-    const voto = await service.registrarVoto(data, cedula, await filtroCarreraDe(req));
+    const voto = await service.registrarVoto(data, cedula, await filtroCarreraDe(req), req.user?.fk_id_institucion);
     res.status(201).json(voto);
   } catch (err: any) {
     // Carrera: dos peticiones simultáneas. La restricción única de codigo_voto
@@ -40,7 +40,7 @@ export async function votar(req: Request, res: Response) {
  * solo cambia quién puede pedirlo.
  */
 export async function resultados(req: Request, res: Response) {
-  const resultados = await service.obtenerResultados(Number(req.params.votacionId));
+  const resultados = await service.obtenerResultados(Number(req.params.votacionId), req.user?.fk_id_institucion);
   res.json(resultados);
 }
 
@@ -48,6 +48,7 @@ export async function resultadosEstudiante(req: Request, res: Response) {
   const resultados = await service.obtenerResultadosEstudiante(
     Number(req.params.votacionId),
     await filtroCarreraDe(req),
+    req.user?.fk_id_institucion
   );
   res.json(resultados);
 }

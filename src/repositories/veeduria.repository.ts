@@ -8,21 +8,31 @@ const BASE_QUERY = `
     vd.fk_id_veedor, ve.nombre AS veedor
   FROM veeduria vd
   JOIN votacion v ON v.id_votacion = vd.fk_id_votacion
+  JOIN proceso_electoral p ON p.id_proceso = v.fk_id_proceso
   JOIN veedor ve ON ve.id_veedor = vd.fk_id_veedor
 `;
 
-export async function findAll() {
-  const [rows] = await pool.query(BASE_QUERY + ' ORDER BY vd.id_veeduria');
+function condicionInstitucion(institucionId?: number): { sql: string; params: any[] } {
+  if (institucionId === undefined) return { sql: '', params: [] };
+  return { sql: ' AND p.fk_id_institucion = ?', params: [institucionId] };
+}
+
+export async function findAll(institucionId?: number) {
+  const inst = condicionInstitucion(institucionId);
+  const where = inst.sql ? ` WHERE 1=1${inst.sql}` : '';
+  const [rows] = await pool.query(`${BASE_QUERY}${where} ORDER BY vd.id_veeduria`, inst.params);
   return rows as any[];
 }
 
-export async function findById(id: number) {
-  const [rows] = await pool.query(BASE_QUERY + ' WHERE vd.id_veeduria = ?', [id]) as [any[], any];
+export async function findById(id: number, institucionId?: number) {
+  const inst = condicionInstitucion(institucionId);
+  const [rows] = await pool.query(`${BASE_QUERY} WHERE vd.id_veeduria = ?${inst.sql}`, [id, ...inst.params]) as [any[], any];
   return rows[0] ?? null;
 }
 
-export async function findByVotacion(id: number) {
-  const [rows] = await pool.query(BASE_QUERY + ' WHERE vd.fk_id_votacion = ?', [id]);
+export async function findByVotacion(id: number, institucionId?: number) {
+  const inst = condicionInstitucion(institucionId);
+  const [rows] = await pool.query(`${BASE_QUERY} WHERE vd.fk_id_votacion = ?${inst.sql}`, [id, ...inst.params]);
   return rows as any[];
 }
 

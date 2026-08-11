@@ -5,20 +5,20 @@ import { HttpError } from '../utils/httpError.js';
 import { PROMEDIO_MINIMO_POSTULACION } from '../config/reglas.js';
 import { CrearCandidatoDTO, ActualizarCandidatoDTO } from '../schemas/candidato.schema.js';
 
-export async function listarCandidato() {
-  return repo.findAll();
+export async function listarCandidato(institucionId?: number) {
+  return repo.findAll(institucionId);
 }
 
-export async function obtenerCandidato(id: number) {
-  const registro = await repo.findById(id);
+export async function obtenerCandidato(id: number, institucionId?: number) {
+  const registro = await repo.findById(id, institucionId);
   return registro ?? null;
 }
 
-export async function listarPorLista(id: number) {
-  return repo.findByLista(id);
+export async function listarPorLista(id: number, institucionId?: number) {
+  return repo.findByLista(id, institucionId);
 }
 
-export async function crearCandidato(data: CrearCandidatoDTO) {
+export async function crearCandidato(data: CrearCandidatoDTO, institucionId?: number) {
   // El cargo ya lo valida Zod (enum). Aquí validamos las referencias y el duplicado
   // para responder mensajes claros en lugar de un 500 por clave foránea.
   const estudiante = await estudianteRepo.findByCedula(data.fk_cedula_estudiante);
@@ -31,9 +31,9 @@ export async function crearCandidato(data: CrearCandidatoDTO) {
     throw new HttpError(409, `El estudiante no cumple el promedio mínimo de ${PROMEDIO_MINIMO_POSTULACION}/100 requerido para ser candidato.`);
   }
 
-  const lista = await listaRepo.findById(data.fk_id_lista);
+  const lista = await listaRepo.findById(data.fk_id_lista, institucionId);
   if (!lista) {
-    throw new HttpError(404, 'La lista candidata no existe.');
+    throw new HttpError(404, 'La lista candidata no existe o pertenece a otra institución.');
   }
 
   if (await repo.existeEnLista(data.fk_cedula_estudiante, data.fk_id_lista)) {
@@ -42,7 +42,7 @@ export async function crearCandidato(data: CrearCandidatoDTO) {
 
   // Una sola candidatura activa a la vez (no puede estar en Consejo y en
   // representante de carrera simultáneamente). Misma regla que en el portal.
-  const activa = await repo.candidaturaActiva(data.fk_cedula_estudiante);
+  const activa = await repo.candidaturaActiva(data.fk_cedula_estudiante, 0, institucionId);
   if (activa) {
     throw new HttpError(409, `Este estudiante ya tiene una candidatura activa en "${activa.nombre_proceso}" (lista "${activa.nombre_lista}"). Solo se permite una candidatura a la vez.`);
   }
@@ -50,14 +50,14 @@ export async function crearCandidato(data: CrearCandidatoDTO) {
   return repo.create(data);
 }
 
-export async function actualizarCandidato(id: number, data: ActualizarCandidatoDTO) {
-  const existente = await repo.findById(id);
+export async function actualizarCandidato(id: number, data: ActualizarCandidatoDTO, institucionId?: number) {
+  const existente = await repo.findById(id, institucionId);
   if (!existente) return null;
   return repo.update(id, data);
 }
 
-export async function eliminarCandidato(id: number) {
-  const existente = await repo.findById(id);
+export async function eliminarCandidato(id: number, institucionId?: number) {
+  const existente = await repo.findById(id, institucionId);
   if (!existente) return false;
   await repo.remove(id);
   return true;

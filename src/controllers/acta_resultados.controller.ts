@@ -2,13 +2,13 @@ import { Request, Response } from 'express';
 import { crearActaResultadosSchema, actualizarActaResultadosSchema } from '../schemas/acta_resultados.schema.js';
 import * as service from '../services/acta_resultados.service.js';
 
-export async function listar(_req: Request, res: Response) {
-  const registros = await service.listarActaResultados();
+export async function listar(req: Request, res: Response) {
+  const registros = await service.listarActaResultados(req.user?.fk_id_institucion);
   res.json(registros);
 }
 
 export async function obtener(req: Request, res: Response) {
-  const registro = await service.obtenerActaResultados(Number(req.params.id));
+  const registro = await service.obtenerActaResultados(Number(req.params.id), req.user?.fk_id_institucion);
   if (!registro) {
     res.status(404).json({ error: 'Acta no encontrada.' });
     return;
@@ -17,19 +17,19 @@ export async function obtener(req: Request, res: Response) {
 }
 
 export async function listarPorVotacion(req: Request, res: Response) {
-  const registros = await service.listarPorVotacion(Number(req.params.votacionId));
+  const registros = await service.listarPorVotacion(Number(req.params.votacionId), req.user?.fk_id_institucion);
   res.json(registros);
 }
 
 export async function crear(req: Request, res: Response) {
   const data  = crearActaResultadosSchema.parse(req.body);
-  const nuevo = await service.crearActaResultados(data);
+  const nuevo = await service.crearActaResultados(data, req.user?.fk_id_institucion);
   res.status(201).json(nuevo);
 }
 
 export async function actualizar(req: Request, res: Response) {
   const data        = actualizarActaResultadosSchema.parse(req.body);
-  const actualizado = await service.actualizarActaResultados(Number(req.params.id), data);
+  const actualizado = await service.actualizarActaResultados(Number(req.params.id), data, req.user?.fk_id_institucion);
   if (!actualizado) {
     res.status(404).json({ error: 'Acta no encontrada.' });
     return;
@@ -38,7 +38,7 @@ export async function actualizar(req: Request, res: Response) {
 }
 
 export async function eliminar(req: Request, res: Response) {
-  const eliminado = await service.eliminarActaResultados(Number(req.params.id));
+  const eliminado = await service.eliminarActaResultados(Number(req.params.id), req.user?.fk_id_institucion);
   if (!eliminado) {
     res.status(404).json({ error: 'Acta no encontrada.' });
     return;

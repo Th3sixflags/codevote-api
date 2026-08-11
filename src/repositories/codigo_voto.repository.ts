@@ -22,20 +22,30 @@ const CONSULTA_ANONIMA = `
     cv.estado_codigo, cv.fecha_envio
   FROM codigo_voto cv
   JOIN votacion v ON v.id_votacion = cv.fk_id_votacion
+  JOIN proceso_electoral p ON p.id_proceso = v.fk_id_proceso
 `;
 
-export async function findAll() {
-  const [rows] = await pool.query(CONSULTA_ANONIMA + ' ORDER BY cv.id_codigo');
+function condicionInstitucion(institucionId?: number): { sql: string; params: any[] } {
+  if (institucionId === undefined) return { sql: '', params: [] };
+  return { sql: ' AND p.fk_id_institucion = ?', params: [institucionId] };
+}
+
+export async function findAll(institucionId?: number) {
+  const inst = condicionInstitucion(institucionId);
+  const where = inst.sql ? ` WHERE 1=1${inst.sql}` : '';
+  const [rows] = await pool.query(`${CONSULTA_ANONIMA}${where} ORDER BY cv.id_codigo`, inst.params);
   return rows as any[];
 }
 
-export async function findById(id: number) {
-  const [rows] = await pool.query(CONSULTA_ANONIMA + ' WHERE cv.id_codigo = ?', [id]) as [any[], any];
+export async function findById(id: number, institucionId?: number) {
+  const inst = condicionInstitucion(institucionId);
+  const [rows] = await pool.query(`${CONSULTA_ANONIMA} WHERE cv.id_codigo = ?${inst.sql}`, [id, ...inst.params]) as [any[], any];
   return rows[0] ?? null;
 }
 
-export async function findByVotacion(id: number) {
-  const [rows] = await pool.query(CONSULTA_ANONIMA + ' WHERE cv.fk_id_votacion = ?', [id]);
+export async function findByVotacion(id: number, institucionId?: number) {
+  const inst = condicionInstitucion(institucionId);
+  const [rows] = await pool.query(`${CONSULTA_ANONIMA} WHERE cv.fk_id_votacion = ?${inst.sql}`, [id, ...inst.params]);
   return rows as any[];
 }
 
@@ -45,7 +55,8 @@ export async function findByVotacion(id: number) {
  * hash se reserva a la auditoría administrativa para no revelar/relacionar nada
  * del voto. Los endpoints de admin (findAll/findById/findByVotacion) sí lo traen.
  */
-export async function findByEstudiante(cedula: string) {
+export async function findByEstudiante(cedula: string, institucionId?: number) {
+  const inst = condicionInstitucion(institucionId);
   const [rows] = await pool.query(
     `SELECT
        cv.id_codigo, cv.estado_codigo, cv.fecha_envio, cv.codigo_verificacion,
@@ -55,9 +66,9 @@ export async function findByEstudiante(cedula: string) {
      FROM codigo_voto cv
      JOIN votacion v ON v.id_votacion = cv.fk_id_votacion
      JOIN proceso_electoral p ON p.id_proceso = v.fk_id_proceso
-     WHERE cv.fk_cedula_estudiante = ?
+     WHERE cv.fk_cedula_estudiante = ?${inst.sql}
      ORDER BY cv.fecha_envio DESC, cv.id_codigo DESC`,
-    [cedula]
+    [cedula, ...inst.params]
   );
   return rows as any[];
 }

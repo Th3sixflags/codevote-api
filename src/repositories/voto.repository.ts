@@ -9,11 +9,21 @@ const BASE_QUERY = `
     l.id_lista, l.nombre_lista
   FROM voto v
   JOIN votacion vot ON vot.id_votacion = v.fk_id_votacion
+  JOIN proceso_electoral p ON p.id_proceso = vot.fk_id_proceso
   LEFT JOIN lista_candidata l ON l.id_lista = v.fk_id_lista
 `;
 
-export async function findByVotacion(votacionId: number) {
-  const [rows] = await pool.query(BASE_QUERY + ' WHERE v.fk_id_votacion = ? ORDER BY v.fecha_hora DESC', [votacionId]);
+function condicionInstitucion(institucionId?: number): { sql: string; params: any[] } {
+  if (institucionId === undefined) return { sql: '', params: [] };
+  return { sql: ' AND p.fk_id_institucion = ?', params: [institucionId] };
+}
+
+export async function findByVotacion(votacionId: number, institucionId?: number) {
+  const inst = condicionInstitucion(institucionId);
+  const [rows] = await pool.query(
+    `${BASE_QUERY} WHERE v.fk_id_votacion = ?${inst.sql} ORDER BY v.fecha_hora DESC`,
+    [votacionId, ...inst.params]
+  );
   return rows as any[];
 }
 
@@ -111,15 +121,16 @@ export interface EstadoDeVotacion {
  * hora final. Quien decide si se admite un voto tiene que mirar el reloj, no
  * solo esa columna (ver utils/estadoVotacion.ts).
  */
-export async function estadoDeVotacion(votacionId: number): Promise<EstadoDeVotacion | null> {
+export async function estadoDeVotacion(votacionId: number, institucionId?: number): Promise<EstadoDeVotacion | null> {
+  const inst = condicionInstitucion(institucionId);
   const [rows] = await pool.query(
     `SELECT v.estado AS votacion, p.estado AS proceso, v.fk_id_carrera AS carrera_votacion,
             v.fecha_apertura, v.fecha_cierre, p.fecha_fin_votacion,
             (p.archivado_at IS NOT NULL) AS archivado
      FROM votacion v
      JOIN proceso_electoral p ON p.id_proceso = v.fk_id_proceso
-     WHERE v.id_votacion = ?`,
-    [votacionId]
+     WHERE v.id_votacion = ?${inst.sql}`,
+    [votacionId, ...inst.params]
   ) as [any[], any];
   const fila = rows[0];
   return fila ? { ...fila, archivado: Number(fila.archivado) === 1 } : null;

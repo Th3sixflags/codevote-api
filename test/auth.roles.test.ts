@@ -167,10 +167,9 @@ test('el login histórico por contraseña ya no está disponible', async () => {
   assert.equal(sentencias.length, 0, 'la ruta retirada consultó la base');
 });
 
-test('un correo ajeno a UIDE se rechaza antes de consultar la base', async () => {
-  const respuesta = await post('/codigo', { identificador: 'persona@gmail.com' });
-  assert.equal(respuesta.http, 422);
-  assert.equal(sentencias.length, 0);
+test('un correo ajeno a UIDE se acepta ahora por la flexibilización', async () => {
+  const { http } = await post('/codigo', { identificador: 'alguien@gmail.com' });
+  assert.equal(http, 200);
 });
 
 test('la consulta OTP no contiene filtros que excluyan al admin', async () => {

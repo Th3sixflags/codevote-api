@@ -2,13 +2,13 @@ import { Request, Response } from 'express';
 import { crearCodigoVotoSchema, actualizarCodigoVotoSchema } from '../schemas/codigo_voto.schema.js';
 import * as service from '../services/codigo_voto.service.js';
 
-export async function listar(_req: Request, res: Response) {
-  const registros = await service.listarCodigoVoto();
+export async function listar(req: Request, res: Response) {
+  const registros = await service.listarCodigoVoto(req.user?.fk_id_institucion);
   res.json(registros);
 }
 
 export async function obtener(req: Request, res: Response) {
-  const registro = await service.obtenerCodigoVoto(Number(req.params.id));
+  const registro = await service.obtenerCodigoVoto(Number(req.params.id), req.user?.fk_id_institucion);
   if (!registro) {
     res.status(404).json({ error: 'Código de voto no encontrado.' });
     return;
@@ -17,13 +17,13 @@ export async function obtener(req: Request, res: Response) {
 }
 
 export async function listarPorVotacion(req: Request, res: Response) {
-  const registros = await service.listarPorVotacion(Number(req.params.votacionId));
+  const registros = await service.listarPorVotacion(Number(req.params.votacionId), req.user?.fk_id_institucion);
   res.json(registros);
 }
 
 /** Comprobantes del usuario autenticado. No requiere rol admin. */
 export async function listarMisCodigos(req: Request, res: Response) {
-  const registros = await service.listarPorEstudiante(req.user!.sub);
+  const registros = await service.listarPorEstudiante(req.user!.sub, req.user?.fk_id_institucion);
   res.json(registros);
 }
 
@@ -43,13 +43,13 @@ export async function verificarMiCodigo(req: Request, res: Response) {
 
 export async function crear(req: Request, res: Response) {
   const data  = crearCodigoVotoSchema.parse(req.body);
-  const nuevo = await service.crearCodigoVoto(data);
+  const nuevo = await service.crearCodigoVoto(data, req.user?.fk_id_institucion);
   res.status(201).json(nuevo);
 }
 
 export async function actualizar(req: Request, res: Response) {
   const data        = actualizarCodigoVotoSchema.parse(req.body);
-  const actualizado = await service.actualizarCodigoVoto(Number(req.params.id), data);
+  const actualizado = await service.actualizarCodigoVoto(Number(req.params.id), data, req.user?.fk_id_institucion);
   if (!actualizado) {
     res.status(404).json({ error: 'Código de voto no encontrado.' });
     return;
@@ -58,7 +58,7 @@ export async function actualizar(req: Request, res: Response) {
 }
 
 export async function eliminar(req: Request, res: Response) {
-  const eliminado = await service.eliminarCodigoVoto(Number(req.params.id));
+  const eliminado = await service.eliminarCodigoVoto(Number(req.params.id), req.user?.fk_id_institucion);
   if (!eliminado) {
     res.status(404).json({ error: 'Código de voto no encontrado.' });
     return;

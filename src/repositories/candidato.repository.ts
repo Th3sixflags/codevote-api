@@ -17,7 +17,13 @@ const BASE_QUERY = `
   FROM candidato c
   JOIN estudiante e ON e.cedula = c.fk_cedula_estudiante
   JOIN lista_candidata l ON l.id_lista = c.fk_id_lista
+  JOIN proceso_electoral p ON p.id_proceso = l.fk_id_proceso
 `;
+
+function condicionInstitucion(institucionId?: number): { sql: string; params: any[] } {
+  if (institucionId === undefined) return { sql: '', params: [] };
+  return { sql: ' AND p.fk_id_institucion = ?', params: [institucionId] };
+}
 
 /** MySQL devuelve los booleanos como 0/1: se normalizan a boolean real. */
 function normalizar(row: any) {
@@ -25,13 +31,16 @@ function normalizar(row: any) {
   return { ...row, es_responsable: Number(row.es_responsable) === 1 };
 }
 
-export async function findAll() {
-  const [rows] = await pool.query(BASE_QUERY + ' ORDER BY c.id_candidato');
+export async function findAll(institucionId?: number) {
+  const inst = condicionInstitucion(institucionId);
+  const where = inst.sql ? ` WHERE 1=1${inst.sql}` : '';
+  const [rows] = await pool.query(`${BASE_QUERY}${where} ORDER BY c.id_candidato`, inst.params);
   return (rows as any[]).map(normalizar);
 }
 
-export async function findById(id: number) {
-  const [rows] = await pool.query(BASE_QUERY + ' WHERE c.id_candidato = ?', [id]) as [any[], any];
+export async function findById(id: number, institucionId?: number) {
+  const inst = condicionInstitucion(institucionId);
+  const [rows] = await pool.query(`${BASE_QUERY} WHERE c.id_candidato = ?${inst.sql}`, [id, ...inst.params]) as [any[], any];
   return normalizar(rows[0] ?? null);
 }
 
@@ -39,11 +48,12 @@ export async function findById(id: number) {
  * Integrantes de una lista, con el Presidente (responsable) siempre primero
  * para que el frontend pueda mostrarlo encabezando la candidatura.
  */
-export async function findByLista(id: number) {
+export async function findByLista(id: number, institucionId?: number) {
+  const inst = condicionInstitucion(institucionId);
   const [rows] = await pool.query(
-    BASE_QUERY + ` WHERE c.fk_id_lista = ?
-                   ORDER BY (c.cargo = ?) DESC, c.id_candidato`,
-    [id, CARGO_PRESIDENTE]
+    `${BASE_QUERY} WHERE c.fk_id_lista = ?${inst.sql}
+                    ORDER BY (c.cargo = ?) DESC, c.id_candidato`,
+    [id, ...inst.params, CARGO_PRESIDENTE]
   );
   return (rows as any[]).map(normalizar);
 }
@@ -102,7 +112,15 @@ export async function remove(id: number) {
 // --- Soporte del portal del candidato -------------------------------------
 
 /** Candidato con datos de su lista y proceso (para verificar dueño y estados). */
-export async function findByIdConLista(id: number) {
+export async function findByIdConLista(id: number, institucionId?: number) {
+  let where = ' WHERE c.id_candidato = ?';
+  const params: any[] = [id];
+  
+  if (institucionId !== undefined) {
+    where += ' AND p.fk_id_institucion = ?';
+    params.push(institucionId);
+  }
+
   const [rows] = await pool.query(
     `SELECT c.id_candidato, c.cargo, c.fk_cedula_estudiante, c.fk_id_lista,
             l.fk_cedula_responsable, l.estado_revision, l.fk_id_proceso,
@@ -112,8 +130,8 @@ export async function findByIdConLista(id: number) {
      FROM candidato c
      JOIN lista_candidata l ON l.id_lista = c.fk_id_lista
      JOIN proceso_electoral p ON p.id_proceso = l.fk_id_proceso
-     WHERE c.id_candidato = ?`,
-    [id]
+     ${where}`,
+    params
   ) as [any[], any];
   return normalizar(rows[0] ?? null);
 }
@@ -128,12 +146,14 @@ export async function existeCargoEnLista(listaId: number, cargo: string, exceptI
 }
 
 /** ¿El estudiante ya es candidato en alguna lista de ese proceso? (listas incompatibles). */
-export async function participaEnProceso(cedula: string, procesoId: number, exceptId = 0): Promise<boolean> {
+export async function participaEnProceso(cedula: string, procesoId: number, exceptId = 0, institucionId?: number): Promise<boolean> {
+  const inst = condicionInstitucion(institucionId);
   const [rows] = await pool.query(
     `SELECT 1 FROM candidato c
      JOIN lista_candidata l ON l.id_lista = c.fk_id_lista
-     WHERE c.fk_cedula_estudiante = ? AND l.fk_id_proceso = ? AND c.id_candidato <> ? LIMIT 1`,
-    [cedula, procesoId, exceptId]
+     JOIN proceso_electoral p ON p.id_proceso = l.fk_id_proceso
+     WHERE c.fk_cedula_estudiante = ? AND l.fk_id_proceso = ? AND c.id_candidato <> ?${inst.sql} LIMIT 1`,
+    [cedula, procesoId, exceptId, ...inst.params]
   ) as [any[], any];
   return rows.length > 0;
 }
@@ -146,7 +166,8 @@ export async function participaEnProceso(cedula: string, procesoId: number, exce
  * Se consideran activas las listas que no fueron rechazadas ni retiradas, en
  * procesos que no estén finalizados, cancelados ni archivados.
  */
-export async function candidaturaActiva(cedula: string, exceptId = 0) {
+export async function candidaturaActiva(cedula: string, exceptId = 0, institucionId?: number) {
+  const inst = condicionInstitucion(institucionId);
   const [rows] = await pool.query(
     `SELECT c.id_candidato, l.id_lista, l.nombre_lista, p.id_proceso, p.nombre_proceso, p.tipo_proceso
      FROM candidato c
@@ -157,8 +178,9 @@ export async function candidaturaActiva(cedula: string, exceptId = 0) {
        AND l.estado_revision NOT IN ('rechazada', 'retirada')
        AND p.estado NOT IN ('finalizado', 'cancelado')
        AND p.archivado_at IS NULL
+       ${inst.sql}
      LIMIT 1`,
-    [cedula, exceptId]
+    [cedula, exceptId, ...inst.params]
   ) as [any[], any];
   return rows[0] ?? null;
 }
