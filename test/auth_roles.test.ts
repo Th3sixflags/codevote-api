@@ -62,7 +62,10 @@ before(() => {
   (pool as any).query = async (sql: string, params?: any[]) => {
     const s = sql.trim().toUpperCase();
 
-    if (s.includes('SELECT CEDULA, NOMBRES, APELLIDOS, CORREO_INSTITUCIONAL')) {
+    // Normalizar espacios y saltos de línea para el match
+    const normalizedSql = s.replace(/\s+/g, ' ');
+
+    if (normalizedSql.includes('SELECT CEDULA, NOMBRES, APELLIDOS, CORREO_INSTITUCIONAL, ROL, FOTO_URL, FK_ID_INSTITUCION FROM ESTUDIANTE')) {
       const identificador = params?.[0];
       const user = Object.values(dbState).find(u => u.correo_institucional === identificador || u.cedula === identificador);
       return [user ? [user] : []];
