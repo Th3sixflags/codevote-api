@@ -27,3 +27,7 @@ export const pool = mysql.createPool({
   waitForConnections: true,
   connectionLimit:    10,
 });
+
+pool.on('connection', (connection) => {
+  connection.query('SET NAMES utf8mb4');
+});

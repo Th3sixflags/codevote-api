@@ -234,3 +234,45 @@ test('7. Admin de institución no puede listar todas las instituciones (403)', a
   });
   assert.equal(res.status, 403);
 });
+
+test('8. Creación y edición de instituciones con tildes y eñes (UTF-8)', async () => {
+  const nuevaInstitucion = {
+    nombre: 'Institución de Gestión electoral Muñoz',
+    tipo: 'sindicato',
+    config_json: { requiere_promedio: false }
+  };
+
+  // Creación
+  const res = await fetch(`${baseUrl}/api/instituciones`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${superToken()}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(nuevaInstitucion),
+  });
+  
+  assert.equal(res.status, 201, `Debería crear la institución. Respondió ${res.status}`);
+  const data = await res.json();
+  assert.equal(data.institucion.nombre, 'Institución de Gestión electoral Muñoz');
+  
+  const institucionId = data.institucion.id_institucion;
+
+  // Edición
+  const edicion = {
+    nombre: 'Asociación Pérez'
+  };
+
+  const resEdit = await fetch(`${baseUrl}/api/instituciones/${institucionId}`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${superToken()}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(edicion),
+  });
+
+  assert.equal(resEdit.status, 200, `Debería editar la institución. Respondió ${resEdit.status}`);
+  const dataEdit = await resEdit.json();
+  assert.equal(dataEdit.institucion.nombre, 'Asociación Pérez');
+});
