@@ -22,13 +22,6 @@ CREATE TABLE IF NOT EXISTS institucion (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- 2. New table: superadmin (platform administrators, NOT students)
-CREATE TABLE IF NOT EXISTS superadmin (
-    id_superadmin INT AUTO_INCREMENT PRIMARY KEY,
-    nombres VARCHAR(80) NOT NULL,
-    apellidos VARCHAR(80) NOT NULL,
-    correo VARCHAR(120) NOT NULL UNIQUE,
-    password_hash VARCHAR(255) NOT NULL,
     activo TINYINT(1) NOT NULL DEFAULT 1,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

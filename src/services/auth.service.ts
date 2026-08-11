@@ -204,7 +204,12 @@ export async function verificarCodigo(
   }
 
   const token = jwt.sign(
-    { sub: cuenta.cedula, email: cuenta.correo_institucional, rol: cuenta.rol, fk_id_institucion: cuenta.fk_id_institucion ?? undefined },
+    { 
+      sub: cuenta.cedula, 
+      email: cuenta.correo_institucional, 
+      rol: cuenta.rol, 
+      fk_id_institucion: cuenta.rol === 'superadmin' ? undefined : cuenta.fk_id_institucion 
+    },
     process.env.JWT_SECRET!,
     { expiresIn: (process.env.JWT_EXPIRES_IN ?? '8h') as any }
   );

@@ -42,7 +42,7 @@ CREATE TABLE estudiante (
   fecha_ingreso DATE NULL DEFAULT NULL,
   membresia_activa TINYINT(1) NOT NULL DEFAULT 1,
   password VARCHAR(255) NOT NULL, -- Added for JWT Auth
-  rol ENUM('estudiante', 'admin', 'candidato') NOT NULL DEFAULT 'estudiante', -- Usado por el login y los middlewares de autorización
+  rol ENUM('estudiante', 'admin', 'candidato', 'superadmin') NOT NULL DEFAULT 'estudiante', -- Usado por el login y los middlewares de autorización
   foto_url VARCHAR(255) NULL DEFAULT NULL, -- URL de la foto de perfil (portal del estudiante)
   -- 1 = la cuenta tiene una contraseña temporal y debe cambiarla al entrar.
   debe_cambiar_password TINYINT(1) NOT NULL DEFAULT 0,
