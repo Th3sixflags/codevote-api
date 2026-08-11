@@ -22,10 +22,6 @@ CREATE TABLE IF NOT EXISTS institucion (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-    activo TINYINT(1) NOT NULL DEFAULT 1,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
 -- Stored Procedure for Idempotent Column Additions
 DELIMITER //
 CREATE PROCEDURE IF NOT EXISTS _cv_migration_v2()
