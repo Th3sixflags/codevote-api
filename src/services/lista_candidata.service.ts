@@ -13,6 +13,7 @@ import { CARGOS } from '../schemas/common.js';
 import { componerLista } from './candidato_portal.service.js';
 import { CrearListaDTO, ActualizarListaDTO } from '../schemas/lista_candidata.schema.js';
 import { obtenerConfiguracionInstitucion, validarRequisitosCandidato } from './reglas_electorales.service.js';
+import { validarFase } from './proceso_electoral.service.js';
 
 // Doble filtro para estudiantes y candidatos: la carrera de la papeleta y el
 // estado de revisión (solo las aprobadas). La administración las ve todas.
@@ -53,7 +54,10 @@ export async function listarPorProceso(procesoId: number, vis: VisibilidadListas
 export async function crearLista(data: CrearListaDTO, institucionId?: number) {
   const votacion = await votacionRepo.findById(data.fk_id_votacion, institucionId);
   if (!votacion) throw new HttpError(404, 'La votación indicada no existe o pertenece a otra institución.');
-  return repo.create(data, votacion.id_proceso);
+  
+  await validarFase(votacion.fk_id_proceso || votacion.id_proceso, ['inscripcion'], institucionId);
+  
+  return repo.create(data, votacion.fk_id_proceso || votacion.id_proceso);
 }
 
 /** Listas que compiten en una papeleta, según lo que pueda ver quien consulta. */
@@ -64,6 +68,8 @@ export async function listarPorVotacion(votacionId: number, vis: VisibilidadList
 export async function actualizarLista(id: number, data: ActualizarListaDTO, institucionId?: number) {
   const existente = await repo.findById(id, institucionId);
   if (!existente) return null;
+  
+  await validarFase(existente.id_proceso || existente.fk_id_proceso, ['inscripcion'], institucionId);
   return repo.update(id, data);
 }
 
@@ -76,6 +82,8 @@ export async function actualizarLista(id: number, data: ActualizarListaDTO, inst
 export async function eliminarLista(id: number, institucionId?: number) {
   const existente = await repo.findById(id, institucionId);
   if (!existente) return false;
+
+  await validarFase(existente.id_proceso || existente.fk_id_proceso, ['inscripcion'], institucionId);
 
   if (!existente.puede_eliminar) {
     throw new HttpError(409, `No se puede eliminar la lista. ${existente.motivo_bloqueo}`);
@@ -136,6 +144,8 @@ function verificarTransicion(actual: string, destino: string) {
 export async function aprobarLista(id: number, institucionId?: number) {
   const existente = await repo.findById(id, institucionId);
   if (!existente) return null;
+
+  await validarFase(existente.id_proceso || existente.fk_id_proceso, ['inscripcion', 'campaña'], institucionId);
   verificarTransicion(existente.estado_revision, 'aprobada');
 
   // Una lista APROBADA nunca puede contener propuestas sin PDF. El envío a
@@ -173,17 +183,19 @@ export async function aprobarLista(id: number, institucionId?: number) {
   return lista;
 }
 
-export async function rechazarLista(id: number, motivo: string, institucionId?: number) {
+export async function rechazarLista(id: number, motivo_rechazo: string, institucionId?: number) {
   const existente = await repo.findById(id, institucionId);
   if (!existente) return null;
+
+  await validarFase(existente.id_proceso || existente.fk_id_proceso, ['inscripcion'], institucionId);
   verificarTransicion(existente.estado_revision, 'rechazada');
 
-  const lista = await repo.setEstadoRevision(id, 'rechazada', motivo);
+  const lista = await repo.setEstadoRevision(id, 'rechazada', motivo_rechazo);
   await notificaciones.notificarResolucionDeLista(
     existente.fk_cedula_responsable,
     existente.nombre_lista,
     'rechazada',
-    motivo
+    motivo_rechazo
   );
   return lista;
 }
@@ -191,6 +203,8 @@ export async function rechazarLista(id: number, motivo: string, institucionId?: 
 export async function retirarLista(id: number, institucionId?: number) {
   const existente = await repo.findById(id, institucionId);
   if (!existente) return null;
+
+  await validarFase(existente.id_proceso || existente.fk_id_proceso, ['inscripcion', 'campaña'], institucionId);
   verificarTransicion(existente.estado_revision, 'retirada');
   return repo.setEstadoRevision(id, 'retirada', existente.motivo_rechazo ?? null);
 }
@@ -207,6 +221,16 @@ export async function retirarLista(id: number, institucionId?: number) {
  * asignación y vuelve a 'estudiante' si no administra otra candidatura. Todo
  * ocurre dentro de una transacción (ver repositorio).
  */
+export async function enviarRevision(id: number, fk_cedula_responsable: string, institucionId?: number) {
+  const lista = await repo.findById(id, institucionId);
+  if (!lista || lista.fk_cedula_responsable !== fk_cedula_responsable) {
+    throw new HttpError(404, 'Lista no encontrada o no te pertenece.');
+  }
+
+  await validarFase(lista.id_proceso || lista.fk_id_proceso, ['inscripcion'], institucionId);
+  return repo.setEstadoRevision(id, 'en_revision', null);
+}
+
 export async function transferirResponsable(listaId: number, nuevaCedula: string, institucionId?: number) {
   const lista = await repo.findById(listaId, institucionId);
   if (!lista) return null;

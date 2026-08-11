@@ -887,6 +887,37 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
 
+  /procesos-electorales/{id}/expediente:
+    get:
+      tags:
+        - Procesos electorales
+      summary: Descargar expediente del proceso electoral
+      description: Genera y descarga un archivo PDF con el expediente completo de un proceso electoral finalizado o cancelado, incluyendo estadísticas, resultados y veedurías.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Expediente generado exitosamente (Archivo PDF).
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '401':
+          description: No autorizado.
+        '403':
+          description: Permisos insuficientes o proceso pertenece a otra institución.
+        '404':
+          description: Proceso electoral no encontrado.
+        '409':
+          description: El proceso no está en estado finalizado o cancelado.
+
   /cronogramas:
     get:
       tags: [Cronogramas]

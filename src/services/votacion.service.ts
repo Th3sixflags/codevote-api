@@ -6,6 +6,7 @@ import { procesoVisible } from '../utils/accesoCarrera.js';
 import { estaVencida } from '../utils/estadoVotacion.js';
 import { cerrarPapeleta } from './cierre_votacion.service.js';
 import * as avisos from './avisos_electorales.service.js';
+import { validarFase } from './proceso_electoral.service.js';
 import { CrearVotacionDTO, ActualizarVotacionDTO } from '../schemas/votacion.schema.js';
 
 export async function listarVotaciones(institucionId?: number) {
@@ -26,6 +27,8 @@ export async function listarPorProceso(procesoId: number, filtro: FiltroCarrera 
 }
 
 export async function crearVotacion(data: CrearVotacionDTO, institucionId?: number) {
+  await validarFase(data.fk_id_proceso, ['planificado', 'convocado'], institucionId);
+
   if (institucionId !== undefined) {
     const proceso = await repoProceso.findById(data.fk_id_proceso, institucionId);
     if (!proceso) throw new HttpError(403, 'No tienes permiso para agregar papeletas a este proceso electoral.');
@@ -56,6 +59,8 @@ export async function crearVotacion(data: CrearVotacionDTO, institucionId?: numb
 export async function actualizarVotacion(id: number, data: ActualizarVotacionDTO, institucionId?: number) {
   const existente = await repo.findById(id, institucionId);
   if (!existente) return null;
+  
+  await validarFase(existente.fk_id_proceso, ['planificado', 'convocado', 'votacion'], institucionId);
   
   if (data.fk_id_proceso && data.fk_id_proceso !== existente.fk_id_proceso && institucionId !== undefined) {
     const procesoNuevo = await repoProceso.findById(data.fk_id_proceso, institucionId);
@@ -123,6 +128,8 @@ export async function actualizarVotacion(id: number, data: ActualizarVotacionDTO
 export async function eliminarVotacion(id: number, institucionId?: number) {
   const existente = await repo.findById(id, institucionId);
   if (!existente) return false;
+  
+  await validarFase(existente.fk_id_proceso, ['planificado', 'convocado'], institucionId);
 
   if (!existente.puede_eliminar) {
     throw new HttpError(409, `No se puede eliminar la votación. ${existente.motivo_bloqueo}`);

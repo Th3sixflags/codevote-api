@@ -103,7 +103,7 @@ function ejecutar(sqlCrudo: string, params: any[] = []): any {
       id_votacion: v.id_votacion, titulo_papeleta: v.titulo_papeleta, estado: v.estado,
       fecha_apertura: '2020-01-01 08:00:00', fecha_cierre: p.fecha_fin_votacion,
       fk_id_carrera: null, nombre_carrera: null, foto_url: null,
-      id_proceso: p.id_proceso, nombre_proceso: p.nombre_proceso,
+      id_proceso: p.id_proceso, fk_id_proceso: p.id_proceso, nombre_proceso: p.nombre_proceso,
       estado_proceso: p.estado, fecha_fin_votacion: p.fecha_fin_votacion,
       archivado: p.archivado ? 1 : 0,
       tiene_votos: 0, tiene_comprobantes: 0, tiene_actas: 0, tiene_veedurias: 0,
@@ -171,6 +171,11 @@ function ejecutar(sqlCrudo: string, params: any[] = []): any {
   if (sql.includes('INSERT INTO notificacion') || sql.includes('FROM codigo_voto cv')) {
     estado.notificaciones.push({ cedula: 'padron', titulo: 'Resultados disponibles' });
     return { affectedRows: 1 };
+  }
+
+  if (sql.toLowerCase().includes('select p.*, c.nombre_carrera')) {
+    const p = procesoDe(Number(params[0]));
+    return p ? [{ ...p, puede_eliminar: 1 }] : [];
   }
 
   throw new Error(`consulta inesperada en la prueba: ${sql.slice(0, 140)}`);

@@ -11,6 +11,23 @@ import { CrearProcesoDTO, ActualizarProcesoDTO } from '../schemas/proceso_electo
 const ARCHIVABLES = ['finalizado', 'cancelado'];
 
 /**
+ * Valida que el proceso esté en alguna de las fases permitidas.
+ * Lanza HttpError 409 si no lo está.
+ */
+export async function validarFase(procesoId: number, fasesPermitidas: string[], institucionId?: number) {
+  const proceso = await repo.findById(procesoId, institucionId);
+  if (!proceso) throw new HttpError(404, 'Proceso electoral no encontrado.');
+  
+  if (!fasesPermitidas.includes(proceso.estado)) {
+    throw new HttpError(
+      409, 
+      `Acción no permitida en la fase actual. Fases permitidas: ${fasesPermitidas.join(', ')}. Fase actual: ${proceso.estado}`
+    );
+  }
+  return proceso;
+}
+
+/**
  * Lista los procesos visibles para quien consulta: la administración ve todos y
  * el estudiante solo los globales y los de su propia carrera (ver FiltroCarrera).
  */
@@ -42,6 +59,17 @@ export async function crearProceso(data: CrearProcesoDTO, institucionId?: number
 export async function actualizarProceso(id: number, data: ActualizarProcesoDTO) {
   const existente = await repo.findById(id);
   if (!existente) return null;
+
+  // Validar configuración incompleta al avanzar de fase
+  const nuevoEstado = data.estado ?? existente.estado;
+  const fInicioInsc = data.fecha_inicio_inscripcion !== undefined ? data.fecha_inicio_inscripcion : existente.fecha_inicio_inscripcion;
+  const fFinInsc = data.fecha_fin_inscripcion !== undefined ? data.fecha_fin_inscripcion : existente.fecha_fin_inscripcion;
+  
+  if (['inscripcion', 'campaña'].includes(nuevoEstado)) {
+    if (!fInicioInsc || !fFinInsc) {
+      throw new HttpError(409, 'No se puede avanzar a inscripción o campaña sin definir las fechas de inscripción.');
+    }
+  }
 
   const actualizado = await repo.update(id, data);
 
