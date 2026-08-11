@@ -25,6 +25,7 @@ import { recordatorioRoutes, sancionRoutes } from './recordatorio.routes.js';
 import uploadRoutes                from './upload.routes.js';
 import institucionRoutes from './institucion.routes.js';
 import superadminRoutes from './superadmin.routes.js';
+import importacionRoutes from './importacion.routes.js';
 
 export function registerRoutes(app: Express) {
   // Autenticación
@@ -78,6 +79,9 @@ export function registerRoutes(app: Express) {
 
   // Gestión de instituciones (super admin)
   app.use('/api/instituciones', institucionRoutes);
+
+  // Importación de miembros (admin/superadmin)
+  app.use('/api/miembros', importacionRoutes);
 
   // Super admin
   app.use('/api/superadmin', superadminRoutes);

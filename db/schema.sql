@@ -32,7 +32,7 @@ CREATE TABLE carrera (
 
 -- 4. estudiante
 CREATE TABLE estudiante (
-  cedula CHAR(10) PRIMARY KEY,
+  cedula VARCHAR(20) PRIMARY KEY,
   nombres VARCHAR(80) NOT NULL,
   apellidos VARCHAR(80) NOT NULL,
   correo_institucional VARCHAR(120) NOT NULL UNIQUE,
@@ -127,7 +127,7 @@ CREATE TABLE lista_candidata (
   estado_revision VARCHAR(30) NOT NULL DEFAULT 'en_revision',
   fecha_inscripcion DATE NOT NULL,
   motivo_rechazo VARCHAR(250) NULL DEFAULT NULL,       -- Observación del admin al rechazar
-  fk_cedula_responsable CHAR(10) NULL DEFAULT NULL,    -- Candidato dueño de la lista (portal candidato)
+  fk_cedula_responsable VARCHAR(20) NULL DEFAULT NULL,    -- Candidato dueño de la lista (portal candidato)
   foto_url VARCHAR(255) NULL DEFAULT NULL,             -- Imagen principal de la lista (URL https)
   -- Papeleta en la que compite la lista. De aquí se deriva su carrera; por eso
   -- la carrera NO se duplica en esta tabla.
@@ -146,7 +146,7 @@ CREATE TABLE candidato (
   cargo ENUM('Presidente', 'Vicepresidente', 'Secretario', 'Tesorero', 'Vocal') NOT NULL,
   cumple_requisitos TINYINT(1) DEFAULT 0,
   foto_url VARCHAR(255),
-  fk_cedula_estudiante CHAR(10) NOT NULL,
+  fk_cedula_estudiante VARCHAR(20) NOT NULL,
   fk_id_lista INT NOT NULL,
   -- Columna generada para garantizar UN solo Presidente por lista: vale el id
   -- de la lista solo en la fila del presidente y NULL en las demás (MySQL no
@@ -206,7 +206,7 @@ CREATE TABLE codigo_voto (
   codigo_hash VARCHAR(255) NOT NULL,
   estado_codigo ENUM('generado', 'enviado', 'usado', 'expirado') NOT NULL DEFAULT 'generado',
   fecha_envio DATETIME,
-  fk_cedula_estudiante CHAR(10) NOT NULL,
+  fk_cedula_estudiante VARCHAR(20) NOT NULL,
   -- Identificador público OPACO (UUID v4 aleatorio) que el estudiante usa para
   -- verificar su participación. No revela la opción votada; `codigo_hash` queda
   -- reservado a la auditoría administrativa.
@@ -255,7 +255,7 @@ CREATE TABLE veeduria (
 -- 19. notificacion (portal del estudiante)
 CREATE TABLE notificacion (
   id_notificacion INT AUTO_INCREMENT PRIMARY KEY,
-  fk_cedula_estudiante CHAR(10) NOT NULL,
+  fk_cedula_estudiante VARCHAR(20) NOT NULL,
   tipo VARCHAR(30) NOT NULL,
   titulo VARCHAR(120) NOT NULL,
   mensaje VARCHAR(255) NOT NULL,
@@ -268,11 +268,27 @@ CREATE TABLE notificacion (
 -- El candidato no elige proceso/carrera/papeleta: trabaja solo con su asignación.
 CREATE TABLE asignacion_candidatura (
   id_asignacion INT AUTO_INCREMENT PRIMARY KEY,
-  fk_cedula_estudiante CHAR(10) NOT NULL,
+  fk_cedula_estudiante VARCHAR(20) NOT NULL,
   fk_id_votacion INT NOT NULL,
   fecha_asignacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   estado ENUM('activa', 'retirada') NOT NULL DEFAULT 'activa',
   CONSTRAINT uq_asignacion_estudiante UNIQUE (fk_cedula_estudiante),
   CONSTRAINT fk_asignacion_estudiante FOREIGN KEY (fk_cedula_estudiante) REFERENCES estudiante(cedula),
   CONSTRAINT fk_asignacion_votacion FOREIGN KEY (fk_id_votacion) REFERENCES votacion(id_votacion)
+);
+
+-- 21. historial_importacion
+CREATE TABLE historial_importacion (
+  id_importacion INT AUTO_INCREMENT PRIMARY KEY,
+  fk_id_institucion INT NOT NULL,
+  cedula_importador VARCHAR(20) NOT NULL,
+  fecha DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  nombre_archivo VARCHAR(255) NOT NULL,
+  total_filas INT NOT NULL DEFAULT 0,
+  filas_importadas INT NOT NULL DEFAULT 0,
+  filas_rechazadas INT NOT NULL DEFAULT 0,
+  filas_duplicadas INT NOT NULL DEFAULT 0,
+  errores_json JSON NULL,
+  CONSTRAINT fk_historial_institucion FOREIGN KEY (fk_id_institucion) REFERENCES institucion(id_institucion),
+  CONSTRAINT fk_historial_importador FOREIGN KEY (cedula_importador) REFERENCES estudiante(cedula)
 );

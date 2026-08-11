@@ -1,0 +1,8 @@
+▶ Importación CSV de Miembros
+  ✖ Debe rechazar si falta el archivo
+  ✖ Debe rechazar si faltan columnas requeridas
+  ✖ Debe generar vista previa con válidas, inválidas y duplicadas
+  ✖ Debe importar solo las filas válidas al confirmar
+  ✖ Admin B no puede importar usando institución A
+  ✖ Puede listar el historial y descargar errores con aislamiento cruzado
+✖ Importación CSV de Miembros (17.33075ms)
