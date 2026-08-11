@@ -7,8 +7,8 @@ import * as estudianteRepo from '../repositories/estudiante.repository.js';
 import * as asignacionRepo from '../repositories/asignacion_candidatura.repository.js';
 import { HttpError } from '../utils/httpError.js';
 import { verificarPropuestasCompletas } from '../utils/propuestasCompletas.js';
-import { PROMEDIO_MINIMO_POSTULACION } from '../config/reglas.js';
 import { CARGO_PRESIDENTE } from '../schemas/common.js';
+import { obtenerConfiguracionInstitucion, validarRequisitosCandidato } from './reglas_electorales.service.js';
 import {
   CrearListaCandidatoDTO, ActualizarListaCandidatoDTO,
   AgregarCandidatoDTO, ActualizarCandidatoPortalDTO,
@@ -155,7 +155,7 @@ export async function actualizarLista(cedula: string, listaId: number, data: Act
  * y NO obtiene acceso al portal: solo se crea su fila en la tabla `candidato`
  * con su cargo dentro de la lista.
  */
-export async function agregarCandidato(cedula: string, listaId: number, data: AgregarCandidatoDTO) {
+export async function agregarCandidato(cedula: string, listaId: number, data: AgregarCandidatoDTO, institucionId?: number) {
   const lista = await listaRepo.findById(listaId);
   if (!lista) throw new HttpError(404, 'Lista no encontrada.');
   verificarDueno(lista, cedula);
@@ -175,19 +175,14 @@ export async function agregarCandidato(cedula: string, listaId: number, data: Ag
   if (!estudiante) {
     throw new HttpError(404, 'El estudiante indicado no existe.');
   }
-  // La papeleta define la carrera exigida: en una papeleta de carrera, todos los
-  // integrantes deben pertenecer a esa misma carrera.
+  
   const votacionLista = await votacionRepo.findById(lista.fk_id_votacion);
-  if (votacionLista?.fk_id_carrera != null) {
-    const carreraIntegrante = estudiante.id_carrera == null ? null : Number(estudiante.id_carrera);
-    if (carreraIntegrante !== Number(votacionLista.fk_id_carrera)) {
-      throw new HttpError(409, `Esta papeleta corresponde a la carrera "${votacionLista.nombre_carrera}" y esa persona no pertenece a ella.`);
-    }
-  }
-  // Requisito de elegibilidad: promedio mínimo para postularse.
-  if (estudiante.promedio == null || Number(estudiante.promedio) < PROMEDIO_MINIMO_POSTULACION) {
-    throw new HttpError(409, `El estudiante no cumple el promedio mínimo de ${PROMEDIO_MINIMO_POSTULACION}/100 requerido para postularse.`);
-  }
+  const carreraExigida = votacionLista?.fk_id_carrera == null ? null : Number(votacionLista.fk_id_carrera);
+  const nombrePapeleta = votacionLista?.nombre_carrera;
+  
+  const config = await obtenerConfiguracionInstitucion(institucionId);
+  validarRequisitosCandidato(estudiante, config, carreraExigida, nombrePapeleta);
+
   if (await candidatoRepo.existeCargoEnLista(listaId, data.cargo)) {
     throw new HttpError(409, `Ya existe un candidato con el cargo "${data.cargo}" en esta lista.`);
   }
@@ -277,18 +272,34 @@ export async function actualizarPlan(cedula: string, planId: number, data: Actua
   return planRepo.update(planId, data);
 }
 
-export async function enviarARevision(cedula: string, listaId: number) {
+export async function enviarARevision(cedula: string, listaId: number, institucionId?: number) {
   const lista = await listaRepo.findById(listaId);
   if (!lista) throw new HttpError(404, 'Lista no encontrada.');
   verificarDueno(lista, cedula);
   verificarInscripcion(lista);
   verificarEditable(lista); // aprobada/retirada no pueden reenviarse
 
-  // El responsable ya cuenta como Presidente, así que se exige al menos un
-  // integrante más: una lista de una sola persona no es una candidatura.
+  // Validar a todos los integrantes con las reglas vigentes. Si las reglas cambiaron
+  // desde que se agregaron los candidatos, la lista no pasará a revisión.
+  const config = await obtenerConfiguracionInstitucion(institucionId);
+  const votacionLista = await votacionRepo.findById(lista.fk_id_votacion);
+  const carreraExigida = votacionLista?.fk_id_carrera == null ? null : Number(votacionLista.fk_id_carrera);
+  
   const integrantes = await candidatoRepo.findByLista(listaId);
   if (integrantes.filter((i) => !i.es_responsable).length === 0) {
     throw new HttpError(409, 'Agrega al menos un integrante además del presidente antes de enviar la lista a revisión.');
+  }
+
+  // Validar todos
+  for (const integrante of integrantes) {
+    const estudiante = await estudianteRepo.findByCedula(integrante.fk_cedula_estudiante);
+    if (estudiante) {
+      try {
+        validarRequisitosCandidato(estudiante, config, carreraExigida, votacionLista?.nombre_carrera);
+      } catch (err: any) {
+        throw new HttpError(409, `El integrante ${integrante.nombres} (${integrante.cargo}) ya no cumple los requisitos: ${err.message || 'Regla no satisfecha'}`);
+      }
+    }
   }
 
   // El programa tiene que estar completo: al menos una propuesta y cada una con
@@ -305,13 +316,35 @@ export async function enviarARevision(cedula: string, listaId: number) {
  * compatibles con la carrera de su papeleta asignada y sin candidatura activa.
  * Devuelve únicamente cédula, nombres, apellidos y carrera.
  */
-export async function buscarIntegrantes(cedula: string, texto: string) {
+export async function buscarIntegrantes(cedula: string, texto: string, institucionId?: number) {
   const asignacion = await asignacionRepo.findActivaDeEstudiante(cedula);
   if (!asignacion) {
     throw new HttpError(409, 'Todavía no tienes una papeleta asignada, así que no puedes buscar integrantes.');
   }
-  const carreraCompatible = asignacion.carrera_votacion == null ? null : Number(asignacion.carrera_votacion);
-  return estudianteRepo.buscarPosiblesIntegrantes(carreraCompatible, texto);
+  
+  const config = await obtenerConfiguracionInstitucion(institucionId);
+  const carreraCompatible = (!config.requiere_carrera || asignacion.carrera_votacion == null) ? null : Number(asignacion.carrera_votacion);
+  
+  // Buscar en BD
+  const encontrados = await estudianteRepo.buscarPosiblesIntegrantes(carreraCompatible, texto);
+  
+  // Filtrar los que no cumplen los demás requisitos en memoria (promedio, membresia, etc.)
+  const filtrados = encontrados.filter(estudiante => {
+    try {
+      validarRequisitosCandidato(estudiante, config, carreraCompatible, null);
+      return true;
+    } catch {
+      return false;
+    }
+  });
+
+  // Solo devolver los datos públicos
+  return filtrados.map(e => ({
+    cedula: e.cedula,
+    nombres: e.nombres,
+    apellidos: e.apellidos,
+    nombre_carrera: e.nombre_carrera,
+  }));
 }
 
 /**

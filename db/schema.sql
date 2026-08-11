@@ -39,12 +39,16 @@ CREATE TABLE estudiante (
   promedio DECIMAL(5,2),
   estado_academico ENUM('activo', 'inactivo', 'egresado', 'graduado') NOT NULL DEFAULT 'activo',
   fk_id_carrera INT,
+  fecha_ingreso DATE NULL DEFAULT NULL,
+  membresia_activa TINYINT(1) NOT NULL DEFAULT 1,
   password VARCHAR(255) NOT NULL, -- Added for JWT Auth
   rol ENUM('estudiante', 'admin', 'candidato') NOT NULL DEFAULT 'estudiante', -- Usado por el login y los middlewares de autorización
   foto_url VARCHAR(255) NULL DEFAULT NULL, -- URL de la foto de perfil (portal del estudiante)
   -- 1 = la cuenta tiene una contraseña temporal y debe cambiarla al entrar.
   debe_cambiar_password TINYINT(1) NOT NULL DEFAULT 0,
-  CONSTRAINT fk_estudiante_carrera FOREIGN KEY (fk_id_carrera) REFERENCES carrera(id_carrera)
+  fk_id_institucion INT NULL, -- Agregado en migration_v2_multi_tenant
+  CONSTRAINT fk_estudiante_carrera FOREIGN KEY (fk_id_carrera) REFERENCES carrera(id_carrera),
+  CONSTRAINT fk_estudiante_institucion FOREIGN KEY (fk_id_institucion) REFERENCES institucion(id_institucion)
 );
 
 -- 5. responsable

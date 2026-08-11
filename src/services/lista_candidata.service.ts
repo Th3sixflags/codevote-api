@@ -12,6 +12,7 @@ import { verificarPropuestasCompletas } from '../utils/propuestasCompletas.js';
 import { CARGOS } from '../schemas/common.js';
 import { componerLista } from './candidato_portal.service.js';
 import { CrearListaDTO, ActualizarListaDTO } from '../schemas/lista_candidata.schema.js';
+import { obtenerConfiguracionInstitucion, validarRequisitosCandidato } from './reglas_electorales.service.js';
 
 // Doble filtro para estudiantes y candidatos: la carrera de la papeleta y el
 // estado de revisión (solo las aprobadas). La administración las ve todas.
@@ -142,6 +143,23 @@ export async function aprobarLista(id: number, institucionId?: number) {
   // 'en_revision': sin esta segunda comprobación bastaría con añadir después una
   // propuesta vacía para colarla.
   verificarPropuestasCompletas(await planRepo.findByLista(id), 'aprobar la lista');
+
+  // Validar reglas electorales
+  const config = await obtenerConfiguracionInstitucion(institucionId);
+  const votacionLista = await votacionRepo.findById(existente.fk_id_votacion);
+  const carreraExigida = votacionLista?.fk_id_carrera == null ? null : Number(votacionLista.fk_id_carrera);
+  const integrantes = await candidatoRepo.findByLista(id);
+  
+  for (const integrante of integrantes) {
+    const estudiante = await estudianteRepo.findByCedula(integrante.fk_cedula_estudiante);
+    if (estudiante) {
+      try {
+        validarRequisitosCandidato(estudiante, config, carreraExigida, votacionLista?.nombre_carrera);
+      } catch (err: any) {
+        throw new HttpError(409, `No se puede aprobar la lista porque el integrante ${integrante.nombres} (${integrante.cargo}) ya no cumple los requisitos: ${err.message || 'Regla no satisfecha'}`);
+      }
+    }
+  }
 
   const lista = await repo.setEstadoRevision(id, 'aprobada', null);
   // El responsable se entera del resultado sin tener que entrar a mirar. Como

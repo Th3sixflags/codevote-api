@@ -2,8 +2,9 @@ import * as repo from '../repositories/candidato.repository.js';
 import * as estudianteRepo from '../repositories/estudiante.repository.js';
 import * as listaRepo from '../repositories/lista_candidata.repository.js';
 import { HttpError } from '../utils/httpError.js';
-import { PROMEDIO_MINIMO_POSTULACION } from '../config/reglas.js';
 import { CrearCandidatoDTO, ActualizarCandidatoDTO } from '../schemas/candidato.schema.js';
+import { obtenerConfiguracionInstitucion, validarRequisitosCandidato } from './reglas_electorales.service.js';
+import * as votacionRepo from '../repositories/votacion.repository.js';
 
 export async function listarCandidato(institucionId?: number) {
   return repo.findAll(institucionId);
@@ -26,15 +27,17 @@ export async function crearCandidato(data: CrearCandidatoDTO, institucionId?: nu
     throw new HttpError(404, 'El estudiante con esa cédula no existe.');
   }
 
-  // Requisito de elegibilidad: promedio mínimo para ser candidato.
-  if (estudiante.promedio == null || Number(estudiante.promedio) < PROMEDIO_MINIMO_POSTULACION) {
-    throw new HttpError(409, `El estudiante no cumple el promedio mínimo de ${PROMEDIO_MINIMO_POSTULACION}/100 requerido para ser candidato.`);
-  }
-
   const lista = await listaRepo.findById(data.fk_id_lista, institucionId);
   if (!lista) {
     throw new HttpError(404, 'La lista candidata no existe o pertenece a otra institución.');
   }
+
+  // Requisitos de elegibilidad
+  const config = await obtenerConfiguracionInstitucion(institucionId);
+  const votacionLista = await votacionRepo.findById(lista.fk_id_votacion);
+  const carreraExigida = votacionLista?.fk_id_carrera == null ? null : Number(votacionLista.fk_id_carrera);
+  
+  validarRequisitosCandidato(estudiante, config, carreraExigida, votacionLista?.nombre_carrera);
 
   if (await repo.existeEnLista(data.fk_cedula_estudiante, data.fk_id_lista)) {
     throw new HttpError(409, 'Este estudiante ya es candidato en esta lista.');

@@ -89,7 +89,8 @@ paths:
                   tipo: { type: string }
                   logo_url: { type: string, nullable: true }
                   colores_json: { type: object, nullable: true }
-                  config_json: { type: object, nullable: true }
+                  config_json:
+                    $ref: '#/components/schemas/InstitucionConfig'
                   activa: { type: boolean }
         '401': { $ref: '#/components/responses/NoAutenticado' }
         '403': { $ref: '#/components/responses/SinPermiso' }
@@ -3459,6 +3460,13 @@ components:
           minimum: 0
           maximum: 100
           description: Promedio sobre 100 (escala de la universidad).
+        fecha_ingreso:
+          type: string
+          format: date
+          description: Fecha de ingreso del estudiante (YYYY-MM-DD).
+        membresia_activa:
+          type: boolean
+          description: Si el estudiante está activo en la organización.
         estado_academico:
           type: string
           enum: ["activo", "inactivo", "egresado", "graduado"]
@@ -3490,6 +3498,11 @@ components:
           format: "email"
         promedio:
           type: number
+        fecha_ingreso:
+          type: string
+          format: date
+        membresia_activa:
+          type: boolean
         estado_academico:
           type: string
           enum: ["activo", "inactivo", "egresado", "graduado"]
@@ -4174,6 +4187,29 @@ components:
           type: array
           description: Listas empatadas en el máximo. Vacío si no hay empate.
           items: { $ref: '#/components/schemas/ListaGanadora' }
+
+    InstitucionConfig:
+      type: object
+      properties:
+        requiere_promedio:
+          type: boolean
+          default: false
+        promedio_minimo:
+          type: number
+        requiere_carrera:
+          type: boolean
+          default: false
+        requiere_antiguedad:
+          type: boolean
+          default: false
+        antiguedad_minima_meses:
+          type: integer
+        requiere_estado_activo:
+          type: boolean
+          default: false
+        requiere_membresia_activa:
+          type: boolean
+          default: false
 
     ListaGanadora:
       type: object

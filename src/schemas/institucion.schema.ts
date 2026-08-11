@@ -1,5 +1,17 @@
 import { z } from 'zod';
 
+export const configJsonSchema = z.object({
+  requiere_promedio: z.boolean().default(false),
+  promedio_minimo: z.number().min(0).max(100).optional(),
+  requiere_carrera: z.boolean().default(false),
+  requiere_antiguedad: z.boolean().default(false),
+  antiguedad_minima_meses: z.number().int().min(1).optional(),
+  requiere_estado_activo: z.boolean().default(false),
+  requiere_membresia_activa: z.boolean().default(false),
+});
+
+export type InstitucionConfig = z.infer<typeof configJsonSchema>;
+
 export const crearInstitucionSchema = z.object({
   nombre:         z.string().min(2).max(255),
   slug:           z.string().min(2).max(100).regex(/^[a-z0-9-]+$/, 'El slug solo admite letras minúsculas, números y guiones').optional(),
@@ -12,7 +24,7 @@ export const crearInstitucionSchema = z.object({
   sitio_web:      z.string().url().optional().or(z.literal('')),
   dominio_email:  z.string().optional(),
   colores_json:   z.record(z.string()).optional(),
-  config_json:    z.record(z.unknown()).optional(),
+  config_json:    configJsonSchema.partial().optional(),
 });
 
 export const actualizarInstitucionSchema = crearInstitucionSchema.partial();

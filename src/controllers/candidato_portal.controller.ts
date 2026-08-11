@@ -30,7 +30,7 @@ export async function actualizarLista(req: Request, res: Response) {
 /** POST /candidato/listas/:id/candidatos */
 export async function agregarCandidato(req: Request, res: Response) {
   const data      = agregarCandidatoSchema.parse(req.body);
-  const candidato = await service.agregarCandidato(req.user!.sub, Number(req.params.id), data);
+  const candidato = await service.agregarCandidato(req.user!.sub, Number(req.params.id), data, req.user!.fk_id_institucion);
   res.status(201).json(candidato);
 }
 
@@ -63,7 +63,7 @@ export async function actualizarPlan(req: Request, res: Response) {
 
 /** POST /candidato/listas/:id/enviar-revision */
 export async function enviarARevision(req: Request, res: Response) {
-  const lista = await service.enviarARevision(req.user!.sub, Number(req.params.id));
+  const lista = await service.enviarARevision(req.user!.sub, Number(req.params.id), req.user!.fk_id_institucion);
   res.json(lista);
 }
 
@@ -74,7 +74,7 @@ export async function buscarIntegrantes(req: Request, res: Response) {
     res.status(422).json({ error: 'Indica al menos 2 caracteres en el parámetro "buscar".' });
     return;
   }
-  const encontrados = await service.buscarIntegrantes(req.user!.sub, texto);
+  const encontrados = await service.buscarIntegrantes(req.user!.sub, texto, req.user!.fk_id_institucion);
   res.json(encontrados);
 }
 

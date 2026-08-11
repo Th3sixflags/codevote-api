@@ -123,7 +123,7 @@ export async function buscarPosiblesIntegrantes(
   params.push(limite);
 
   const [rows] = await pool.query(
-    `SELECT e.cedula, e.nombres, e.apellidos, c.nombre_carrera
+    `SELECT e.*, c.nombre_carrera
      FROM estudiante e
      LEFT JOIN carrera c ON c.id_carrera = e.fk_id_carrera
      WHERE (e.nombres LIKE ? OR e.apellidos LIKE ? OR e.cedula LIKE ?)
