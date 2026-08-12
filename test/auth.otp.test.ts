@@ -73,11 +73,19 @@ function ejecutar(sqlCrudo: string, params: any[] = []): any {
 
   if (sql.includes('FROM estudiante') && sql.includes('correo_institucional = ? OR cedula = ?')) {
     if (!estado.cuentaActiva) return [];
-    if (params[0] !== CORREO && params[0] !== CEDULA) return [];
-    return [{
-      cedula: CEDULA, nombres: 'Ana', apellidos: 'Carpio',
-      correo_institucional: CORREO, rol: 'estudiante', foto_url: null,
-    }];
+    if (params[0] === CORREO || params[0] === CEDULA) {
+      return [{
+        cedula: CEDULA, nombres: 'Ana', apellidos: 'Carpio',
+        correo_institucional: CORREO, rol: 'estudiante', foto_url: null,
+      }];
+    }
+    if (params[0] === 'admin@uide.edu.ec' || params[0] === '1105830812') {
+      return [{
+        cedula: '1105830812', nombres: 'Deyvi', apellidos: 'Admin',
+        correo_institucional: 'admin@uide.edu.ec', rol: 'admin', foto_url: null,
+      }];
+    }
+    return [];
   }
   if (sql.includes('FROM codigo_acceso') && sql.includes('usado_at IS NULL')) {
     const c = vigenteDe(params[0]);
@@ -206,6 +214,21 @@ test('también se puede pedir con la cédula', async () => {
 
   assert.equal(http, 200);
   assert.equal(cuerpo.correo_enmascarado, enmascararCorreo(CORREO));
+});
+
+test('admin puede iniciar sesión por cédula y correo', async () => {
+  const { http, cuerpo } = await pedirCodigo('1105830812');
+  assert.equal(http, 200);
+  assert.equal(cuerpo.correo_enmascarado, enmascararCorreo('admin@uide.edu.ec'));
+
+  const codigo = ultimoCodigoEmitido();
+  const { http: httpVerificar, cuerpo: cuerpoVerificar } = await verificar(codigo, '1105830812');
+  
+  assert.equal(httpVerificar, 200);
+  const payload = jwt.verify(cuerpoVerificar.token, process.env.JWT_SECRET!) as any;
+  assert.equal(payload.rol, 'admin');
+  assert.equal(payload.sub, '1105830812');
+  assert.equal(cuerpoVerificar.usuario.rol, 'admin');
 });
 
 test('una cuenta inexistente responde exactamente igual: no revela el padrón', async () => {

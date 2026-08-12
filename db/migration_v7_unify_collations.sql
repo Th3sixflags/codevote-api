@@ -13,6 +13,7 @@ ALTER TABLE notificacion DROP FOREIGN KEY fk_notificacion_estudiante;
 ALTER TABLE asignacion_candidatura DROP FOREIGN KEY fk_asignacion_estudiante;
 ALTER TABLE historial_importacion DROP FOREIGN KEY fk_historial_importador;
 ALTER TABLE sancion_electoral DROP FOREIGN KEY fk_sancion_estudiante;
+ALTER TABLE codigo_acceso DROP FOREIGN KEY fk_codigo_acceso_estudiante;
 
 -- 2. Modificar columnas a utf8mb4_unicode_ci
 -- ESTUDIANTE
@@ -42,6 +43,12 @@ ALTER TABLE codigo_voto MODIFY COLUMN fk_cedula_estudiante VARCHAR(20) CHARACTER
 ALTER TABLE codigo_voto MODIFY COLUMN codigo_hash VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL;
 ALTER TABLE codigo_voto MODIFY COLUMN codigo_verificacion CHAR(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL;
 ALTER TABLE codigo_voto MODIFY COLUMN estado_codigo ENUM('generado', 'enviado', 'usado', 'expirado') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'generado';
+
+-- CODIGO ACCESO
+ALTER TABLE codigo_acceso DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE codigo_acceso MODIFY COLUMN fk_cedula_estudiante VARCHAR(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL;
+ALTER TABLE codigo_acceso MODIFY COLUMN codigo_hash VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL;
+ALTER TABLE codigo_acceso MODIFY COLUMN ip VARCHAR(45) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL;
 
 -- NOTIFICACION
 ALTER TABLE notificacion DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -95,5 +102,6 @@ ALTER TABLE notificacion ADD CONSTRAINT fk_notificacion_estudiante FOREIGN KEY (
 ALTER TABLE asignacion_candidatura ADD CONSTRAINT fk_asignacion_estudiante FOREIGN KEY (fk_cedula_estudiante) REFERENCES estudiante(cedula);
 ALTER TABLE historial_importacion ADD CONSTRAINT fk_historial_importador FOREIGN KEY (cedula_importador) REFERENCES estudiante(cedula);
 ALTER TABLE sancion_electoral ADD CONSTRAINT fk_sancion_estudiante FOREIGN KEY (fk_cedula_estudiante) REFERENCES estudiante(cedula) ON DELETE CASCADE;
+ALTER TABLE codigo_acceso ADD CONSTRAINT fk_codigo_acceso_estudiante FOREIGN KEY (fk_cedula_estudiante) REFERENCES estudiante(cedula) ON DELETE CASCADE;
 
 SET FOREIGN_KEY_CHECKS = 1;
