@@ -3,54 +3,60 @@ SET NAMES utf8mb4;
 
 USE codevote_db;
 
+-- 0. institución base de demostración
+INSERT INTO institucion
+  (id_institucion, nombre, slug, tipo, dominio_email, activo)
+VALUES
+  (1, 'Universidad Internacional del Ecuador', 'uide', 'universidad', 'uide.edu.ec', 1);
+
 -- 1. facultad
-INSERT INTO facultad (nombre_facultad) VALUES 
-('Ingeniería y Ciencias Aplicadas'), 
-('Ciencias Médicas y de la Salud');
+INSERT INTO facultad (nombre_facultad, fk_id_institucion) VALUES
+('Ingeniería y Ciencias Aplicadas', 1),
+('Ciencias Médicas y de la Salud', 1);
 
 -- 2. director
-INSERT INTO director (nombres, apellidos, correo) VALUES 
-('Carlos', 'Mendoza', 'cmendoza@uide.edu.ec'), 
-('Ana', 'Suárez', 'asuarez@uide.edu.ec');
+INSERT INTO director (nombres, apellidos, correo, fk_id_institucion) VALUES
+('Carlos', 'Mendoza', 'cmendoza@uide.edu.ec', 1),
+('Ana', 'Suárez', 'asuarez@uide.edu.ec', 1);
 
 -- 3. carrera
-INSERT INTO carrera (nombre_carrera, fk_id_director, fk_id_facultad) VALUES
-('Ingeniería de Software', 1, 1),
-('Ingeniería Civil', 1, 1),
-('Medicina', 2, 2),
+INSERT INTO carrera (nombre_carrera, fk_id_director, fk_id_facultad, fk_id_institucion) VALUES
+('Ingeniería de Software', 1, 1, 1),
+('Ingeniería Civil', 1, 1, 1),
+('Medicina', 2, 2, 1),
 -- Carreras de la facultad usadas por los procesos de representante de carrera.
-('Arquitectura', 1, 1),
-('Administración de Empresas', 1, 1),
-('Marketing e Inteligencia de Mercados', 1, 1),
-('Psicología Clínica', 2, 2),
-('TICs', 1, 1),
-('Derecho', 1, 1);
+('Arquitectura', 1, 1, 1),
+('Administración de Empresas', 1, 1, 1),
+('Marketing e Inteligencia de Mercados', 1, 1, 1),
+('Psicología Clínica', 2, 2, 1),
+('TICs', 1, 1, 1),
+('Derecho', 1, 1, 1);
 
 -- 4. estudiante (20 registros con bcrypt password123)
 -- Hash: $2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e
 -- OJO: `promedio` va en escala 0–100, que es la que usa toda la aplicación
 -- (PROMEDIO_MINIMO_POSTULACION = 85). No cargar notas sobre 10.
-INSERT INTO estudiante (cedula, nombres, apellidos, correo_institucional, promedio, estado_academico, fk_id_carrera, password, rol) VALUES
-('1710000009', 'Steven', 'Chininin', 'stchinininca@uide.edu.ec', 95, 'activo', 1, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e', 'superadmin'),
-('1710000017', 'María', 'González', 'mgonzalez@uide.edu.ec', 82, 'activo', 1, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e', 'estudiante'),
-('1710000025', 'Carlos', 'Pérez', 'cperez@uide.edu.ec', 75, 'activo', 2, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e', 'estudiante'),
-('1710000033', 'Ana', 'Torres', 'atorres@uide.edu.ec', 98, 'activo', 3, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e', 'estudiante'),
-('1710000041', 'Luis', 'Ramírez', 'lramirez@uide.edu.ec', 69, 'activo', 1, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e', 'estudiante'),
-('1710000058', 'Sofía', 'Mendoza', 'smendoza@uide.edu.ec', 89, 'activo', 2, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e', 'estudiante'),
-('1710000066', 'Diego', 'Castillo', 'dcastillo@uide.edu.ec', 78, 'activo', 3, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e', 'estudiante'),
-('1710000074', 'Valentina', 'Ruiz', 'vruiz@uide.edu.ec', 91, 'activo', 1, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e', 'estudiante'),
-('1710000082', 'Andrés', 'Mora', 'amora@uide.edu.ec', 84, 'activo', 2, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e', 'estudiante'),
-('1710000090', 'Camila', 'Vega', 'cvega@uide.edu.ec', 72, 'activo', 3, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e', 'estudiante'),
-('1710000108', 'Javier', 'Cordero', 'jcordero@uide.edu.ec', 86, 'activo', 1, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e', 'estudiante'),
-('1710000116', 'Gabriela', 'Lara', 'glara@uide.edu.ec', 93, 'activo', 2, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e', 'estudiante'),
-('1710000124', 'Felipe', 'Herrera', 'fherrera@uide.edu.ec', 68, 'activo', 3, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e', 'estudiante'),
-('1710000132', 'Natalia', 'Ortiz', 'nortiz@uide.edu.ec', 88, 'activo', 1, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e', 'estudiante'),
-('1710000140', 'Roberto', 'Iglesias', 'riglesias@uide.edu.ec', 79, 'activo', 2, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e', 'estudiante'),
-('1710000157', 'Laura', 'Sánchez', 'lsanchez@uide.edu.ec', 92, 'activo', 3, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e', 'estudiante'),
-('1710000165', 'Tomás', 'Rojas', 'trojas@uide.edu.ec', 74, 'activo', 1, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e', 'estudiante'),
-('1710000173', 'Isabella', 'Flores', 'iflores@uide.edu.ec', 85, 'activo', 2, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e', 'estudiante'),
-('1710000181', 'Martín', 'Acosta', 'macosta@uide.edu.ec', 71, 'activo', 3, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e', 'estudiante'),
-('1710000199', 'Elena', 'Guerrero', 'eguerrero@uide.edu.ec', 90, 'activo', 1, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e', 'estudiante');
+INSERT INTO estudiante (cedula, nombres, apellidos, correo_institucional, promedio, estado_academico, fk_id_carrera, password, rol, fk_id_institucion) VALUES
+('1710000009', 'Steven', 'Chininin', 'stchinininca@uide.edu.ec', 95, 'activo', NULL, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e', 'superadmin', NULL),
+('1710000017', 'María', 'González', 'mgonzalez@uide.edu.ec', 82, 'activo', 1, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e', 'estudiante', 1),
+('1710000025', 'Carlos', 'Pérez', 'cperez@uide.edu.ec', 75, 'activo', 2, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e', 'estudiante', 1),
+('1710000033', 'Ana', 'Torres', 'atorres@uide.edu.ec', 98, 'activo', 3, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e', 'estudiante', 1),
+('1710000041', 'Luis', 'Ramírez', 'lramirez@uide.edu.ec', 69, 'activo', 1, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e', 'estudiante', 1),
+('1710000058', 'Sofía', 'Mendoza', 'smendoza@uide.edu.ec', 89, 'activo', 2, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e', 'estudiante', 1),
+('1710000066', 'Diego', 'Castillo', 'dcastillo@uide.edu.ec', 78, 'activo', 3, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e', 'estudiante', 1),
+('1710000074', 'Valentina', 'Ruiz', 'vruiz@uide.edu.ec', 91, 'activo', 1, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e', 'estudiante', 1),
+('1710000082', 'Andrés', 'Mora', 'amora@uide.edu.ec', 84, 'activo', 2, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e', 'estudiante', 1),
+('1710000090', 'Camila', 'Vega', 'cvega@uide.edu.ec', 72, 'activo', 3, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e', 'estudiante', 1),
+('1710000108', 'Javier', 'Cordero', 'jcordero@uide.edu.ec', 86, 'activo', 1, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e', 'estudiante', 1),
+('1710000116', 'Gabriela', 'Lara', 'glara@uide.edu.ec', 93, 'activo', 2, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e', 'estudiante', 1),
+('1710000124', 'Felipe', 'Herrera', 'fherrera@uide.edu.ec', 68, 'activo', 3, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e', 'estudiante', 1),
+('1710000132', 'Natalia', 'Ortiz', 'nortiz@uide.edu.ec', 88, 'activo', 1, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e', 'estudiante', 1),
+('1710000140', 'Roberto', 'Iglesias', 'riglesias@uide.edu.ec', 79, 'activo', 2, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e', 'estudiante', 1),
+('1710000157', 'Laura', 'Sánchez', 'lsanchez@uide.edu.ec', 92, 'activo', 3, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e', 'estudiante', 1),
+('1710000165', 'Tomás', 'Rojas', 'trojas@uide.edu.ec', 74, 'activo', 1, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e', 'estudiante', 1),
+('1710000173', 'Isabella', 'Flores', 'iflores@uide.edu.ec', 85, 'activo', 2, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e', 'estudiante', 1),
+('1710000181', 'Martín', 'Acosta', 'macosta@uide.edu.ec', 71, 'activo', 3, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e', 'estudiante', 1),
+('1710000199', 'Elena', 'Guerrero', 'eguerrero@uide.edu.ec', 90, 'activo', 1, '$2b$12$3OzHrkuizGgocsXFhBrmouJayTnyVknGV/Iorxjhk0xYUNsnQP.5e', 'estudiante', 1);
 
 -- Usuario administrador de prueba (el resto queda con el rol 'estudiante' por defecto)
 UPDATE estudiante SET rol = 'admin' WHERE cedula = '1710000017';
@@ -61,9 +67,12 @@ INSERT INTO responsable (nombres, apellidos, cargo, correo) VALUES
 ('Marta', 'Reyes', 'Secretaria Tribunal', 'mreyes@uide.edu.ec');
 
 -- 6. proceso_electoral
-INSERT INTO proceso_electoral (nombre_proceso, tipo_proceso, fecha_convocatoria, fecha_inicio_votacion, fecha_fin_votacion, estado, descripcion) VALUES 
-('Elecciones Consejo 2026', 'consejo_estudiantil', '2026-06-01', '2026-07-01 08:00:00', '2026-07-02 17:00:00', 'votacion', 'Elección principal del año'),
-('Referéndum Estatutos 2025', 'referendum', '2025-05-01', '2025-06-01 08:00:00', '2025-06-02 17:00:00', 'finalizado', 'Revisión de estatutos');
+INSERT INTO proceso_electoral
+  (nombre_proceso, tipo_proceso, fecha_convocatoria, fecha_inicio_votacion,
+   fecha_fin_votacion, estado, descripcion, fk_id_institucion)
+VALUES
+('Elecciones Consejo 2026', 'consejo_estudiantil', '2026-06-01', '2026-07-01 08:00:00', '2026-07-02 17:00:00', 'votacion', 'Elección principal del año', 1),
+('Referéndum Estatutos 2025', 'referendum', '2025-05-01', '2025-06-01 08:00:00', '2025-06-02 17:00:00', 'finalizado', 'Revisión de estatutos', 1);
 
 -- 7. cronograma
 INSERT INTO cronograma (fk_id_proceso, fk_id_responsable, actividad, fecha_inicio, fecha_fin) VALUES 

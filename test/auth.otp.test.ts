@@ -181,12 +181,12 @@ const verificar = (codigo: string, identificador = CORREO) =>
  * fuera. Se captura ese aviso, de modo que la prueba lee lo mismo que leería
  * quien levanta el backend en local.
  */
-function ultimoCodigoEmitido(): string {
+function ultimoCodigoEmitido(cedula = CEDULA): string {
   const encontrado = avisos.at(-1)?.match(/\bes (\d{6})\b/);
   assert.ok(encontrado, 'el servicio no registró el código emitido');
   // Y de paso se confirma que lo guardado es el hash de ese código.
   const hash = createHash('sha256').update(encontrado![1]).digest('hex');
-  assert.equal(vigenteDe(CEDULA)?.codigo_hash, hash, 'el hash guardado no corresponde al código enviado');
+  assert.equal(vigenteDe(cedula)?.codigo_hash, hash, 'el hash guardado no corresponde al código enviado');
   return encontrado![1];
 }
 
@@ -221,7 +221,7 @@ test('admin puede iniciar sesión por cédula y correo', async () => {
   assert.equal(http, 200);
   assert.equal(cuerpo.correo_enmascarado, enmascararCorreo('admin@uide.edu.ec'));
 
-  const codigo = ultimoCodigoEmitido();
+  const codigo = ultimoCodigoEmitido('1105830812');
   const { http: httpVerificar, cuerpo: cuerpoVerificar } = await verificar(codigo, '1105830812');
   
   assert.equal(httpVerificar, 200);

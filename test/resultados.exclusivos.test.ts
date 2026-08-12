@@ -100,6 +100,25 @@ test('un rechazo nunca llega a consultar la base', async () => {
   assert.deepEqual(consultas, [], 'una petición sin permiso consultó los resultados');
 });
 
+test('un administrador no puede crear, editar ni borrar actas manualmente', async () => {
+  const autorizacion = `Bearer ${jwt.sign(
+    { sub: '1710000009', rol: 'admin', fk_id_institucion: 1 },
+    process.env.JWT_SECRET!
+  )}`;
+  for (const [method, ruta] of [
+    ['POST', '/api/actas-resultados'],
+    ['PATCH', '/api/actas-resultados/1'],
+    ['DELETE', '/api/actas-resultados/1'],
+  ]) {
+    const respuesta = await fetch(`${baseUrl}${ruta}`, {
+      method,
+      headers: { Authorization: autorizacion, 'Content-Type': 'application/json' },
+      body: method === 'DELETE' ? undefined : '{}',
+    });
+    assert.equal(respuesta.status, 404, `${method} ${ruta} sigue expuesto`);
+  }
+});
+
 // --- 2. Ningún otro contrato filtra resultados -----------------------------
 
 const DIR_SRC = path.resolve(import.meta.dirname, '../src');

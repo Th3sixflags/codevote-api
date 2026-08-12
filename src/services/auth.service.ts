@@ -171,6 +171,7 @@ export interface SesionIniciada {
     correo_institucional: string;
     rol: string;
     foto_url: string | null;
+    fk_id_institucion?: number;
   };
 }
 
@@ -223,6 +224,7 @@ export async function verificarCodigo(
       correo_institucional: cuenta.correo_institucional,
       rol:                  cuenta.rol,
       foto_url:             cuenta.foto_url ?? null,
+      fk_id_institucion:    cuenta.rol === 'superadmin' ? undefined : cuenta.fk_id_institucion,
     },
   };
 }

@@ -1,14 +1,15 @@
 import { Request, Response } from 'express';
 import { crearActaResultadosSchema, actualizarActaResultadosSchema } from '../schemas/acta_resultados.schema.js';
 import * as service from '../services/acta_resultados.service.js';
+import { institucionDeSesion } from '../utils/institucion.js';
 
 export async function listar(req: Request, res: Response) {
-  const registros = await service.listarActaResultados(req.user?.fk_id_institucion);
+  const registros = await service.listarActaResultados(institucionDeSesion(req.user?.rol, req.user?.fk_id_institucion));
   res.json(registros);
 }
 
 export async function obtener(req: Request, res: Response) {
-  const registro = await service.obtenerActaResultados(Number(req.params.id), req.user?.fk_id_institucion);
+  const registro = await service.obtenerActaResultados(Number(req.params.id), institucionDeSesion(req.user?.rol, req.user?.fk_id_institucion));
   if (!registro) {
     res.status(404).json({ error: 'Acta no encontrada.' });
     return;
@@ -17,7 +18,7 @@ export async function obtener(req: Request, res: Response) {
 }
 
 export async function listarPorVotacion(req: Request, res: Response) {
-  const registros = await service.listarPorVotacion(Number(req.params.votacionId), req.user?.fk_id_institucion);
+  const registros = await service.listarPorVotacion(Number(req.params.votacionId), institucionDeSesion(req.user?.rol, req.user?.fk_id_institucion));
   res.json(registros);
 }
 

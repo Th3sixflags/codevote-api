@@ -9,6 +9,27 @@ jobs:
   # 1) Verifica que el TypeScript compile antes de desplegar nada.
   verificar:
     runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
+          MYSQL_DATABASE: codevote_db
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -u root"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: ''
+      DB_NAME: codevote_db
+      JWT_SECRET: secreto-ci-codevote
+      NODE_ENV: test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -16,7 +37,16 @@ jobs:
           node-version: '20'
           cache: npm
       - run: npm ci
+      - name: Preparar MySQL de pruebas
+        run: |
+          mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u root codevote_db < db/schema.sql
+          mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u root codevote_db < db/migrations/2026-08-04_login_otp.sql
+          mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u root codevote_db < db/migrations/2026-08-04_recordatorios_y_sanciones.sql
+          mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u root codevote_db < db/migrations/2026-08-12_aislamiento_institucional.sql
+          mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u root codevote_db < db/migrations/2026-08-12_aislamiento_institucional.sql
+      - run: npm run lint
       - run: npm run build
+      - run: npm test
 
   # 2) Despliega en el servidor AWS por SSH usando Docker Compose.
   desplegar:

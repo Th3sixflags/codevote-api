@@ -87,7 +87,7 @@ let servidor: ReturnType<typeof app.listen>;
 let baseUrl = '';
 
 const tokenAdmin = jwt.sign(
-  { sub: '1710000009', email: 'schininin@uide.edu.ec', rol: 'admin' },
+  { sub: '1710000009', email: 'schininin@uide.edu.ec', rol: 'admin', fk_id_institucion: 1 },
   process.env.JWT_SECRET!
 );
 
@@ -192,7 +192,7 @@ for (const endpoint of ENDPOINTS_DE_ADMIN) {
     assert.equal(sinToken.status, 401);
 
     const tokenEstudiante = jwt.sign(
-      { sub: '1105946139', email: 'ancarpioto@uide.edu.ec', rol: 'estudiante' },
+      { sub: '1105946139', email: 'ancarpioto@uide.edu.ec', rol: 'estudiante', fk_id_institucion: 1 },
       process.env.JWT_SECRET!
     );
     const comoEstudiante = await fetch(`${baseUrl}${endpoint.ruta}`, {
@@ -202,7 +202,7 @@ for (const endpoint of ENDPOINTS_DE_ADMIN) {
   });
 }
 
-test('crear y actualizar tampoco devuelven la cedula que llego en el body', async () => {
+test('crear, actualizar y borrar comprobantes están bloqueados para administradores', async () => {
   const cuerpoEnvio = {
     fk_id_votacion: 1,
     codigo_hash: 'a1b2c3d4e5f6',
@@ -214,16 +214,18 @@ test('crear y actualizar tampoco devuelven la cedula que llego en el body', asyn
     headers: { Authorization: `Bearer ${tokenAdmin}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(cuerpoEnvio),
   });
-  const comprobanteCreado = await creado.json();
-  assert.equal(creado.status, 201);
-  assert.ok(!('fk_cedula_estudiante' in comprobanteCreado), 'POST devuelve la cedula');
+  assert.equal(creado.status, 404);
 
   const actualizado = await fetch(`${baseUrl}/api/codigos-voto/1`, {
     method: 'PATCH',
     headers: { Authorization: `Bearer ${tokenAdmin}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ estado_codigo: 'usado' }),
   });
-  const comprobanteActualizado = await actualizado.json();
-  assert.equal(actualizado.status, 200);
-  assert.ok(!('fk_cedula_estudiante' in comprobanteActualizado), 'PATCH devuelve la cedula');
+  assert.equal(actualizado.status, 404);
+
+  const eliminado = await fetch(`${baseUrl}/api/codigos-voto/1`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${tokenAdmin}` },
+  });
+  assert.equal(eliminado.status, 404);
 });

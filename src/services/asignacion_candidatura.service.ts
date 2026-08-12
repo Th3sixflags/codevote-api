@@ -12,13 +12,13 @@ import { HttpError } from '../utils/httpError.js';
  */
 
 /** Consulta la asignación de un estudiante (null si no tiene). */
-export async function obtenerDeEstudiante(cedula: string) {
-  return repo.findByEstudiante(cedula);
+export async function obtenerDeEstudiante(cedula: string, institucionId?: number) {
+  return repo.findByEstudiante(cedula, institucionId);
 }
 
 /** Asignación activa del candidato autenticado (null si no tiene). */
-export async function obtenerActiva(cedula: string) {
-  return repo.findActivaDeEstudiante(cedula);
+export async function obtenerActiva(cedula: string, institucionId?: number) {
+  return repo.findActivaDeEstudiante(cedula, institucionId);
 }
 
 /**
@@ -27,17 +27,17 @@ export async function obtenerActiva(cedula: string) {
  *  - la papeleta existe y su proceso está en periodo de inscripción;
  *  - si la papeleta es de una carrera, el candidato debe ser de esa carrera.
  */
-async function validarAsignacion(cedula: string, votacionId: number) {
-  const estudiante = await estudianteRepo.findByCedula(cedula);
+async function validarAsignacion(cedula: string, votacionId: number, institucionId?: number) {
+  const estudiante = await estudianteRepo.findByCedula(cedula, institucionId);
   if (!estudiante) throw new HttpError(404, 'El estudiante indicado no existe.');
   if (String(estudiante.rol).toLowerCase() !== 'candidato') {
     throw new HttpError(409, 'Solo una cuenta con rol candidato puede recibir una asignación de candidatura.');
   }
 
-  const votacion = await votacionRepo.findById(votacionId);
+  const votacion = await votacionRepo.findById(votacionId, institucionId);
   if (!votacion) throw new HttpError(404, 'La papeleta (votación) indicada no existe.');
 
-  const proceso = await procesoRepo.findById(votacion.id_proceso);
+  const proceso = await procesoRepo.findById(votacion.id_proceso, institucionId);
   if (!proceso) throw new HttpError(404, 'El proceso de la papeleta no existe.');
   if (proceso.estado !== 'inscripcion') {
     throw new HttpError(409, 'El proceso de esa papeleta no está en periodo de inscripción.');
@@ -55,8 +55,8 @@ async function validarAsignacion(cedula: string, votacionId: number) {
 }
 
 /** Impide mover o retirar la asignación si ya hay una lista que debe conservarse. */
-async function verificarSinListaComprometida(cedula: string, accion: string) {
-  const lista = await repo.listaQueBloquea(cedula);
+async function verificarSinListaComprometida(cedula: string, accion: string, institucionId?: number) {
+  const lista = await repo.listaQueBloquea(cedula, institucionId);
   if (!lista) return;
 
   // El mensaje anterior pedía "retirar o rechazar esa lista", que no es la
@@ -72,35 +72,35 @@ async function verificarSinListaComprometida(cedula: string, accion: string) {
 }
 
 /** Crea la asignación. Falla con 409 si ya tiene una. */
-export async function asignar(cedula: string, votacionId: number) {
+export async function asignar(cedula: string, votacionId: number, institucionId?: number) {
   // Solo bloquea una asignación ACTIVA de un proceso vigente. Antes bastaba con
   // que existiera cualquier fila —incluida una ya retirada por haberse
   // archivado su proceso—, así que quien había sido candidato una vez no podía
   // volver a serlo. La fila anterior se reutiliza (ver repo.create).
-  const activa = await repo.findActivaDeEstudiante(cedula);
+  const activa = await repo.findActivaDeEstudiante(cedula, institucionId);
   if (activa) {
     throw new HttpError(409, `El candidato ya tiene una asignación activa (papeleta "${activa.titulo_papeleta}"). Modifícala o retírala antes de crear otra.`);
   }
 
-  await validarAsignacion(cedula, votacionId);
-  return repo.create(cedula, votacionId);
+  await validarAsignacion(cedula, votacionId, institucionId);
+  return repo.create(cedula, votacionId, institucionId);
 }
 
 /** Cambia la papeleta asignada. */
-export async function reasignar(cedula: string, votacionId: number) {
-  const existente = await repo.findByEstudiante(cedula);
+export async function reasignar(cedula: string, votacionId: number, institucionId?: number) {
+  const existente = await repo.findByEstudiante(cedula, institucionId);
   if (!existente) return null;
 
-  await verificarSinListaComprometida(cedula, 'cambiar');
-  await validarAsignacion(cedula, votacionId);
-  return repo.updateVotacion(cedula, votacionId);
+  await verificarSinListaComprometida(cedula, 'cambiar', institucionId);
+  await validarAsignacion(cedula, votacionId, institucionId);
+  return repo.updateVotacion(cedula, votacionId, institucionId);
 }
 
 /** Retira (elimina) la asignación. */
-export async function retirar(cedula: string) {
-  const existente = await repo.findByEstudiante(cedula);
+export async function retirar(cedula: string, institucionId?: number) {
+  const existente = await repo.findByEstudiante(cedula, institucionId);
   if (!existente) return false;
 
-  await verificarSinListaComprometida(cedula, 'retirar');
-  return repo.remove(cedula);
+  await verificarSinListaComprometida(cedula, 'retirar', institucionId);
+  return repo.remove(cedula, institucionId);
 }

@@ -1,14 +1,15 @@
 import { Request, Response } from 'express';
 import { crearCarreraSchema, actualizarCarreraSchema } from '../schemas/carrera.schema.js';
 import * as service from '../services/carrera.service.js';
+import { institucionDeSesion } from '../utils/institucion.js';
 
-export async function listar(_req: Request, res: Response) {
-  const registros = await service.listarCarrera();
+export async function listar(req: Request, res: Response) {
+  const registros = await service.listarCarrera(institucionDeSesion(req.user?.rol, req.user?.fk_id_institucion));
   res.json(registros);
 }
 
 export async function obtener(req: Request, res: Response) {
-  const registro = await service.obtenerCarrera(Number(req.params.id));
+  const registro = await service.obtenerCarrera(Number(req.params.id), institucionDeSesion(req.user?.rol, req.user?.fk_id_institucion));
   if (!registro) {
     res.status(404).json({ error: 'Carrera no encontrada.' });
     return;
@@ -18,13 +19,13 @@ export async function obtener(req: Request, res: Response) {
 
 export async function crear(req: Request, res: Response) {
   const data  = crearCarreraSchema.parse(req.body);
-  const nuevo = await service.crearCarrera(data);
+  const nuevo = await service.crearCarrera(data, req.user?.fk_id_institucion);
   res.status(201).json(nuevo);
 }
 
 export async function actualizar(req: Request, res: Response) {
   const data        = actualizarCarreraSchema.parse(req.body);
-  const actualizado = await service.actualizarCarrera(Number(req.params.id), data);
+  const actualizado = await service.actualizarCarrera(Number(req.params.id), data, institucionDeSesion(req.user?.rol, req.user?.fk_id_institucion));
   if (!actualizado) {
     res.status(404).json({ error: 'Carrera no encontrada.' });
     return;
@@ -33,7 +34,7 @@ export async function actualizar(req: Request, res: Response) {
 }
 
 export async function eliminar(req: Request, res: Response) {
-  const eliminado = await service.eliminarCarrera(Number(req.params.id));
+  const eliminado = await service.eliminarCarrera(Number(req.params.id), institucionDeSesion(req.user?.rol, req.user?.fk_id_institucion));
   if (!eliminado) {
     res.status(404).json({ error: 'Carrera no encontrada.' });
     return;

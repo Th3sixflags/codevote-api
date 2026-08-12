@@ -5,18 +5,29 @@ import { procesoVisible } from '../utils/accesoCarrera.js';
 import { disponibilidadDeVoto } from '../utils/estadoVotacion.js';
 import type { FiltroCarrera } from '../repositories/proceso_electoral.repository.js';
 import { CrearVotoDTO } from '../schemas/voto.schema.js';
+import { institucionObligatoria } from '../utils/institucion.js';
 
 export async function yaVoto(votacionId: number, cedula: string) {
   return repo.yaVotoEstudiante(votacionId, cedula);
 }
 
-export async function registrarVoto(data: CrearVotoDTO, cedula: string, filtro: FiltroCarrera = undefined, institucionId?: number) {
+export async function registrarVoto(data: CrearVotoDTO, cedula: string, institucionId?: number) {
+  const tenant = institucionObligatoria(institucionId);
+
+  const { comprobante, ...voto } = await repo.enTransaccion(async (conn) => {
   // Integridad electoral: solo se acepta el voto si la votación está ABIERTA y
   // su proceso está activo. Sin esto, una llamada directa a la API permitiría
   // votar en votaciones cerradas o pendientes (el frontend ya lo bloquea, pero
   // el backend debe hacerlo por su cuenta).
-  const estado = await repo.estadoDeVotacion(data.fk_id_votacion, institucionId);
+  // `FOR UPDATE` serializa esta operación con el UPDATE del cierre. Al obtener
+  // el bloqueo, el estado leído es el que realmente decidirá si el voto entra.
+  const estado = await repo.estadoDeVotacion(data.fk_id_votacion, tenant, conn, true);
   if (!estado) throw new HttpError(404, 'La votación indicada no existe o pertenece a otra institución.');
+
+  const votante = await repo.votanteHabilitadoParaActualizar(cedula, tenant, conn);
+  if (!votante) {
+    throw new HttpError(403, 'No perteneces al padrón activo de esta institución.');
+  }
 
   // La FECHA se comprueba aquí directamente, no se confía en `votacion.estado`.
   //
@@ -41,7 +52,8 @@ export async function registrarVoto(data: CrearVotoDTO, cedula: string, filtro: 
   // Segmentación por carrera: cada papeleta puede ser global o de una carrera.
   // Solo los estudiantes de esa carrera pueden votarla. Se comprueba en el
   // backend y no se delega al frontend.
-  if (!procesoVisible(estado.carrera_votacion, filtro)) {
+  const carreraVotante = votante.fk_id_carrera == null ? null : Number(votante.fk_id_carrera);
+  if (!procesoVisible(estado.carrera_votacion, carreraVotante)) {
     throw new HttpError(403, 'Esta votación corresponde a otra carrera.');
   }
 
@@ -55,7 +67,11 @@ export async function registrarVoto(data: CrearVotoDTO, cedula: string, filtro: 
   // no es una opción de la papeleta: tampoco se muestra en Elecciones, así que
   // llegar aquí con ella solo puede venir de una llamada directa a la API.
   if (data.tipo_voto === 'valido' && data.fk_id_lista != null) {
-    const estadoLista = await repo.estadoDeListaEnVotacion(data.fk_id_lista, data.fk_id_votacion);
+    const estadoLista = await repo.estadoDeListaEnVotacion(
+      data.fk_id_lista,
+      data.fk_id_votacion,
+      conn
+    );
     if (estadoLista === null) {
       throw new HttpError(400, 'La lista seleccionada no pertenece a esta votación.');
     }
@@ -64,10 +80,17 @@ export async function registrarVoto(data: CrearVotoDTO, cedula: string, filtro: 
     }
   }
 
+  // El doble voto se comprueba DESPUÉS de bloquear papeleta y votante, dentro de
+  // la transacción. La restricción única sigue siendo la última defensa.
+  if (await repo.yaVotoEstudiante(data.fk_id_votacion, cedula, conn)) {
+    throw new HttpError(409, 'Ya has emitido tu voto en esta votación.');
+  }
+
   // El hash del comprobante NUNCA se expone al estudiante (mantiene el voto
   // anónimo y evita relacionarlo con la opción elegida): se descarta aquí y
   // solo queda almacenado en codigo_voto para la auditoría administrativa.
-  const { comprobante, ...voto } = await repo.createConComprobante(data, cedula);
+  return repo.insertarVotoYComprobante(data, cedula, conn);
+  });
 
   // Se notifica al estudiante SOLO después de confirmar la transacción del
   // voto y el comprobante (best-effort: si falla, no rompe el voto).
@@ -109,7 +132,7 @@ export async function obtenerResultados(votacionId: number, institucionId?: numb
   const [filas, totalHabilitados, totalVotantes] = await Promise.all([
     repo.countByVotacion(votacionId),
     // Papeleta de carrera -> solo esa carrera; papeleta global -> todo el padrón.
-    repo.countHabilitados(carreraVotacion),
+    repo.countHabilitados(carreraVotacion, Number(estado.fk_id_institucion)),
     repo.countVotantes(votacionId),
   ]);
 

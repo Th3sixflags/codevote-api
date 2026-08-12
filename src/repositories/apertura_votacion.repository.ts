@@ -30,6 +30,7 @@ export interface PapeletaPorAbrir {
   estado_proceso: string;
   fecha_apertura: string;
   fecha_cierre: string;
+  fk_id_institucion: number;
 }
 
 /**
@@ -50,7 +51,7 @@ export async function papeletasPorAbrir(corteEnEcuador: string): Promise<Papelet
   const [rows] = await pool.query(
     `SELECT v.id_votacion, v.titulo_papeleta, v.fk_id_carrera,
             c.nombre_carrera,
-            p.id_proceso, p.nombre_proceso, p.estado AS estado_proceso,
+            p.id_proceso, p.nombre_proceso, p.estado AS estado_proceso, p.fk_id_institucion,
             v.fecha_apertura, v.fecha_cierre
        FROM votacion v
        JOIN proceso_electoral p ON p.id_proceso = v.fk_id_proceso

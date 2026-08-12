@@ -9,6 +9,7 @@ import { HttpError } from '../utils/httpError.js';
 import { verificarPropuestasCompletas } from '../utils/propuestasCompletas.js';
 import { CARGO_PRESIDENTE } from '../schemas/common.js';
 import { obtenerConfiguracionInstitucion, validarRequisitosCandidato } from './reglas_electorales.service.js';
+import { institucionObligatoria } from '../utils/institucion.js';
 import {
   CrearListaCandidatoDTO, ActualizarListaCandidatoDTO,
   AgregarCandidatoDTO, ActualizarCandidatoPortalDTO,
@@ -317,7 +318,8 @@ export async function enviarARevision(cedula: string, listaId: number, instituci
  * Devuelve únicamente cédula, nombres, apellidos y carrera.
  */
 export async function buscarIntegrantes(cedula: string, texto: string, institucionId?: number) {
-  const asignacion = await asignacionRepo.findActivaDeEstudiante(cedula);
+  const tenant = institucionObligatoria(institucionId);
+  const asignacion = await asignacionRepo.findActivaDeEstudiante(cedula, tenant);
   if (!asignacion) {
     throw new HttpError(409, 'Todavía no tienes una papeleta asignada, así que no puedes buscar integrantes.');
   }
@@ -326,7 +328,7 @@ export async function buscarIntegrantes(cedula: string, texto: string, instituci
   const carreraCompatible = (!config.requiere_carrera || asignacion.carrera_votacion == null) ? null : Number(asignacion.carrera_votacion);
   
   // Buscar en BD
-  const encontrados = await estudianteRepo.buscarPosiblesIntegrantes(carreraCompatible, texto);
+  const encontrados = await estudianteRepo.buscarPosiblesIntegrantes(carreraCompatible, texto, tenant);
   
   // Filtrar los que no cumplen los demás requisitos en memoria (promedio, membresia, etc.)
   const filtrados = encontrados.filter(estudiante => {

@@ -33,7 +33,7 @@ const BASE_QUERY = `
   SELECT
     v.id_votacion, v.titulo_papeleta, v.fecha_apertura, v.fecha_cierre, v.estado, v.foto_url,
     v.fk_id_carrera, c.nombre_carrera,
-    p.id_proceso, p.nombre_proceso,
+    p.id_proceso, p.nombre_proceso, p.fk_id_institucion,
     p.estado AS estado_proceso, p.fecha_fin_votacion,
     (p.archivado_at IS NOT NULL) AS archivado,
     EXISTS(SELECT 1 FROM voto x WHERE x.fk_id_votacion = v.id_votacion) AS tiene_votos,

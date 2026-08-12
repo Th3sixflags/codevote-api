@@ -6,10 +6,32 @@ CREATE DATABASE IF NOT EXISTS codevote_db CHARACTER SET utf8mb4 COLLATE utf8mb4_
 
 USE codevote_db;
 
+-- 0. institucion (raíz del aislamiento multi-tenant)
+CREATE TABLE institucion (
+  id_institucion INT AUTO_INCREMENT PRIMARY KEY,
+  nombre VARCHAR(255) NOT NULL,
+  slug VARCHAR(100) NOT NULL UNIQUE,
+  tipo VARCHAR(50) NOT NULL DEFAULT 'universidad',
+  descripcion TEXT NULL,
+  logo_url VARCHAR(500) NULL,
+  colores_json JSON NULL,
+  config_json JSON NULL,
+  email_contacto VARCHAR(255) NULL,
+  telefono VARCHAR(50) NULL,
+  direccion TEXT NULL,
+  sitio_web VARCHAR(500) NULL,
+  dominio_email VARCHAR(100) NULL,
+  activo TINYINT(1) NOT NULL DEFAULT 1,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 -- 1. facultad
 CREATE TABLE facultad (
   id_facultad INT AUTO_INCREMENT PRIMARY KEY,
-  nombre_facultad VARCHAR(100) NOT NULL
+  nombre_facultad VARCHAR(100) NOT NULL,
+  fk_id_institucion INT NOT NULL,
+  UNIQUE KEY uq_facultad_tenant_ref (id_facultad, fk_id_institucion),
+  CONSTRAINT fk_facultad_institucion FOREIGN KEY (fk_id_institucion) REFERENCES institucion(id_institucion)
 );
 
 -- 2. director
@@ -17,7 +39,10 @@ CREATE TABLE director (
   id_director INT AUTO_INCREMENT PRIMARY KEY,
   nombres VARCHAR(80) NOT NULL,
   apellidos VARCHAR(80) NOT NULL,
-  correo VARCHAR(120) NOT NULL
+  correo VARCHAR(120) NOT NULL,
+  fk_id_institucion INT NOT NULL,
+  UNIQUE KEY uq_director_tenant_ref (id_director, fk_id_institucion),
+  CONSTRAINT fk_director_institucion FOREIGN KEY (fk_id_institucion) REFERENCES institucion(id_institucion)
 );
 
 -- 3. carrera
@@ -26,8 +51,15 @@ CREATE TABLE carrera (
   nombre_carrera VARCHAR(100) NOT NULL,
   fk_id_director INT,
   fk_id_facultad INT,
+  fk_id_institucion INT NOT NULL,
+  UNIQUE KEY uq_carrera_tenant_ref (id_carrera, fk_id_institucion),
   CONSTRAINT fk_carrera_director FOREIGN KEY (fk_id_director) REFERENCES director(id_director),
-  CONSTRAINT fk_carrera_facultad FOREIGN KEY (fk_id_facultad) REFERENCES facultad(id_facultad)
+  CONSTRAINT fk_carrera_facultad FOREIGN KEY (fk_id_facultad) REFERENCES facultad(id_facultad),
+  CONSTRAINT fk_carrera_institucion FOREIGN KEY (fk_id_institucion) REFERENCES institucion(id_institucion),
+  CONSTRAINT fk_carrera_director_tenant FOREIGN KEY (fk_id_director, fk_id_institucion)
+    REFERENCES director(id_director, fk_id_institucion),
+  CONSTRAINT fk_carrera_facultad_tenant FOREIGN KEY (fk_id_facultad, fk_id_institucion)
+    REFERENCES facultad(id_facultad, fk_id_institucion)
 );
 
 -- 4. estudiante
@@ -41,14 +73,16 @@ CREATE TABLE estudiante (
   fk_id_carrera INT,
   fecha_ingreso DATE NULL DEFAULT NULL,
   membresia_activa TINYINT(1) NOT NULL DEFAULT 1,
-  password VARCHAR(255) NOT NULL, -- Added for JWT Auth
+  password VARCHAR(255) NULL, -- Legado: el acceso actual usa OTP, no contraseña
   rol ENUM('estudiante', 'admin', 'candidato', 'superadmin') NOT NULL DEFAULT 'estudiante', -- Usado por el login y los middlewares de autorización
   foto_url VARCHAR(255) NULL DEFAULT NULL, -- URL de la foto de perfil (portal del estudiante)
   -- 1 = la cuenta tiene una contraseña temporal y debe cambiarla al entrar.
   debe_cambiar_password TINYINT(1) NOT NULL DEFAULT 0,
-  fk_id_institucion INT NULL, -- Agregado en migration_v2_multi_tenant
+  fk_id_institucion INT NULL, -- NULL únicamente para superadmin global
   CONSTRAINT fk_estudiante_carrera FOREIGN KEY (fk_id_carrera) REFERENCES carrera(id_carrera),
-  CONSTRAINT fk_estudiante_institucion FOREIGN KEY (fk_id_institucion) REFERENCES institucion(id_institucion)
+  CONSTRAINT fk_estudiante_institucion FOREIGN KEY (fk_id_institucion) REFERENCES institucion(id_institucion),
+  CONSTRAINT fk_estudiante_carrera_tenant FOREIGN KEY (fk_id_carrera, fk_id_institucion)
+    REFERENCES carrera(id_carrera, fk_id_institucion)
 );
 
 -- 5. responsable
@@ -82,7 +116,9 @@ CREATE TABLE proceso_electoral (
   fecha_fin_inscripcion DATETIME NULL DEFAULT NULL,
   fecha_posesion DATETIME NULL DEFAULT NULL,
   foto_url VARCHAR(255) NULL DEFAULT NULL,            -- Imagen del proceso (URL https)
-  CONSTRAINT fk_proceso_carrera FOREIGN KEY (fk_id_carrera) REFERENCES carrera(id_carrera)
+  fk_id_institucion INT NOT NULL,
+  CONSTRAINT fk_proceso_carrera FOREIGN KEY (fk_id_carrera) REFERENCES carrera(id_carrera),
+  CONSTRAINT fk_proceso_institucion FOREIGN KEY (fk_id_institucion) REFERENCES institucion(id_institucion)
 );
 
 -- 7. cronograma
@@ -229,6 +265,7 @@ CREATE TABLE acta_resultados (
   votos_nulos INT NOT NULL DEFAULT 0,
   lista_ganadora VARCHAR(80),
   fecha_emision DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT uq_acta_votacion UNIQUE (fk_id_votacion),
   CONSTRAINT fk_acta_votacion FOREIGN KEY (fk_id_votacion) REFERENCES votacion(id_votacion)
 );
 

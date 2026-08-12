@@ -68,7 +68,9 @@ let servidor: ReturnType<typeof app.listen>;
 let baseUrl = '';
 
 const token = (sub: string) =>
-  jwt.sign({ sub, email: `${sub}@uide.edu.ec`, rol: 'estudiante' }, process.env.JWT_SECRET!);
+  jwt.sign({ sub, email: `${sub}@uide.edu.ec`, rol: 'estudiante', fk_id_institucion: 1 }, process.env.JWT_SECRET!);
+
+let colaTransacciones: Promise<void> = Promise.resolve();
 
 async function ejecutar(sqlCrudo: string, params: any[] = []): Promise<any> {
   const sql = sqlCrudo.replace(/\s+/g, ' ').trim();
@@ -80,6 +82,13 @@ async function ejecutar(sqlCrudo: string, params: any[] = []): Promise<any> {
       votacion: 'abierta', proceso: 'votacion', carrera_votacion: null, archivado: 0,
       fecha_apertura: '2026-01-01 08:00:00', fecha_cierre: '2099-12-31 23:59:59',
       fecha_fin_votacion: '2099-12-31 23:59:59',
+      fk_id_institucion: 1,
+    }];
+  }
+  if (sql.includes('FROM estudiante') && sql.includes('FOR UPDATE')) {
+    return [{
+      cedula: params[0], rol: 'estudiante', estado_academico: 'activo',
+      fk_id_carrera: null, fk_id_institucion: 1,
     }];
   }
   // Estado de la lista dentro de la papeleta: solo se puede votar por una aprobada.
@@ -100,10 +109,7 @@ async function ejecutar(sqlCrudo: string, params: any[] = []): Promise<any> {
 
   // El voto en sí. Nadie escribe hasta que todas las peticiones han pasado el
   // control previo: así la carrera se reproduce siempre, no por casualidad.
-  if (sql.startsWith('INSERT INTO voto')) {
-    if (cruzadas) await barrera;
-    return { insertId: 1 };
-  }
+  if (sql.startsWith('INSERT INTO voto')) return { insertId: 1 };
 
   // El comprobante: aquí vive la restricción única.
   if (sql.startsWith('INSERT INTO codigo_voto')) {
@@ -129,14 +135,20 @@ async function ejecutar(sqlCrudo: string, params: any[] = []): Promise<any> {
 
 before(async () => {
   (pool as any).query = async (sql: string, params: any[] = []) => [await ejecutar(sql, params), []];
-  (pool as any).getConnection = async () => ({
-    query: async (sql: string, params: any[] = []) => [await ejecutar(sql, params), []],
-    beginTransaction: async () => {},
-    commit: async () => {},
-    // El rollback deshace el voto, pero el comprobante nunca llegó a escribirse.
-    rollback: async () => {},
-    release: () => {},
-  });
+  (pool as any).getConnection = async () => {
+    let liberar: (() => void) | null = null;
+    return {
+      query: async (sql: string, params: any[] = []) => [await ejecutar(sql, params), []],
+      beginTransaction: async () => {
+        const anterior = colaTransacciones;
+        colaTransacciones = new Promise<void>((resolve) => { liberar = resolve; });
+        await anterior;
+      },
+      commit: async () => { liberar?.(); liberar = null; },
+      rollback: async () => { liberar?.(); liberar = null; },
+      release: () => {},
+    };
+  };
 
   await new Promise<void>((resolve) => {
     servidor = app.listen(0, () => {
@@ -159,6 +171,7 @@ beforeEach(() => {
   enEspera = 0;
   barrera = null;
   abrirBarrera = null;
+  colaTransacciones = Promise.resolve();
 });
 
 function votar(cedula: string, votacionId = 1) {

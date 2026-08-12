@@ -1,28 +1,28 @@
 import * as repo from '../repositories/facultad.repository.js';
 import { CrearFacultadDTO, ActualizarFacultadDTO } from '../schemas/facultad.schema.js';
+import { institucionObligatoria } from '../utils/institucion.js';
 
-export async function listarFacultad() {
-  return repo.findAll();
+export async function listarFacultad(institucionId?: number) {
+  return repo.findAll(institucionId);
 }
 
-export async function obtenerFacultad(id: number) {
-  const registro = await repo.findById(id);
+export async function obtenerFacultad(id: number, institucionId?: number) {
+  const registro = await repo.findById(id, institucionId);
   return registro ?? null;
 }
 
-export async function crearFacultad(data: CrearFacultadDTO) {
-  return repo.create(data);
+export async function crearFacultad(data: CrearFacultadDTO, institucionId?: number) {
+  return repo.create(data, institucionObligatoria(institucionId));
 }
 
-export async function actualizarFacultad(id: number, data: ActualizarFacultadDTO) {
-  const existente = await repo.findById(id);
+export async function actualizarFacultad(id: number, data: ActualizarFacultadDTO, institucionId?: number) {
+  const existente = await repo.findById(id, institucionId);
   if (!existente) return null;
-  return repo.update(id, data);
+  return repo.update(id, data, institucionId);
 }
 
-export async function eliminarFacultad(id: number) {
-  const existente = await repo.findById(id);
+export async function eliminarFacultad(id: number, institucionId?: number) {
+  const existente = await repo.findById(id, institucionId);
   if (!existente) return false;
-  await repo.remove(id);
-  return true;
+  return repo.remove(id, institucionId);
 }

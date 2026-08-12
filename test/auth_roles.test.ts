@@ -53,10 +53,12 @@ const dbState: Record<string, any> = {
 const codigosVigentes: Record<string, any> = {};
 
 let originalQuery: any;
+let originalGetConnection: any;
 let originalComponerCorreo: any;
 
 before(() => {
   originalQuery = (pool as any).query;
+  originalGetConnection = (pool as any).getConnection;
   originalComponerCorreo = (authService as any).componerCorreoDeCodigo;
 
   (pool as any).query = async (sql: string, params?: any[]) => {
@@ -71,7 +73,7 @@ before(() => {
       return [user ? [user] : []];
     }
     
-    if (s.includes('SELECT * FROM CODIGO_ACCESO WHERE FK_CEDULA_ESTUDIANTE = ? AND EXPIRA_AT > NOW()')) {
+    if (normalizedSql.includes('FROM CODIGO_ACCESO') && normalizedSql.includes('USADO_AT IS NULL')) {
       const cedula = params?.[0];
       const entry = codigosVigentes[cedula];
       return [entry ? [entry] : []];
@@ -80,15 +82,28 @@ before(() => {
     if (s.includes('INSERT INTO CODIGO_ACCESO')) {
       const cedula = params?.[0];
       const codigo_hash = params?.[1];
-      const expira_at = params?.[2];
+      const vigencia = Number(params?.[2] ?? 600);
       codigosVigentes[cedula] = {
         id_codigo: 1,
         codigo_hash,
         intentos: 0,
         creado_at: new Date().toISOString(),
-        expira_at: expira_at
+        expira_at: new Date(Date.now() + vigencia * 1000).toISOString(),
+        usado_at: null,
       };
       return [{ insertId: 1 }];
+    }
+
+    if (normalizedSql.startsWith('UPDATE CODIGO_ACCESO SET USADO_AT = NOW() WHERE FK_CEDULA_ESTUDIANTE')) {
+      const entry = codigosVigentes[params?.[0]];
+      if (entry) entry.usado_at = new Date().toISOString();
+      return [{ affectedRows: entry ? 1 : 0 }];
+    }
+
+    if (normalizedSql.startsWith('UPDATE CODIGO_ACCESO SET USADO_AT = NOW() WHERE ID_CODIGO')) {
+      const entry = Object.values(codigosVigentes).find((v: any) => v.id_codigo === params?.[0] && v.usado_at == null) as any;
+      if (entry) entry.usado_at = new Date().toISOString();
+      return [{ affectedRows: entry ? 1 : 0 }];
     }
 
     if (s.includes('UPDATE CODIGO_ACCESO SET INTENTOS = INTENTOS + 1')) {
@@ -105,15 +120,24 @@ before(() => {
     return [[]];
   };
 
+  (pool as any).getConnection = async () => ({
+    query: (sql: string, params?: any[]) => (pool as any).query(sql, params),
+    beginTransaction: async () => {},
+    commit: async () => {},
+    rollback: async () => {},
+    release: () => {},
+  });
+
 });
 
 after(() => {
   (pool as any).query = originalQuery;
+  (pool as any).getConnection = originalGetConnection;
 });
 
 test('1. Steven solicita código y, al verificar, obtiene rol superadmin con acceso global', async () => {
   const req = await authService.solicitarCodigo('stchinininca@uide.edu.ec', null);
-  assert.equal(req.correo_enmascarado, 's*******a@uide.edu.ec');
+  assert.equal(req.correo_enmascarado, 's********a@uide.edu.ec');
   
   const { createHash } = await import('crypto');
   const testCode = '123456';

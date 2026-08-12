@@ -49,7 +49,7 @@ let baseUrl = '';
 
 /** El token tal como lo devuelve /auth/verificar tras canjear el código. */
 const token = (sub: string, rol: string) =>
-  jwt.sign({ sub, email: `${sub}@uide.edu.ec`, rol }, process.env.JWT_SECRET!);
+  jwt.sign({ sub, email: `${sub}@uide.edu.ec`, rol, fk_id_institucion: 1 }, process.env.JWT_SECRET!);
 
 const SESION_CANDIDATO = token(CANDIDATO, 'candidato');
 
@@ -71,6 +71,13 @@ function ejecutar(sqlCrudo: string, params: any[] = []): any {
       votacion: 'abierta', proceso: 'votacion', carrera_votacion: null, archivado: 0,
       fecha_apertura: '2026-01-01 08:00:00', fecha_cierre: '2099-01-01 23:59:59',
       fecha_fin_votacion: '2099-01-01 23:59:59',
+      fk_id_institucion: 1,
+    }];
+  }
+  if (sql.includes('FROM estudiante') && sql.includes('FOR UPDATE')) {
+    return [{
+      cedula: params[0], rol: params[0] === CANDIDATO ? 'candidato' : 'estudiante',
+      estado_academico: 'activo', fk_id_carrera: null, fk_id_institucion: 1,
     }];
   }
   if (sql.includes('FROM lista_candidata WHERE id_lista = ?')) {

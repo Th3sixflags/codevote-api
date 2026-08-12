@@ -109,6 +109,7 @@ export async function actualizarVotacion(id: number, data: ActualizarVotacionDTO
       titulo_papeleta: existente.titulo_papeleta,
       nombre_proceso: existente.nombre_proceso ?? 'Proceso electoral',
       nombre_carrera: existente.nombre_carrera ?? null,
+      fk_id_institucion: Number(existente.fk_id_institucion),
     });
 
     // El resto de campos que vinieran en la misma petición, ya sin el estado.

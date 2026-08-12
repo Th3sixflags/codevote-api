@@ -9,6 +9,7 @@ export interface PapeletaVencida {
   id_proceso: number;
   nombre_proceso: string;
   fecha_fin_votacion: string;
+  fk_id_institucion: number;
 }
 
 /**
@@ -38,7 +39,7 @@ export async function papeletasVencidas(corteEnEcuador: string): Promise<Papelet
   const [rows] = await pool.query(
     `SELECT v.id_votacion, v.titulo_papeleta, v.fk_id_carrera,
             c.nombre_carrera,
-            p.id_proceso, p.nombre_proceso, p.fecha_fin_votacion
+            p.id_proceso, p.nombre_proceso, p.fecha_fin_votacion, p.fk_id_institucion
        FROM votacion v
        JOIN proceso_electoral p ON p.id_proceso = v.fk_id_proceso
        LEFT JOIN carrera c ON c.id_carrera = v.fk_id_carrera
@@ -177,14 +178,16 @@ export async function nombreDeProceso(procesoId: number): Promise<string | null>
 }
 
 /** Administración activa: destinatarios del aviso de cierre. */
-export async function administradoresActivos(): Promise<
+export async function administradoresActivos(institucionId: number): Promise<
   Array<{ cedula: string; nombres: string; apellidos: string; correo_institucional: string }>
 > {
   const [rows] = await pool.query(
     `SELECT cedula, nombres, apellidos, correo_institucional
-       FROM estudiante
+      FROM estudiante
       WHERE rol = 'admin' AND estado_academico = 'activo'
+        AND fk_id_institucion = ?
       ORDER BY apellidos, nombres`
+    , [institucionId]
   ) as [any[], any];
   return rows as any[];
 }

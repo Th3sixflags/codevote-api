@@ -61,7 +61,15 @@ before(async () => {
 
     if (s.startsWith('INSERT INTO INSTITUCION')) {
       const id = lastInsertId++;
-      dbState[id] = { id_institucion: id, ...Object.fromEntries(params?.map((v, i) => [i, v]) ?? []) };
+      const columnas = [
+        'nombre', 'slug', 'tipo', 'logo_url', 'descripcion', 'email_contacto',
+        'telefono', 'direccion', 'sitio_web', 'dominio_email', 'colores_json', 'config_json',
+      ];
+      dbState[id] = {
+        id_institucion: id,
+        ...Object.fromEntries(columnas.map((columna, i) => [columna, params?.[i] ?? null])),
+        activo: 1,
+      };
       return [{ insertId: id }];
     }
 
@@ -254,9 +262,9 @@ test('8. Creación y edición de instituciones con tildes y eñes (UTF-8)', asyn
   
   assert.equal(res.status, 201, `Debería crear la institución. Respondió ${res.status}`);
   const data = await res.json();
-  assert.equal(data.institucion.nombre, 'Institución de Gestión electoral Muñoz');
+  assert.equal(data.nombre, 'Institución de Gestión electoral Muñoz');
   
-  const institucionId = data.institucion.id_institucion;
+  const institucionId = data.id_institucion;
 
   // Edición
   const edicion = {
@@ -274,5 +282,5 @@ test('8. Creación y edición de instituciones con tildes y eñes (UTF-8)', asyn
 
   assert.equal(resEdit.status, 200, `Debería editar la institución. Respondió ${resEdit.status}`);
   const dataEdit = await resEdit.json();
-  assert.equal(dataEdit.institucion.nombre, 'Asociación Pérez');
+  assert.equal(dataEdit.nombre, 'Asociación Pérez');
 });

@@ -1,14 +1,15 @@
 import { Request, Response } from 'express';
 import { crearCodigoVotoSchema, actualizarCodigoVotoSchema } from '../schemas/codigo_voto.schema.js';
 import * as service from '../services/codigo_voto.service.js';
+import { institucionDeSesion } from '../utils/institucion.js';
 
 export async function listar(req: Request, res: Response) {
-  const registros = await service.listarCodigoVoto(req.user?.fk_id_institucion);
+  const registros = await service.listarCodigoVoto(institucionDeSesion(req.user?.rol, req.user?.fk_id_institucion));
   res.json(registros);
 }
 
 export async function obtener(req: Request, res: Response) {
-  const registro = await service.obtenerCodigoVoto(Number(req.params.id), req.user?.fk_id_institucion);
+  const registro = await service.obtenerCodigoVoto(Number(req.params.id), institucionDeSesion(req.user?.rol, req.user?.fk_id_institucion));
   if (!registro) {
     res.status(404).json({ error: 'Código de voto no encontrado.' });
     return;
@@ -17,13 +18,13 @@ export async function obtener(req: Request, res: Response) {
 }
 
 export async function listarPorVotacion(req: Request, res: Response) {
-  const registros = await service.listarPorVotacion(Number(req.params.votacionId), req.user?.fk_id_institucion);
+  const registros = await service.listarPorVotacion(Number(req.params.votacionId), institucionDeSesion(req.user?.rol, req.user?.fk_id_institucion));
   res.json(registros);
 }
 
 /** Comprobantes del usuario autenticado. No requiere rol admin. */
 export async function listarMisCodigos(req: Request, res: Response) {
-  const registros = await service.listarPorEstudiante(req.user!.sub, req.user?.fk_id_institucion);
+  const registros = await service.listarPorEstudiante(req.user!.sub, institucionDeSesion(req.user?.rol, req.user?.fk_id_institucion));
   res.json(registros);
 }
 

@@ -34,6 +34,8 @@ async function teardownTestDB(institucionIds: number[], cedulas: string[]) {
   }
   await pool.query('DELETE FROM estudiante WHERE nombres = "Nuevo"');
   if (institucionIds.length > 0) {
+    await pool.query('DELETE FROM historial_importacion WHERE fk_id_institucion IN (?)', [institucionIds]);
+    await pool.query('DELETE FROM estudiante WHERE fk_id_institucion IN (?)', [institucionIds]);
     await pool.query('DELETE FROM institucion WHERE id_institucion IN (?)', [institucionIds]);
   }
 }

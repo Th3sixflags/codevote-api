@@ -21,11 +21,20 @@ const BASE_QUERY = `
   LEFT JOIN carrera c ON c.id_carrera = v.fk_id_carrera
 `;
 
+function condicionInstitucion(institucionId?: number) {
+  if (institucionId === undefined) return { sql: '', params: [] as number[] };
+  return {
+    sql: ' AND e.fk_id_institucion = ? AND p.fk_id_institucion = ?',
+    params: [institucionId, institucionId],
+  };
+}
+
 /** Asignación de un estudiante (cualquier estado), o null. */
-export async function findByEstudiante(cedula: string) {
+export async function findByEstudiante(cedula: string, institucionId?: number) {
+  const inst = condicionInstitucion(institucionId);
   const [rows] = await pool.query(
-    `${BASE_QUERY} WHERE a.fk_cedula_estudiante = ?`,
-    [cedula]
+    `${BASE_QUERY} WHERE a.fk_cedula_estudiante = ?${inst.sql}`,
+    [cedula, ...inst.params]
   ) as [any[], any];
   return rows[0] ?? null;
 }
@@ -37,10 +46,11 @@ export async function findByEstudiante(cedula: string) {
  * su candidatura terminó y no debe aparecer como asignación vigente ni
  * habilitar el portal.
  */
-export async function findActivaDeEstudiante(cedula: string) {
+export async function findActivaDeEstudiante(cedula: string, institucionId?: number) {
+  const inst = condicionInstitucion(institucionId);
   const [rows] = await pool.query(
-    `${BASE_QUERY} WHERE a.fk_cedula_estudiante = ? AND a.estado = 'activa' AND p.archivado_at IS NULL`,
-    [cedula]
+    `${BASE_QUERY} WHERE a.fk_cedula_estudiante = ? AND a.estado = 'activa' AND p.archivado_at IS NULL${inst.sql}`,
+    [cedula, ...inst.params]
   ) as [any[], any];
   return rows[0] ?? null;
 }
@@ -57,7 +67,7 @@ export async function findActivaDeEstudiante(cedula: string) {
  * vuelve a estado 'activa'. El historial de participación no se pierde, porque
  * vive en `lista_candidata` y `candidato`, que el archivado conserva intactos.
  */
-export async function create(cedula: string, votacionId: number) {
+export async function create(cedula: string, votacionId: number, institucionId?: number) {
   await pool.query(
     `INSERT INTO asignacion_candidatura (fk_cedula_estudiante, fk_id_votacion, estado)
      VALUES (?, ?, 'activa')
@@ -66,25 +76,41 @@ export async function create(cedula: string, votacionId: number) {
                              fecha_asignacion = NOW()`,
     [cedula, votacionId]
   );
-  return findByEstudiante(cedula);
+  return findByEstudiante(cedula, institucionId);
 }
 
 /** Reasigna la papeleta (se mantiene una sola fila por persona). */
-export async function updateVotacion(cedula: string, votacionId: number) {
+export async function updateVotacion(cedula: string, votacionId: number, institucionId?: number) {
+  const filtro = institucionId === undefined ? '' : `
+       AND EXISTS (SELECT 1 FROM estudiante e WHERE e.cedula = asignacion_candidatura.fk_cedula_estudiante AND e.fk_id_institucion = ?)
+       AND EXISTS (
+         SELECT 1 FROM votacion v JOIN proceso_electoral p ON p.id_proceso = v.fk_id_proceso
+          WHERE v.id_votacion = ? AND p.fk_id_institucion = ?
+       )`;
+  const params = institucionId === undefined
+    ? [votacionId, cedula]
+    : [votacionId, cedula, institucionId, votacionId, institucionId];
   await pool.query(
     `UPDATE asignacion_candidatura
      SET fk_id_votacion = ?, estado = 'activa', fecha_asignacion = NOW()
-     WHERE fk_cedula_estudiante = ?`,
-    [votacionId, cedula]
+     WHERE fk_cedula_estudiante = ?${filtro}`,
+    params
   );
-  return findByEstudiante(cedula);
+  return findByEstudiante(cedula, institucionId);
 }
 
 /** Retira la asignación eliminándola (deja libre al candidato). */
-export async function remove(cedula: string) {
+export async function remove(cedula: string, institucionId?: number) {
+  const filtro = institucionId === undefined ? '' : `
+     AND EXISTS (SELECT 1 FROM estudiante e WHERE e.cedula = asignacion_candidatura.fk_cedula_estudiante AND e.fk_id_institucion = ?)
+     AND EXISTS (
+       SELECT 1 FROM votacion v JOIN proceso_electoral p ON p.id_proceso = v.fk_id_proceso
+        WHERE v.id_votacion = asignacion_candidatura.fk_id_votacion AND p.fk_id_institucion = ?
+     )`;
+  const params = institucionId === undefined ? [cedula] : [cedula, institucionId, institucionId];
   const [result] = await pool.query(
-    'DELETE FROM asignacion_candidatura WHERE fk_cedula_estudiante = ?',
-    [cedula]
+    `DELETE FROM asignacion_candidatura WHERE fk_cedula_estudiante = ?${filtro}`,
+    params
   ) as [any, any];
   return result.affectedRows > 0;
 }
@@ -101,7 +127,9 @@ export async function remove(cedula: string) {
  * El corte es `archivado_at IS NOT NULL`, no `estado = 'archivado'`: un proceso
  * archivado conserva su estado anterior (finalizado o cancelado).
  */
-export async function listaQueBloquea(cedula: string) {
+export async function listaQueBloquea(cedula: string, institucionId?: number) {
+  const filtro = institucionId === undefined ? '' : ' AND p.fk_id_institucion = ?';
+  const params = institucionId === undefined ? [cedula] : [cedula, institucionId];
   const [rows] = await pool.query(
     `SELECT l.id_lista, l.nombre_lista, l.estado_revision, p.nombre_proceso,
             EXISTS(SELECT 1 FROM voto vo WHERE vo.fk_id_lista = l.id_lista) AS tiene_votos
@@ -109,10 +137,11 @@ export async function listaQueBloquea(cedula: string) {
      JOIN proceso_electoral p ON p.id_proceso = l.fk_id_proceso
      WHERE l.fk_cedula_responsable = ?
        AND p.archivado_at IS NULL
+       ${filtro}
        AND (l.estado_revision IN ('en_revision', 'aprobada')
             OR EXISTS(SELECT 1 FROM voto vo WHERE vo.fk_id_lista = l.id_lista))
      LIMIT 1`,
-    [cedula]
+    params
   ) as [any[], any];
   return rows[0] ?? null;
 }

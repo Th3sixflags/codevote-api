@@ -42,6 +42,7 @@ export async function cerrarPapeleta(papeleta: {
   titulo_papeleta: string;
   nombre_proceso: string;
   nombre_carrera?: string | null;
+  fk_id_institucion: number;
 }): Promise<ResultadoCierre | null> {
   const cerrada = await repo.cerrarSiSigueAbierta(papeleta.id_votacion);
   if (!cerrada) return null; // otra ejecución llegó primero: no se repite nada
@@ -136,11 +137,17 @@ export function componerCorreoDeCierre(datos: {
 
 /** Notificación en la campanita y correo, para la administración activa. */
 async function avisarALaAdministracion(
-  papeleta: { id_votacion: number; titulo_papeleta: string; nombre_proceso: string; nombre_carrera?: string | null },
+  papeleta: {
+    id_votacion: number;
+    titulo_papeleta: string;
+    nombre_proceso: string;
+    nombre_carrera?: string | null;
+    fk_id_institucion: number;
+  },
   momento: string,
   participacion: number
 ): Promise<boolean> {
-  const admins = await repo.administradoresActivos();
+  const admins = await repo.administradoresActivos(papeleta.fk_id_institucion);
   if (admins.length === 0) return false;
 
   const cuando = formatearEnEcuador(momento);

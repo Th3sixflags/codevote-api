@@ -12,8 +12,7 @@ router.get('/mis-codigos',          requireAuth,               ctrl.listarMisCod
 router.get('/mis-codigos/:id/verificar', requireAuth,          ctrl.verificarMiCodigo);
 router.get('/votacion/:votacionId', requireAuth, requireAdmin, ctrl.listarPorVotacion);
 router.get('/:id',                  requireAuth, requireAdmin, ctrl.obtener);
-router.post('/',                    requireAuth, requireAdmin, ctrl.crear);
-router.patch('/:id',                requireAuth, requireAdmin, ctrl.actualizar);
-router.delete('/:id',               requireAuth, requireAdmin, ctrl.eliminar);
+// No existen rutas de mutación manual: un comprobante nace únicamente dentro de
+// la transacción que registra un voto y luego es evidencia append-only.
 
 export default router;

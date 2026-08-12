@@ -7,15 +7,8 @@ export async function votar(req: Request, res: Response) {
   const data = crearVotoSchema.parse(req.body);
   const cedula = req.user!.sub;
 
-  // Un estudiante solo puede votar una vez por votación.
-  if (await service.yaVoto(data.fk_id_votacion, cedula)) {
-    res.status(409).json({ error: 'Ya has emitido tu voto en esta votación.' });
-    return;
-  }
-
   try {
-    // El filtro de carrera se resuelve aquí y se valida en el servicio.
-    const voto = await service.registrarVoto(data, cedula, await filtroCarreraDe(req), req.user?.fk_id_institucion);
+    const voto = await service.registrarVoto(data, cedula, req.user?.fk_id_institucion);
     res.status(201).json(voto);
   } catch (err: any) {
     // Carrera: dos peticiones simultáneas. La restricción única de codigo_voto

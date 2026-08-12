@@ -14,8 +14,7 @@ const router = Router();
 router.get('/',                     requireAuth, requireAdmin, ctrl.listar);
 router.get('/votacion/:votacionId', requireAuth, requireAdmin, ctrl.listarPorVotacion);
 router.get('/:id',                  requireAuth, requireAdmin, ctrl.obtener);
-router.post('/',                    requireAuth, requireAdmin, ctrl.crear);
-router.patch('/:id',                requireAuth, requireAdmin, ctrl.actualizar);
-router.delete('/:id',               requireAuth, requireAdmin, ctrl.eliminar);
+// No existen rutas de mutación manual: el cierre de la papeleta es el único
+// productor de actas y una acta emitida no se edita ni se elimina por la API.
 
 export default router;

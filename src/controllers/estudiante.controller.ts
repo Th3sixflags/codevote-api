@@ -2,10 +2,11 @@ import { Request, Response } from 'express';
 import { crearEstudianteSchema, actualizarEstudianteSchema } from '../schemas/estudiante.schema.js';
 import * as service from '../services/estudiante.service.js';
 import { esAdministracion } from '../utils/accesoCarrera.js';
+import { institucionDeSesion } from '../utils/institucion.js';
 
 export async function listar(req: Request, res: Response) {
   // Multi-tenant: cada admin solo ve los miembros de su institución.
-  const institucionId = req.user?.fk_id_institucion;
+  const institucionId = institucionDeSesion(req.user?.rol, req.user?.fk_id_institucion);
   const estudiantes = await service.listarEstudiantes(institucionId);
   res.json(estudiantes);
 }
@@ -20,7 +21,8 @@ export async function obtener(req: Request, res: Response) {
     return;
   }
 
-  const estudiante = await service.obtenerEstudiante(cedula);
+  const institucionId = institucionDeSesion(req.user?.rol, req.user?.fk_id_institucion);
+  const estudiante = await service.obtenerEstudiante(cedula, institucionId);
   if (!estudiante) {
     res.status(404).json({ error: 'Estudiante no encontrado.' });
     return;
@@ -31,7 +33,7 @@ export async function obtener(req: Request, res: Response) {
 export async function crear(req: Request, res: Response) {
   const data  = crearEstudianteSchema.parse(req.body);
   try {
-    const nuevo = await service.crearEstudiante(data);
+    const nuevo = await service.crearEstudiante(data, req.user?.fk_id_institucion);
     res.status(201).json(nuevo);
   } catch (err: any) {
     if (err.code === 'ER_DUP_ENTRY') {
@@ -44,7 +46,12 @@ export async function crear(req: Request, res: Response) {
 
 export async function actualizar(req: Request, res: Response) {
   const data        = actualizarEstudianteSchema.parse(req.body);
-  const actualizado = await service.actualizarEstudiante(req.params.cedula as string, data);
+  const institucionId = institucionDeSesion(req.user?.rol, req.user?.fk_id_institucion);
+  const actualizado = await service.actualizarEstudiante(
+    req.params.cedula as string,
+    data,
+    institucionId
+  );
   if (!actualizado) {
     res.status(404).json({ error: 'Estudiante no encontrado.' });
     return;
@@ -53,7 +60,11 @@ export async function actualizar(req: Request, res: Response) {
 }
 
 export async function eliminar(req: Request, res: Response) {
-  const eliminado = await service.eliminarEstudiante(req.params.cedula as string);
+  const institucionId = institucionDeSesion(req.user?.rol, req.user?.fk_id_institucion);
+  const eliminado = await service.eliminarEstudiante(
+    req.params.cedula as string,
+    institucionId
+  );
   if (!eliminado) {
     res.status(404).json({ error: 'Estudiante no encontrado.' });
     return;

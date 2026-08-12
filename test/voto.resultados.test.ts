@@ -43,15 +43,15 @@ let servidor: ReturnType<typeof app.listen>;
 let baseUrl = '';
 
 const tokenAdmin = jwt.sign(
-  { sub: '1710000009', email: 'schininin@uide.edu.ec', rol: 'admin' },
+  { sub: '1710000009', email: 'schininin@uide.edu.ec', rol: 'admin', fk_id_institucion: 1 },
   process.env.JWT_SECRET!
 );
 const tokenEstudiante = jwt.sign(
-  { sub: '1105946139', email: 'ancarpioto@uide.edu.ec', rol: 'estudiante' },
+  { sub: '1105946139', email: 'ancarpioto@uide.edu.ec', rol: 'estudiante', fk_id_institucion: 1 },
   process.env.JWT_SECRET!
 );
 const tokenCandidato = jwt.sign(
-  { sub: '1710000017', email: 'presidente@uide.edu.ec', rol: 'candidato' },
+  { sub: '1710000017', email: 'presidente@uide.edu.ec', rol: 'candidato', fk_id_institucion: 1 },
   process.env.JWT_SECRET!
 );
 
@@ -66,6 +66,7 @@ before(async () => {
         votacion: escenario.votacion,
         proceso: escenario.proceso,
         carrera_votacion: escenario.carrera_votacion,
+        fk_id_institucion: 1,
       }], []];
     }
     if (sql.includes('FROM lista_candidata l') && sql.includes('total_votos')) {
@@ -73,7 +74,7 @@ before(async () => {
     }
     if (sql.includes('FROM estudiante e') && sql.includes('COUNT(*) AS total')) {
       // Se comprueba de paso que el filtro de carrera llega como parámetro.
-      assert.equal(params[0], escenario.carrera_votacion, 'el padrón no recibió la carrera de la papeleta');
+      assert.deepEqual(params, [1, escenario.carrera_votacion, escenario.carrera_votacion]);
       return [[{ total: escenario.habilitados }], []];
     }
     if (sql.includes('FROM codigo_voto')) {

@@ -51,8 +51,13 @@ export async function findAll(institucionId?: number) {
   return (rows as any[]).map(conAsignacion);
 }
 
-export async function findByCedula(cedula: string) {
-  const [rows] = await pool.query(BASE_QUERY + ' WHERE e.cedula = ?', [cedula]) as [any[], any];
+export async function findByCedula(cedula: string, institucionId?: number) {
+  const filtroInstitucion = institucionId === undefined ? '' : ' AND e.fk_id_institucion = ?';
+  const params = institucionId === undefined ? [cedula] : [cedula, institucionId];
+  const [rows] = await pool.query(
+    BASE_QUERY + ` WHERE e.cedula = ?${filtroInstitucion}`,
+    params
+  ) as [any[], any];
   return conAsignacion(rows[0] ?? null);
 }
 
@@ -71,27 +76,41 @@ export async function findByEmail(email: string) {
   return rows[0] ?? null;
 }
 
-export async function create(data: CrearEstudianteDTO) {
+export async function create(data: CrearEstudianteDTO, institucionId: number) {
   await pool.query(
-    `INSERT INTO estudiante (cedula, nombres, apellidos, correo_institucional, promedio, estado_academico, fk_id_carrera, password, rol, debe_cambiar_password)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [data.cedula, data.nombres, data.apellidos, data.correo_institucional, data.promedio ?? null, data.estado_academico ?? 'activo', data.fk_id_carrera ?? null, null, data.rol ?? 'estudiante', 0]
+    `INSERT INTO estudiante
+       (cedula, nombres, apellidos, correo_institucional, promedio, estado_academico,
+        fk_id_carrera, password, rol, debe_cambiar_password, fk_id_institucion)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [data.cedula, data.nombres, data.apellidos, data.correo_institucional,
+     data.promedio ?? null, data.estado_academico ?? 'activo', data.fk_id_carrera ?? null,
+     null, data.rol ?? 'estudiante', 0, institucionId]
   );
-  return findByCedula(data.cedula);
+  return findByCedula(data.cedula, institucionId);
 }
 
-export async function update(cedula: string, data: ActualizarEstudianteDTO) {
+export async function update(cedula: string, data: ActualizarEstudianteDTO, institucionId?: number) {
   const entradas = Object.entries(data).filter(([, v]) => v !== undefined);
   if (entradas.length > 0) {
     const sets = entradas.map(([k]) => `${k} = ?`).join(', ');
     const valores = entradas.map(([, v]) => v);
-    await pool.query(`UPDATE estudiante SET ${sets} WHERE cedula = ?`, [...valores, cedula]);
+    const filtroInstitucion = institucionId === undefined ? '' : ' AND fk_id_institucion = ?';
+    const params = institucionId === undefined
+      ? [...valores, cedula]
+      : [...valores, cedula, institucionId];
+    await pool.query(`UPDATE estudiante SET ${sets} WHERE cedula = ?${filtroInstitucion}`, params);
   }
-  return findByCedula(cedula);
+  return findByCedula(cedula, institucionId);
 }
 
-export async function remove(cedula: string) {
-  await pool.query('DELETE FROM estudiante WHERE cedula = ?', [cedula]);
+export async function remove(cedula: string, institucionId?: number) {
+  const filtroInstitucion = institucionId === undefined ? '' : ' AND fk_id_institucion = ?';
+  const params = institucionId === undefined ? [cedula] : [cedula, institucionId];
+  const [result] = await pool.query(
+    `DELETE FROM estudiante WHERE cedula = ?${filtroInstitucion}`,
+    params
+  ) as [any, any];
+  return Number(result.affectedRows ?? 0) > 0;
 }
 
 // --- Portal del estudiante (self-service) ---------------------------------
@@ -114,11 +133,12 @@ export async function updateFoto(cedula: string, fotoUrl: string | null) {
 export async function buscarPosiblesIntegrantes(
   carreraCompatible: number | null,
   texto: string,
+  institucionId: number,
   limite = 20
 ) {
   const patron = `%${texto}%`;
   const filtroCarrera = carreraCompatible == null ? '' : ' AND e.fk_id_carrera = ?';
-  const params: any[] = [patron, patron, patron];
+  const params: any[] = [patron, patron, patron, institucionId];
   if (carreraCompatible != null) params.push(carreraCompatible);
   params.push(limite);
 
@@ -127,6 +147,7 @@ export async function buscarPosiblesIntegrantes(
      FROM estudiante e
      LEFT JOIN carrera c ON c.id_carrera = e.fk_id_carrera
      WHERE (e.nombres LIKE ? OR e.apellidos LIKE ? OR e.cedula LIKE ?)
+       AND e.fk_id_institucion = ?
        ${filtroCarrera}
        -- La administración no se postula.
        AND e.rol <> 'admin'

@@ -2,6 +2,8 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { pool } from '../config/database.js';
 import { CrearVotoDTO } from '../schemas/voto.schema.js';
 
+type EjecutorSql = { query: (sql: string, params?: any[]) => Promise<any> };
+
 const BASE_QUERY = `
   SELECT
     v.id_voto, v.tipo_voto, v.fecha_hora,
@@ -28,8 +30,12 @@ export async function findByVotacion(votacionId: number, institucionId?: number)
 }
 
 /** Indica si el estudiante ya emitió su voto en esta votación (tiene comprobante). */
-export async function yaVotoEstudiante(votacionId: number, cedula: string): Promise<boolean> {
-  const [rows] = await pool.query(
+export async function yaVotoEstudiante(
+  votacionId: number,
+  cedula: string,
+  executor: EjecutorSql = pool as any
+): Promise<boolean> {
+  const [rows] = await executor.query(
     'SELECT 1 FROM codigo_voto WHERE fk_id_votacion = ? AND fk_cedula_estudiante = ? LIMIT 1',
     [votacionId, cedula]
   ) as [any[], any];
@@ -37,48 +43,59 @@ export async function yaVotoEstudiante(votacionId: number, cedula: string): Prom
 }
 
 /**
- * Registra el voto y su comprobante en una transacción.
- * - El voto se guarda ANÓNIMO (sin cédula), en la tabla `voto`.
- * - El comprobante (codigo_voto) se guarda con la cédula del estudiante, para
- *   probar la participación sin revelar la elección. No hay relación entre
- *   ambos registros, de modo que el voto sigue siendo secreto.
+ * Ejecuta una operación con una única conexión y una única transacción.
+ * Todas las validaciones decisivas del voto deben ocurrir dentro del callback.
  */
-export async function createConComprobante(data: CrearVotoDTO, cedula: string) {
+export async function enTransaccion<T>(operacion: (conn: EjecutorSql) => Promise<T>): Promise<T> {
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
-
-    const [result] = await conn.query(
-      `INSERT INTO voto (fk_id_votacion, tipo_voto, fk_id_lista) VALUES (?, ?, ?)`,
-      [data.fk_id_votacion, data.tipo_voto, data.fk_id_lista ?? null]
-    ) as [any, any];
-
-    const hash = createHash('sha256')
-      .update(`${data.fk_id_votacion}:${cedula}:${Date.now()}:${randomBytes(8).toString('hex')}`)
-      .digest('hex');
-
-    // Código público de verificación: UUID v4 criptográficamente aleatorio. No
-    // codifica cédula, correo, voto ni marca de tiempo, así que puede mostrarse
-    // al estudiante sin comprometer el secreto del voto (a diferencia del hash,
-    // que queda solo para la auditoría administrativa).
-    const codigoVerificacion = randomUUID();
-
-    await conn.query(
-      `INSERT INTO codigo_voto (fk_id_votacion, codigo_hash, estado_codigo, fecha_envio, fk_cedula_estudiante, codigo_verificacion)
-       VALUES (?, ?, 'usado', NOW(), ?, ?)`,
-      [data.fk_id_votacion, hash, cedula, codigoVerificacion]
-    );
-
+    const resultado = await operacion(conn as any);
     await conn.commit();
-
-    const [rows] = await conn.query(BASE_QUERY + ' WHERE v.id_voto = ?', [result.insertId]) as [any[], any];
-    return { ...rows[0], comprobante: hash };
+    return resultado;
   } catch (err) {
     await conn.rollback();
     throw err;
   } finally {
     conn.release();
   }
+}
+
+/**
+ * Registra el voto y su comprobante usando la transacción que abrió el servicio.
+ * - El voto se guarda ANÓNIMO (sin cédula), en la tabla `voto`.
+ * - El comprobante (codigo_voto) se guarda con la cédula del estudiante, para
+ *   probar la participación sin revelar la elección. No hay relación entre
+ *   ambos registros, de modo que el voto sigue siendo secreto.
+ */
+export async function insertarVotoYComprobante(
+  data: CrearVotoDTO,
+  cedula: string,
+  conn: EjecutorSql
+) {
+  const [result] = await conn.query(
+    `INSERT INTO voto (fk_id_votacion, tipo_voto, fk_id_lista) VALUES (?, ?, ?)`,
+    [data.fk_id_votacion, data.tipo_voto, data.fk_id_lista ?? null]
+  ) as [any, any];
+
+  const hash = createHash('sha256')
+    .update(`${data.fk_id_votacion}:${cedula}:${Date.now()}:${randomBytes(8).toString('hex')}`)
+    .digest('hex');
+
+    // Código público de verificación: UUID v4 criptográficamente aleatorio. No
+    // codifica cédula, correo, voto ni marca de tiempo, así que puede mostrarse
+    // al estudiante sin comprometer el secreto del voto (a diferencia del hash,
+    // que queda solo para la auditoría administrativa).
+  const codigoVerificacion = randomUUID();
+
+  await conn.query(
+    `INSERT INTO codigo_voto (fk_id_votacion, codigo_hash, estado_codigo, fecha_envio, fk_cedula_estudiante, codigo_verificacion)
+     VALUES (?, ?, 'usado', NOW(), ?, ?)`,
+    [data.fk_id_votacion, hash, cedula, codigoVerificacion]
+  );
+
+  const [rows] = await conn.query(BASE_QUERY + ' WHERE v.id_voto = ?', [result.insertId]) as [any[], any];
+  return { ...rows[0], comprobante: hash };
 }
 
 /**
@@ -92,9 +109,9 @@ export async function createConComprobante(data: CrearVotoDTO, cedula: string) {
  * una opción válida de la papeleta.
  */
 export async function estadoDeListaEnVotacion(
-  listaId: number, votacionId: number
+  listaId: number, votacionId: number, executor: EjecutorSql = pool as any
 ): Promise<string | null> {
-  const [rows] = await pool.query(
+  const [rows] = await executor.query(
     'SELECT estado_revision FROM lista_candidata WHERE id_lista = ? AND fk_id_votacion = ? LIMIT 1',
     [listaId, votacionId]
   ) as [any[], any];
@@ -111,6 +128,7 @@ export interface EstadoDeVotacion {
   fecha_cierre: string | null;
   /** Fin del periodo de votación del proceso: el plazo que manda. */
   fecha_fin_votacion: string | null;
+  fk_id_institucion: number;
 }
 
 /**
@@ -121,19 +139,48 @@ export interface EstadoDeVotacion {
  * hora final. Quien decide si se admite un voto tiene que mirar el reloj, no
  * solo esa columna (ver utils/estadoVotacion.ts).
  */
-export async function estadoDeVotacion(votacionId: number, institucionId?: number): Promise<EstadoDeVotacion | null> {
+export async function estadoDeVotacion(
+  votacionId: number,
+  institucionId?: number,
+  executor: EjecutorSql = pool as any,
+  bloquear = false
+): Promise<EstadoDeVotacion | null> {
   const inst = condicionInstitucion(institucionId);
-  const [rows] = await pool.query(
+  const [rows] = await executor.query(
     `SELECT v.estado AS votacion, p.estado AS proceso, v.fk_id_carrera AS carrera_votacion,
+            p.fk_id_institucion,
             v.fecha_apertura, v.fecha_cierre, p.fecha_fin_votacion,
             (p.archivado_at IS NOT NULL) AS archivado
      FROM votacion v
      JOIN proceso_electoral p ON p.id_proceso = v.fk_id_proceso
-     WHERE v.id_votacion = ?${inst.sql}`,
+     WHERE v.id_votacion = ?${inst.sql}${bloquear ? ' FOR UPDATE' : ''}`,
     [votacionId, ...inst.params]
   ) as [any[], any];
   const fila = rows[0];
   return fila ? { ...fila, archivado: Number(fila.archivado) === 1 } : null;
+}
+
+/**
+ * Lee y bloquea la fila del votante dentro de la misma transacción del voto.
+ * La institución y la carrera se obtienen de la base, no de una consulta previa
+ * ni del body, para que no puedan cambiar entre la autorización y el INSERT.
+ */
+export async function votanteHabilitadoParaActualizar(
+  cedula: string,
+  institucionId: number,
+  executor: EjecutorSql
+) {
+  const [rows] = await executor.query(
+    `SELECT cedula, rol, estado_academico, fk_id_carrera, fk_id_institucion
+       FROM estudiante
+      WHERE cedula = ?
+        AND fk_id_institucion = ?
+        AND estado_academico = 'activo'
+        AND rol IN ('estudiante', 'candidato')
+      FOR UPDATE`,
+    [cedula, institucionId]
+  ) as [any[], any];
+  return rows[0] ?? null;
 }
 
 /**
@@ -180,14 +227,15 @@ export async function countByVotacion(votacionId: number) {
  *
  * Devuelve un número, nunca la lista de personas.
  */
-export async function countHabilitados(carreraVotacion: number | null) {
+export async function countHabilitados(carreraVotacion: number | null, institucionId: number) {
   const [rows] = await pool.query(
     `SELECT COUNT(*) AS total
        FROM estudiante e
       WHERE e.estado_academico = 'activo'
         AND e.rol IN ('estudiante', 'candidato')
+        AND e.fk_id_institucion = ?
         AND (? IS NULL OR e.fk_id_carrera = ?)`,
-    [carreraVotacion, carreraVotacion]
+    [institucionId, carreraVotacion, carreraVotacion]
   ) as [any[], any];
   return Number(rows[0]?.total ?? 0);
 }

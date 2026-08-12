@@ -98,10 +98,15 @@ async function procesosPorPonerEnVotacion(
 
 /** Aviso en la campanita para la administración. Sin correo: sería ruido diario. */
 async function avisarALaAdministracion(
-  papeleta: { titulo_papeleta: string; nombre_carrera?: string | null; fecha_cierre: string },
+  papeleta: {
+    titulo_papeleta: string;
+    nombre_carrera?: string | null;
+    fecha_cierre: string;
+    fk_id_institucion: number;
+  },
   momento: string
 ) {
-  const admins = await cierreRepo.administradoresActivos();
+  const admins = await cierreRepo.administradoresActivos(papeleta.fk_id_institucion);
   if (admins.length === 0) return;
 
   const alcance = papeleta.nombre_carrera ? ` · ${papeleta.nombre_carrera}` : '';

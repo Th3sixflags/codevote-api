@@ -56,7 +56,7 @@ let servidor: ReturnType<typeof app.listen>;
 let baseUrl = '';
 
 const token = (sub: string, rol = 'estudiante') =>
-  jwt.sign({ sub, email: `${sub}@uide.edu.ec`, rol }, process.env.JWT_SECRET!);
+  jwt.sign({ sub, email: `${sub}@uide.edu.ec`, rol, fk_id_institucion: 1 }, process.env.JWT_SECRET!);
 
 function ejecutar(sqlCrudo: string, params: any[] = []): any {
   const sql = sqlCrudo.replace(/\s+/g, ' ').trim();
@@ -71,6 +71,13 @@ function ejecutar(sqlCrudo: string, params: any[] = []): any {
       fecha_apertura: escenario.aperturaVotacion,
       fecha_cierre: escenario.finVotacion,
       fecha_fin_votacion: escenario.finVotacion,
+      fk_id_institucion: 1,
+    }];
+  }
+  if (sql.includes('FROM estudiante') && sql.includes('FOR UPDATE')) {
+    return [{
+      cedula: params[0], rol: 'estudiante', estado_academico: 'activo',
+      fk_id_carrera: escenario.carreraEstudiante, fk_id_institucion: 1,
     }];
   }
   // Estado de la lista dentro de la papeleta: solo se puede votar por una aprobada.
