@@ -35,9 +35,25 @@ export function ahoraEnEcuador(momento: Date = new Date()): string {
   return FORMATO.format(momento).replace(' ', ' ').replace('T', ' ');
 }
 
-/** Igual que `ahoraEnEcuador`, pero legible para una persona: 03/08/2026 14:05. */
+/**
+ * Igual que `ahoraEnEcuador`, pero legible para una persona.
+ *
+ * Los strings sin offset vienen de columnas MySQL DATETIME y ya representan
+ * hora civil de Ecuador. No deben pasar por `new Date()`: JavaScript los
+ * interpreta en la zona del proceso (UTC en CI) y luego `Intl` volvería a
+ * convertirlos a Ecuador, restando cinco horas por segunda vez.
+ */
 export function formatearEnEcuador(valor: Date | string): string {
-  const fecha = valor instanceof Date ? valor : new Date(String(valor).replace(' ', 'T'));
+  if (typeof valor === 'string') {
+    const texto = valor.trim();
+    const local = /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::\d{2}(?:\.\d+)?)?)?$/.exec(texto);
+    if (local) {
+      const [, anio, mes, dia, hora = '00', minuto = '00'] = local;
+      return `${dia}/${mes}/${anio}, ${hora}:${minuto}`;
+    }
+  }
+
+  const fecha = valor instanceof Date ? valor : new Date(String(valor));
   if (Number.isNaN(fecha.getTime())) return String(valor);
   return new Intl.DateTimeFormat('es-EC', {
     timeZone: ZONA_ECUADOR,
