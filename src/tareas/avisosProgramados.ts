@@ -197,7 +197,9 @@ async function mantenimiento() {
   }
 }
 
-async function pasada(motivo: 'arranque' | 'programada') {
+export async function ejecutarPasadaDeAvisos(
+  motivo: 'arranque' | 'programada', propagarError = false
+) {
   if (enCurso) return;
   enCurso = true;
   try {
@@ -210,6 +212,7 @@ async function pasada(motivo: 'arranque' | 'programada') {
     // Nunca se propaga: un fallo puntual no debe tumbar el proceso ni impedir
     // que la siguiente pasada lo intente de nuevo.
     console.error(`[avisos] (${motivo}) la comprobación falló`, err);
+    if (propagarError) throw err;
   } finally {
     enCurso = false;
   }
@@ -218,8 +221,8 @@ async function pasada(motivo: 'arranque' | 'programada') {
 export function iniciarAvisosProgramados() {
   if (temporizador) return;
 
-  void pasada('arranque');
-  temporizador = setInterval(() => void pasada('programada'), CADA_UN_MINUTO);
+  void ejecutarPasadaDeAvisos('arranque');
+  temporizador = setInterval(() => void ejecutarPasadaDeAvisos('programada'), CADA_UN_MINUTO);
   temporizador.unref?.();
 
   console.info(

@@ -45,6 +45,8 @@ jobs:
           mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u root codevote_db < db/migrations/2026-08-04_recordatorios_y_sanciones.sql
           mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u root codevote_db < db/migrations/2026-08-12_aislamiento_institucional.sql
           mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u root codevote_db < db/migrations/2026-08-12_aislamiento_institucional.sql
+          mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u root codevote_db < db/migrations/2026-08-12_unificar_collation_rutas_archivos.sql
+          mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u root codevote_db < db/migrations/2026-08-12_unificar_collation_rutas_archivos.sql
       - run: npm run lint
       - run: npm run build
       - run: npm test

@@ -10,12 +10,18 @@ import { pool } from '../config/database.js';
  */
 export async function rutasEnUso(): Promise<Set<string>> {
   const [rows] = await pool.query(
-    `SELECT foto_url    AS ruta FROM estudiante          WHERE foto_url IS NOT NULL
-     UNION SELECT foto_url     FROM proceso_electoral    WHERE foto_url IS NOT NULL
-     UNION SELECT foto_url     FROM votacion             WHERE foto_url IS NOT NULL
-     UNION SELECT foto_url     FROM lista_candidata      WHERE foto_url IS NOT NULL
-     UNION SELECT foto_url     FROM candidato            WHERE foto_url IS NOT NULL
-     UNION SELECT archivo_url  FROM plan_trabajo         WHERE archivo_url IS NOT NULL`
+    `SELECT CONVERT(foto_url USING utf8mb4) COLLATE utf8mb4_unicode_ci AS ruta
+       FROM estudiante WHERE foto_url IS NOT NULL
+     UNION SELECT CONVERT(foto_url USING utf8mb4) COLLATE utf8mb4_unicode_ci
+       FROM proceso_electoral WHERE foto_url IS NOT NULL
+     UNION SELECT CONVERT(foto_url USING utf8mb4) COLLATE utf8mb4_unicode_ci
+       FROM votacion WHERE foto_url IS NOT NULL
+     UNION SELECT CONVERT(foto_url USING utf8mb4) COLLATE utf8mb4_unicode_ci
+       FROM lista_candidata WHERE foto_url IS NOT NULL
+     UNION SELECT CONVERT(foto_url USING utf8mb4) COLLATE utf8mb4_unicode_ci
+       FROM candidato WHERE foto_url IS NOT NULL
+     UNION SELECT CONVERT(archivo_url USING utf8mb4) COLLATE utf8mb4_unicode_ci
+       FROM plan_trabajo WHERE archivo_url IS NOT NULL`
   ) as [any[], any];
 
   // Se guarda solo el nombre del archivo: es lo que se compara contra el disco,
