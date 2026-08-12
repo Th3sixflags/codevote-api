@@ -78,7 +78,7 @@ export async function cerrarPapeleta(papeleta: {
     await repo.emitirActa({
       votacionId: papeleta.id_votacion,
       totalVotantes: participacion,
-      validos, blancos, nulos, ganadora,
+      validos, blancos, nulos, ganadora, fechaEmision: momento,
     });
   }
 

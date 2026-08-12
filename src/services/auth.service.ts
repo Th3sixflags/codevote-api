@@ -1,6 +1,7 @@
-import { createHash, randomInt, timingSafeEqual } from 'node:crypto';
+import { createHash, randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import * as repo from '../repositories/codigo_acceso.repository.js';
+import * as sesiones from '../repositories/sesion.repository.js';
 import { enviarCorreo, correoConfigurado } from '../config/correo.js';
 import { HttpError } from '../utils/httpError.js';
 
@@ -177,7 +178,8 @@ export interface SesionIniciada {
 
 /** Verifica el código y devuelve el JWT. */
 export async function verificarCodigo(
-  identificador: string, codigo: string
+  identificador: string, codigo: string,
+  contexto: { ip?: string | null; userAgent?: string | null } | null = {}
 ): Promise<SesionIniciada> {
   // Mensaje único para cuenta inexistente, código equivocado y código caducado:
   // distinguirlos permitiría averiguar qué cuentas existen.
@@ -204,16 +206,44 @@ export async function verificarCodigo(
     throw new HttpError(401, generico);
   }
 
-  const token = jwt.sign(
-    { 
-      sub: cuenta.cedula, 
-      email: cuenta.correo_institucional, 
-      rol: cuenta.rol, 
-      fk_id_institucion: cuenta.rol === 'superadmin' ? undefined : cuenta.fk_id_institucion 
+  const idSesion = randomUUID();
+  const tokenConSesion = jwt.sign(
+    {
+      sub: cuenta.cedula,
+      email: cuenta.correo_institucional,
+      rol: cuenta.rol,
+      fk_id_institucion: cuenta.rol === 'superadmin' ? undefined : cuenta.fk_id_institucion,
+      jti: idSesion,
     },
     process.env.JWT_SECRET!,
     { expiresIn: (process.env.JWT_EXPIRES_IN ?? '8h') as any }
   );
+
+  const payload = jwt.decode(tokenConSesion) as jwt.JwtPayload;
+  if (!payload.exp) throw new Error('El JWT de sesión no contiene expiración.');
+
+  // Durante el despliegue, el código puede llegar unos minutos antes que la
+  // migración manual de AWS. En ese único caso se emite temporalmente el JWT
+  // histórico; en cuanto existe la tabla, todos los JWT nuevos son revocables.
+  const persistida = await sesiones.crearSiEstaDisponible({
+    idSesion,
+    cedula: cuenta.cedula,
+    expiraAt: new Date(payload.exp * 1000),
+    ip: contexto?.ip ?? null,
+    userAgent: contexto?.userAgent?.slice(0, 255) ?? null,
+  });
+  const token = persistida
+    ? tokenConSesion
+    : jwt.sign(
+        {
+          sub: cuenta.cedula,
+          email: cuenta.correo_institucional,
+          rol: cuenta.rol,
+          fk_id_institucion: cuenta.rol === 'superadmin' ? undefined : cuenta.fk_id_institucion,
+        },
+        process.env.JWT_SECRET!,
+        { expiresIn: (process.env.JWT_EXPIRES_IN ?? '8h') as any }
+      );
 
   return {
     token,
@@ -227,4 +257,13 @@ export async function verificarCodigo(
       fk_id_institucion:    cuenta.rol === 'superadmin' ? undefined : cuenta.fk_id_institucion,
     },
   };
+}
+
+export async function cerrarSesion(cedula: string, idSesion?: string): Promise<boolean> {
+  if (!idSesion) return false;
+  return sesiones.revocar(idSesion, cedula);
+}
+
+export async function cerrarTodasSesiones(cedula: string): Promise<number> {
+  return sesiones.revocarTodas(cedula);
 }

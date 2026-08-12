@@ -22,6 +22,18 @@ export async function listarPorVotacion(req: Request, res: Response) {
   res.json(registros);
 }
 
+export async function verificarIntegridad(req: Request, res: Response) {
+  const resultado = await service.verificarIntegridad(
+    Number(req.params.id),
+    institucionDeSesion(req.user?.rol, req.user?.fk_id_institucion)
+  );
+  if (!resultado) {
+    res.status(404).json({ error: 'Acta no encontrada.' });
+    return;
+  }
+  res.json(resultado);
+}
+
 export async function crear(req: Request, res: Response) {
   const data  = crearActaResultadosSchema.parse(req.body);
   const nuevo = await service.crearActaResultados(data, req.user?.fk_id_institucion);

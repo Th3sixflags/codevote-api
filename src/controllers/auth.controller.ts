@@ -26,6 +26,20 @@ export async function solicitarCodigo(req: Request, res: Response) {
 /** POST /api/auth/verificar — canjea el código por la sesión (JWT). */
 export async function verificarCodigo(req: Request, res: Response) {
   const { identificador, codigo } = verificarCodigoSchema.parse(req.body);
-  res.json(await service.verificarCodigo(identificador, codigo));
+  res.json(await service.verificarCodigo(identificador, codigo, {
+    ip: ipDe(req),
+    userAgent: req.get('user-agent') ?? null,
+  }));
 }
 
+/** Revoca exclusivamente el Bearer actual. */
+export async function cerrarSesion(req: Request, res: Response) {
+  await service.cerrarSesion(req.user!.sub, req.user!.jti);
+  res.status(204).end();
+}
+
+/** Revoca todas las sesiones de la cuenta, incluida la que hizo la petición. */
+export async function cerrarTodasSesiones(req: Request, res: Response) {
+  const revocadas = await service.cerrarTodasSesiones(req.user!.sub);
+  res.json({ sesiones_revocadas: revocadas });
+}

@@ -75,6 +75,7 @@ function ejecutar(sqlCrudo: string, params: any[] = []): any {
     codigos.push({ id, cedula: params[0], hash: params[1], usado: false });
     return { insertId: id };
   }
+  if (sql.startsWith('INSERT INTO sesion')) return { insertId: 1 };
 
   throw new Error(`consulta inesperada en la prueba: ${sql.slice(0, 140)}`);
 }

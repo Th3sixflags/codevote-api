@@ -1,4 +1,5 @@
 import { pool } from '../config/database.js';
+import { hashActa } from '../utils/hashActa.js';
 
 /** Papeleta que ya debería estar cerrada, con el contexto de su proceso. */
 export interface PapeletaVencida {
@@ -97,13 +98,36 @@ export async function emitirActa(datos: {
   blancos: number;
   nulos: number;
   ganadora: string | null;
+  fechaEmision: string;
 }) {
-  await pool.query(
-    `INSERT INTO acta_resultados
-       (fk_id_votacion, total_votantes, votos_validos, votos_blanco, votos_nulos, lista_ganadora)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [datos.votacionId, datos.totalVotantes, datos.validos, datos.blancos, datos.nulos, datos.ganadora]
-  );
+  const sello = hashActa(datos);
+  try {
+    await pool.query(
+      `INSERT INTO acta_resultados
+         (fk_id_votacion, total_votantes, votos_validos, votos_blanco, votos_nulos,
+          lista_ganadora, fecha_emision, hash_version, hash_algoritmo, hash_acta)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 1, 'SHA-256', ?)`,
+      [
+        datos.votacionId, datos.totalVotantes, datos.validos, datos.blancos,
+        datos.nulos, datos.ganadora, datos.fechaEmision, sello,
+      ]
+    );
+  } catch (err: any) {
+    // Despliegue compatible: el pipeline publica el backend antes de que la
+    // migración se aplique manualmente en AWS. Solo se usa el INSERT histórico
+    // cuando MySQL confirma que las columnas P1 todavía no existen.
+    if (err?.code !== 'ER_BAD_FIELD_ERROR' && err?.errno !== 1054) throw err;
+    await pool.query(
+      `INSERT INTO acta_resultados
+         (fk_id_votacion, total_votantes, votos_validos, votos_blanco, votos_nulos,
+          lista_ganadora, fecha_emision)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        datos.votacionId, datos.totalVotantes, datos.validos, datos.blancos,
+        datos.nulos, datos.ganadora, datos.fechaEmision,
+      ]
+    );
+  }
 }
 
 /**

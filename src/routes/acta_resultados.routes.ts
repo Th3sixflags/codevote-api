@@ -13,6 +13,7 @@ const router = Router();
 // El orden importa: las rutas específicas van antes que /:id
 router.get('/',                     requireAuth, requireAdmin, ctrl.listar);
 router.get('/votacion/:votacionId', requireAuth, requireAdmin, ctrl.listarPorVotacion);
+router.get('/:id/integridad',       requireAuth, requireAdmin, ctrl.verificarIntegridad);
 router.get('/:id',                  requireAuth, requireAdmin, ctrl.obtener);
 // No existen rutas de mutación manual: el cierre de la papeleta es el único
 // productor de actas y una acta emitida no se edita ni se elimina por la API.

@@ -11,6 +11,7 @@ import { openapiSpec } from './config/swagger.js';
 import { iniciarCierreProgramado } from './tareas/cierreProgramado.js';
 import { iniciarAvisosProgramados } from './tareas/avisosProgramados.js';
 import { DIRECTORIO_UPLOADS, prepararDirectorios } from './config/uploads.js';
+import { auditarMutacionesHttp } from './middleware/auditoria.js';
 
 const app  = express();
 const PORT = Number(process.env.PORT ?? 3000);
@@ -70,6 +71,7 @@ app.use(
 
 app.use(express.json());
 app.use(requestLogger);
+app.use(auditarMutacionesHttp);
 app.use(rateLimiter);
 
 registerRoutes(app);

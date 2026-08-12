@@ -2,12 +2,16 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { esAdministracion } from '../utils/accesoCarrera.js';
 import { pool } from '../config/database.js';
+import * as sesiones from '../repositories/sesion.repository.js';
 
 export interface JwtPayload {
   sub:   string;
   email: string;
   rol:   'estudiante' | 'admin' | 'candidato' | 'superadmin';
   fk_id_institucion?: number;
+  jti?: string;
+  iat?: number;
+  exp?: number;
 }
 
 declare global {
@@ -16,19 +20,39 @@ declare global {
   }
 }
 
-export function requireAuth(req: Request, res: Response, next: NextFunction) {
+export async function requireAuth(req: Request, res: Response, next: NextFunction) {
   const header = req.headers.authorization;
   if (!header?.startsWith('Bearer ')) {
     res.status(401).json({ error: 'Token no proporcionado.' });
     return;
   }
+  const token = header.split(' ')[1];
+  let payload: JwtPayload;
   try {
-    const token   = header.split(' ')[1];
-    const payload = jwt.verify(token, process.env.JWT_SECRET!) as JwtPayload;
-    req.user = payload;
-    next();
+    payload = jwt.verify(token, process.env.JWT_SECRET!) as JwtPayload;
   } catch {
     res.status(401).json({ error: 'Token inválido o expirado.' });
+    return;
+  }
+
+  try {
+    if (payload.jti) {
+      if (!(await sesiones.estaActiva(payload.jti, payload.sub))) {
+        res.status(401).json({ error: 'La sesión fue revocada o ya caducó.' });
+        return;
+      }
+    } else if (process.env.NODE_ENV === 'production' && await sesiones.tablaDisponible()) {
+      // Una vez aplicada P1, los JWT históricos sin jti dejan de ser válidos.
+      res.status(401).json({ error: 'La sesión ya no es válida. Inicia sesión nuevamente.' });
+      return;
+    }
+
+    req.user = payload;
+    next();
+  } catch (err) {
+    // Una caída de MySQL no convierte un JWT válido en "credenciales malas";
+    // se propaga como fallo del servicio para que sea observable y reintentable.
+    next(err);
   }
 }
 

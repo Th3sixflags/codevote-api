@@ -107,6 +107,7 @@ function ejecutar(sqlCrudo: string, params: any[] = []): any {
     });
     return { insertId: id };
   }
+  if (sql.startsWith('INSERT INTO sesion')) return { insertId: 1 };
   if (sql.startsWith('UPDATE codigo_acceso SET intentos = intentos + 1')) {
     const c = estado.codigos.find((x) => x.id_codigo === Number(params[0]));
     if (c) c.intentos += 1;

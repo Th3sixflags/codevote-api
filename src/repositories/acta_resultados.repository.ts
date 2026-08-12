@@ -35,6 +35,21 @@ export async function findByVotacion(id: number, institucionId?: number) {
   return rows as any[];
 }
 
+export async function findIntegridadById(id: number, institucionId?: number) {
+  const inst = condicionInstitucion(institucionId);
+  const [rows] = await pool.query(
+    `SELECT a.id_acta, a.fk_id_votacion, a.total_votantes, a.votos_validos,
+            a.votos_blanco, a.votos_nulos, a.lista_ganadora, a.fecha_emision,
+            a.hash_version, a.hash_algoritmo, a.hash_acta
+       FROM acta_resultados a
+       JOIN votacion v ON v.id_votacion = a.fk_id_votacion
+       JOIN proceso_electoral p ON p.id_proceso = v.fk_id_proceso
+      WHERE a.id_acta = ?${inst.sql}`,
+    [id, ...inst.params]
+  ) as [any[], any];
+  return rows[0] ?? null;
+}
+
 export async function create(data: CrearActaResultadosDTO) {
   const [result] = await pool.query(
     `INSERT INTO acta_resultados (fk_id_votacion, total_votantes, votos_validos, votos_blanco, votos_nulos, lista_ganadora, fecha_emision)

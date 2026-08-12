@@ -176,8 +176,22 @@ INSERT INTO codigo_voto (fk_id_votacion, codigo_hash, estado_codigo, fecha_envio
 (2, 'hash_codigo_10', 'usado', '2025-05-31 08:00:00', '1710000157', 'daedf9a7-aaaa-4dad-940a-9f9a74bba00a');
 
 -- 16. acta_resultados
-INSERT INTO acta_resultados (fk_id_votacion, total_votantes, votos_validos, votos_blanco, votos_nulos, lista_ganadora, fecha_emision) VALUES 
-(2, 5, 3, 1, 1, 'Opción SÍ', '2025-06-03 10:00:00');
+INSERT INTO acta_resultados
+  (fk_id_votacion, total_votantes, votos_validos, votos_blanco, votos_nulos,
+   lista_ganadora, fecha_emision, hash_version, hash_algoritmo, hash_acta)
+VALUES (
+  2, 5, 3, 1, 1, 'Opción SÍ', '2025-06-03 10:00:00', 1, 'SHA-256',
+  SHA2(CONCAT(
+    'codevote-acta:v1\n',
+    'votacion:2\n',
+    'total_votantes:5\n',
+    'votos_validos:3\n',
+    'votos_blanco:1\n',
+    'votos_nulos:1\n',
+    'lista_ganadora_hex:', UPPER(HEX(CONVERT('Opción SÍ' USING utf8mb4))), '\n',
+    'fecha_emision:2025-06-03 10:00:00'
+  ), 256)
+);
 
 -- 17. veedor
 INSERT INTO veedor (nombre, institucion, tipo_veedor, correo) VALUES 

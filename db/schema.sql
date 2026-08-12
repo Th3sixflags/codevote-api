@@ -265,6 +265,9 @@ CREATE TABLE acta_resultados (
   votos_nulos INT NOT NULL DEFAULT 0,
   lista_ganadora VARCHAR(80),
   fecha_emision DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  hash_version TINYINT UNSIGNED NOT NULL DEFAULT 1,
+  hash_algoritmo VARCHAR(16) NOT NULL DEFAULT 'SHA-256',
+  hash_acta CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
   CONSTRAINT uq_acta_votacion UNIQUE (fk_id_votacion),
   CONSTRAINT fk_acta_votacion FOREIGN KEY (fk_id_votacion) REFERENCES votacion(id_votacion)
 );
@@ -328,4 +331,44 @@ CREATE TABLE historial_importacion (
   errores_json JSON NULL,
   CONSTRAINT fk_historial_institucion FOREIGN KEY (fk_id_institucion) REFERENCES institucion(id_institucion),
   CONSTRAINT fk_historial_importador FOREIGN KEY (cedula_importador) REFERENCES estudiante(cedula)
+);
+
+-- 22. sesión JWT revocable. El token conserva su contrato Bearer, pero su jti
+-- debe apuntar a una fila activa para que logout y revocación sean inmediatos.
+CREATE TABLE sesion (
+  id_sesion CHAR(36) CHARACTER SET ascii COLLATE ascii_bin PRIMARY KEY,
+  fk_cedula_estudiante VARCHAR(20) NOT NULL,
+  creada_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  expira_at DATETIME NOT NULL,
+  revocada_at DATETIME NULL DEFAULT NULL,
+  ultimo_uso_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  ip VARCHAR(45) NULL,
+  user_agent VARCHAR(255) NULL,
+  motivo_revocacion VARCHAR(80) NULL,
+  INDEX idx_sesion_usuario_activa (fk_cedula_estudiante, revocada_at, expira_at),
+  CONSTRAINT fk_sesion_estudiante FOREIGN KEY (fk_cedula_estudiante)
+    REFERENCES estudiante(cedula) ON DELETE CASCADE
+);
+
+-- 23. bitácora append-only. Los triggers de inmutabilidad se instalan mediante
+-- db/migrations/2026-08-12_p1_sesiones_auditoria_hash_actas.sql.
+CREATE TABLE auditoria_evento (
+  id_evento BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  fecha_evento DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  actor_cedula VARCHAR(20) NULL,
+  actor_rol VARCHAR(20) NULL,
+  fk_id_institucion INT NULL,
+  id_sesion CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NULL,
+  accion VARCHAR(80) NOT NULL,
+  metodo VARCHAR(10) NULL,
+  ruta VARCHAR(255) NULL,
+  estado_http SMALLINT UNSIGNED NULL,
+  ip VARCHAR(45) NULL,
+  user_agent VARCHAR(255) NULL,
+  detalles JSON NULL,
+  hash_evento CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  INDEX idx_auditoria_fecha (fecha_evento),
+  INDEX idx_auditoria_actor (actor_cedula, fecha_evento),
+  INDEX idx_auditoria_institucion (fk_id_institucion, fecha_evento),
+  INDEX idx_auditoria_accion (accion, fecha_evento)
 );
