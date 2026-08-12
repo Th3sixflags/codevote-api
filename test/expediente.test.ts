@@ -38,8 +38,12 @@ before(async () => {
       return [[]];
     }
     
-    if (s.includes('FROM VOTACION V LEFT JOIN CARRERA C')) {
-      return [[{ id_votacion: 10, titulo_papeleta: 'Global' }]];
+    if (s.includes('FROM INSTITUCION')) {
+      return [[{ nombre: 'UIDE Test', logo_url: null, colores_json: null }]];
+    }
+    
+    if (s.includes('FROM VOTACION V')) {
+      return [[{ id_votacion: 10, titulo_papeleta: 'Global', nombre_carrera: null }]];
     }
     
     if (s.includes('FROM ACTA_RESULTADOS')) {
@@ -54,7 +58,7 @@ before(async () => {
       return [[{ id_lista: 30, nombre_lista: 'Lista A', lema: 'Lema A' }]];
     }
 
-    if (s.includes('FROM CANDIDATO C JOIN ESTUDIANTE')) {
+    if (s.includes('FROM CANDIDATO')) {
       return [[{ cargo: 'Presidente', nombres: 'Juan', apellidos: 'Perez' }]];
     }
     
@@ -62,7 +66,7 @@ before(async () => {
       return [[{ area: 'academico', archivo_url: 'http://test.pdf' }]];
     }
     
-    if (s.includes('FROM VEEDURIA VD JOIN VEEDOR')) {
+    if (s.includes('FROM VEEDURIA')) {
       return [[{ momento: 'apertura', observacion: 'Todo bien', nombre: 'Inspector', tipo_veedor: 'externo' }]];
     }
 
