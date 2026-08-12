@@ -95,6 +95,51 @@ paths:
         '401': { $ref: '#/components/responses/NoAutenticado' }
         '403': { $ref: '#/components/responses/SinPermiso' }
 
+  /instituciones/{id}/admin:
+    post:
+      summary: Asigna un administrador a la institución
+      description: Permite al SuperAdmin crear o asignar un usuario con rol de administrador para una institución específica.
+      tags:
+        - Instituciones
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: ID de la institución
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [cedula, nombres, apellidos, correo_institucional]
+              properties:
+                cedula:
+                  type: string
+                  description: Cédula, pasaporte u otro identificador
+                nombres:
+                  type: string
+                apellidos:
+                  type: string
+                correo_institucional:
+                  type: string
+                  format: email
+      responses:
+        '201':
+          description: Administrador asignado correctamente
+        '400':
+          $ref: '#/components/responses/ValidacionFallida'
+        '403':
+          description: Se requiere rol superadmin, o la institución está suspendida
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '409':
+          description: El identificador o correo ya están registrados en el sistema.
+
   /auth/codigo:
     post:
       tags: [Autenticación]

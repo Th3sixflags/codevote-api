@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import * as service from '../services/institucion.service.js';
-import { crearInstitucionSchema, actualizarInstitucionSchema } from '../schemas/institucion.schema.js';
+import { crearInstitucionSchema, actualizarInstitucionSchema, asignarAdminSchema } from '../schemas/institucion.schema.js';
 
 export async function listar(req: Request, res: Response) {
   const instituciones = await service.listar();
@@ -74,4 +74,11 @@ export async function obtenerAdmins(req: Request, res: Response) {
   const id = Number(req.params.id);
   const admins = await service.obtenerAdmins(id);
   res.json(admins);
+}
+
+export async function asignarAdmin(req: Request, res: Response) {
+  const id = Number(req.params.id);
+  const data = asignarAdminSchema.parse(req.body);
+  const resultado = await service.asignarAdmin(id, data);
+  res.status(201).json(resultado);
 }

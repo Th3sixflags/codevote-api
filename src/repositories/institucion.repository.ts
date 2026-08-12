@@ -1,6 +1,6 @@
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 import { pool } from '../config/database.js';
-import { CrearInstitucionDTO, ActualizarInstitucionDTO } from '../schemas/institucion.schema.js';
+import { CrearInstitucionDTO, ActualizarInstitucionDTO, AsignarAdminDTO } from '../schemas/institucion.schema.js';
 
 /** Convierte un nombre a un slug URL-safe: minúsculas, sin acentos, espacios → guiones. */
 function slugificar(nombre: string): string {
@@ -103,4 +103,19 @@ export async function findAdmins(id: number) {
   const query = 'SELECT * FROM estudiante WHERE rol = "admin" AND fk_id_institucion = ? ORDER BY apellidos, nombres';
   const [rows] = await pool.query<RowDataPacket[]>(query, [id]);
   return rows;
+}
+
+export async function assignAdmin(id: number, admin: AsignarAdminDTO) {
+  const query = `
+    INSERT INTO estudiante (cedula, nombres, apellidos, correo_institucional, estado_academico, rol, fk_id_institucion, password, debe_cambiar_password)
+    VALUES (?, ?, ?, ?, 'activo', 'admin', ?, '', 1)
+  `;
+  const [result] = await pool.query<ResultSetHeader>(query, [
+    admin.cedula,
+    admin.nombres,
+    admin.apellidos,
+    admin.correo_institucional,
+    id
+  ]);
+  return result.affectedRows;
 }

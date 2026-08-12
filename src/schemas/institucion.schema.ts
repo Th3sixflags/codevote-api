@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { cedulaSchema, nombrePersonaSchema } from './common.js';
 
 export const configJsonSchema = z.object({
   requiere_promedio: z.boolean().default(false),
@@ -29,5 +30,13 @@ export const crearInstitucionSchema = z.object({
 
 export const actualizarInstitucionSchema = crearInstitucionSchema.partial();
 
+export const asignarAdminSchema = z.object({
+  cedula:               z.string().min(3, 'El identificador debe tener al menos 3 caracteres').max(20),
+  nombres:              nombrePersonaSchema,
+  apellidos:            nombrePersonaSchema,
+  correo_institucional: z.string().email('El correo institucional no tiene un formato válido.').max(120),
+});
+
 export type CrearInstitucionDTO      = z.infer<typeof crearInstitucionSchema>;
 export type ActualizarInstitucionDTO = z.infer<typeof actualizarInstitucionSchema>;
+export type AsignarAdminDTO          = z.infer<typeof asignarAdminSchema>;
