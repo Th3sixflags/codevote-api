@@ -2,7 +2,6 @@ import PDFDocument from 'pdfkit';
 import { pool } from '../config/database.js';
 import { HttpError } from '../utils/httpError.js';
 import * as procesoRepo from '../repositories/proceso_electoral.repository.js';
-import fetch from 'node-fetch';
 
 /**
  * Función auxiliar para dibujar tablas manuales en PDFKit
