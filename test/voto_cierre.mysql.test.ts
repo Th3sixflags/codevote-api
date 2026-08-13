@@ -58,6 +58,14 @@ test('dos votos simultáneos producen un voto y un comprobante', async () => {
   ]);
   assert.equal(resultados.filter((r) => r.status === 'fulfilled').length, 1);
   assert.equal(resultados.filter((r) => r.status === 'rejected').length, 1);
+  const registroExitoso = resultados.find(
+    (resultado): resultado is PromiseFulfilledResult<Awaited<ReturnType<typeof registrarVoto>>> => resultado.status === 'fulfilled'
+  )!.value;
+  assert.deepEqual(Object.keys(registroExitoso).sort(), ['codigo_verificacion', 'registrado']);
+  const confirmacionJson = JSON.stringify(registroExitoso);
+  for (const campoProhibido of ['cedula', 'lista', 'candidato', 'tipo_voto', 'id_voto', 'codigo_hash']) {
+    assert.ok(!confirmacionJson.includes(campoProhibido), `la confirmación expone ${campoProhibido}`);
+  }
   assert.equal(await votoRepo.countVotantes(votacionId), 1);
   const [votos] = await pool.query('SELECT COUNT(*) AS total FROM voto WHERE fk_id_votacion = ?', [votacionId]) as [any[], any];
   assert.equal(Number(votos[0].total), 1);

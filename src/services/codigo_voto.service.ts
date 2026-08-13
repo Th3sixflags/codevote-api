@@ -8,15 +8,12 @@ import { CrearCodigoVotoDTO, ActualizarCodigoVotoDTO } from '../schemas/codigo_v
  * o un JOIN a la consulta: lo que no esté aquí, no sale.
  *
  * Nunca: cédula, nombres, apellidos, correo, lista seleccionada, candidato ni
- * opción votada. `codigo_hash` y `codigo_verificacion` sí, porque son
- * identificadores opacos que no revelan identidad ni elección.
+ * opción votada, hashes, códigos de verificación ni IDs internos. Los códigos
+ * públicos se entregan únicamente al propio elector por "Mis recibos".
  */
 function aComprobanteAnonimo(registro: any) {
   return {
-    id_codigo:           registro.id_codigo,
     titulo_papeleta:     registro.titulo_papeleta,
-    codigo_hash:         registro.codigo_hash,
-    codigo_verificacion: registro.codigo_verificacion,
     estado_codigo:       registro.estado_codigo,
     fecha_envio:         registro.fecha_envio,
   };
@@ -38,7 +35,17 @@ export async function listarPorVotacion(id: number, institucionId?: number) {
 }
 
 export async function listarPorEstudiante(cedula: string, institucionId?: number) {
-  return repo.findByEstudiante(cedula, institucionId);
+  const registros = await repo.findByEstudiante(cedula, institucionId);
+  // Lista blanca separada del resultado SQL: `fk_cedula_estudiante` solo se usa
+  // en WHERE y nunca llega al navegador, ni siquiera al propio elector.
+  return registros.map((registro: any) => ({
+    fk_id_votacion: registro.fk_id_votacion,
+    titulo_papeleta: registro.titulo_papeleta,
+    nombre_proceso: registro.nombre_proceso,
+    estado_codigo: registro.estado_codigo,
+    fecha_envio: registro.fecha_envio,
+    codigo_verificacion: registro.codigo_verificacion,
+  }));
 }
 
 /**

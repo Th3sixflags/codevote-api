@@ -12,14 +12,13 @@ import { CrearCodigoVotoDTO, ActualizarCodigoVotoDTO } from '../schemas/codigo_v
  * puede auditar cuántos comprobantes se emitieron, para qué papeleta y en qué
  * estado están, pero no reconstruir quién participó ni qué eligió.
  *
- * Se conservan `codigo_hash` y `codigo_verificacion` porque son identificadores
- * opacos: sirven para cotejar el comprobante que reporte un estudiante y por sí
- * solos no revelan identidad ni elección.
+ * Tampoco se incluyen hashes, códigos de verificación ni IDs internos: aunque
+ * sean opacos, no hacen falta en la auditoría agregada y evitar entregarlos
+ * reduce los artefactos que podrían correlacionarse con otros registros.
  */
 const CONSULTA_ANONIMA = `
   SELECT
-    cv.id_codigo, v.titulo_papeleta, cv.codigo_hash, cv.codigo_verificacion,
-    cv.estado_codigo, cv.fecha_envio
+    v.titulo_papeleta, cv.estado_codigo, cv.fecha_envio
   FROM codigo_voto cv
   JOIN votacion v ON v.id_votacion = cv.fk_id_votacion
   JOIN proceso_electoral p ON p.id_proceso = v.fk_id_proceso
@@ -51,9 +50,9 @@ export async function findByVotacion(id: number, institucionId?: number) {
 
 /**
  * Comprobantes emitidos a un estudiante (usado por "Mis Recibos").
- * NO se incluye `codigo_hash`: el comprobante prueba la participación, pero el
- * hash se reserva a la auditoría administrativa para no revelar/relacionar nada
- * del voto. Los endpoints de admin (findAll/findById/findByVotacion) sí lo traen.
+ * NO se incluye `codigo_hash` ni el ID interno: el comprobante prueba la
+ * participación mediante un código público opaco, sin entregar artefactos de
+ * auditoría que puedan correlacionarse con el voto.
  */
 export async function findByEstudiante(cedula: string, institucionId?: number) {
   const inst = condicionInstitucion(institucionId);

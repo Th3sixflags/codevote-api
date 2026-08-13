@@ -45,10 +45,7 @@ const FILA_CON_DATOS_SENSIBLES = {
 
 /** Lo único que puede salir. */
 const CAMPOS_ESPERADOS = [
-  'id_codigo',
   'titulo_papeleta',
-  'codigo_hash',
-  'codigo_verificacion',
   'estado_codigo',
   'fecha_envio',
 ];
@@ -67,6 +64,8 @@ const CAMPOS_PROHIBIDOS = [
   'fk_id_candidato',
   'nombre_candidato',
   'opcion_votada',
+  'codigo_hash',
+  'codigo_verificacion',
 ];
 
 /** Los tres endpoints que un admin puede consultar. */
@@ -171,12 +170,18 @@ for (const endpoint of ENDPOINTS_DE_ADMIN) {
 
     assert.ok(consultasEjecutadas.length > 0, 'se esperaba al menos una consulta');
     for (const sql of consultasEjecutadas) {
+      const inicioFrom = sql.toUpperCase().indexOf('FROM');
+      const columnasSeleccionadas = inicioFrom >= 0 ? sql.slice(0, inicioFrom) : sql;
       for (const campo of CAMPOS_PROHIBIDOS) {
         assert.ok(
-          !sql.includes(campo),
+          !columnasSeleccionadas.includes(campo),
           `${endpoint.nombre} selecciona "${campo}", que no debe salir del servidor`
         );
       }
+      assert.ok(
+        !columnasSeleccionadas.includes('id_codigo'),
+        `${endpoint.nombre} selecciona un identificador interno, que no debe salir del servidor`
+      );
       // Tampoco debe unirse con las tablas de identidad ni de voto.
       for (const tabla of ['estudiante', 'voto ', 'lista_candidata', 'candidato']) {
         assert.ok(

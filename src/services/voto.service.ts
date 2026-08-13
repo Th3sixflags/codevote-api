@@ -14,7 +14,7 @@ export async function yaVoto(votacionId: number, cedula: string) {
 export async function registrarVoto(data: CrearVotoDTO, cedula: string, institucionId?: number) {
   const tenant = institucionObligatoria(institucionId);
 
-  const { comprobante, ...voto } = await repo.enTransaccion(async (conn) => {
+  const confirmacion = await repo.enTransaccion(async (conn) => {
   // Integridad electoral: solo se acepta el voto si la votación está ABIERTA y
   // su proceso está activo. Sin esto, una llamada directa a la API permitiría
   // votar en votaciones cerradas o pendientes (el frontend ya lo bloquea, pero
@@ -86,9 +86,8 @@ export async function registrarVoto(data: CrearVotoDTO, cedula: string, instituc
     throw new HttpError(409, 'Ya has emitido tu voto en esta votación.');
   }
 
-  // El hash del comprobante NUNCA se expone al estudiante (mantiene el voto
-  // anónimo y evita relacionarlo con la opción elegida): se descarta aquí y
-  // solo queda almacenado en codigo_voto para la auditoría administrativa.
+  // La respuesta final no contiene el voto, tipo, lista ni identificadores del
+  // registro de sufragio; solo un código opaco que prueba participación.
   return repo.insertarVotoYComprobante(data, cedula, conn);
   });
 
@@ -101,7 +100,7 @@ export async function registrarVoto(data: CrearVotoDTO, cedula: string, instituc
     'Tu voto fue registrado correctamente. Puedes consultar tu participación en Mis recibos.'
   );
 
-  return voto;
+  return confirmacion;
 }
 
 /** Redondea a dos decimales sin arrastrar el error binario de los flotantes. */

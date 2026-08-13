@@ -35,6 +35,14 @@ un operador con acceso simultáneo a logs, red y base podría inferir correlacio
 temporales. Antes de una elección con adversario fuerte se requiere una fase
 adicional (canal de anonimización, mezcla/batching y revisión externa).
 
+## Contratos reforzados de API
+
+`POST /api/votos` solo confirma registro con un código opaco; no devuelve lista,
+tipo de voto, candidato, ID de voto ni hash. Las rutas de comprobantes no
+devuelven cédula ni hashes y la verificación pública solo confirma proceso,
+papeleta y participación. Las pruebas de anonimato tratan esos campos como
+prohibidos para evitar regresiones.
+
 ## Operación segura
 
 - Producción debe usar HTTPS, `NODE_ENV=production`, `CORS_ORIGIN` exacto y

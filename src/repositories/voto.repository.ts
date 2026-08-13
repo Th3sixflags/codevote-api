@@ -94,8 +94,9 @@ export async function insertarVotoYComprobante(
     [data.fk_id_votacion, hash, cedula, codigoVerificacion]
   );
 
-  const [rows] = await conn.query(BASE_QUERY + ' WHERE v.id_voto = ?', [result.insertId]) as [any[], any];
-  return { ...rows[0], comprobante: hash };
+  // Nunca releer ni devolver la fila de `voto`: contendría tipo/lista y sería
+  // una correlación innecesaria desde la respuesta de la API al sufragio.
+  return { registrado: true, codigo_verificacion: codigoVerificacion };
 }
 
 /**

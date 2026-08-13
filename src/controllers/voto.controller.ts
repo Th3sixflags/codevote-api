@@ -8,8 +8,8 @@ export async function votar(req: Request, res: Response) {
   const cedula = req.user!.sub;
 
   try {
-    const voto = await service.registrarVoto(data, cedula, req.user?.fk_id_institucion);
-    res.status(201).json(voto);
+    const comprobante = await service.registrarVoto(data, cedula, req.user?.fk_id_institucion);
+    res.status(201).json(comprobante);
   } catch (err: any) {
     // Carrera: dos peticiones simultáneas. La restricción única de codigo_voto
     // rechaza la segunda; se responde con el mismo 409 que la comprobación previa.
