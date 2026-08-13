@@ -21,6 +21,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { leerToken, minutosRestantes } from '../src/jwt.js';
+import { extraerTokenSesion } from '../src/session-token.js';
 
 const API_POR_DEFECTO = process.env.CODEVOTE_API_URL ?? 'https://codevote.lat/api';
 
@@ -67,7 +68,7 @@ Uso: npm run token -- [opciones]
   return opciones;
 }
 
-async function pedirJson(url: string, cuerpo: unknown): Promise<any> {
+async function pedirJson(url: string, cuerpo: unknown): Promise<{ datos: any; cabeceras: Headers }> {
   const respuesta = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -85,7 +86,7 @@ async function pedirJson(url: string, cuerpo: unknown): Promise<any> {
     const detalle = datos?.error ?? datos?.mensaje ?? `HTTP ${respuesta.status}`;
     throw new Error(detalle);
   }
-  return datos;
+  return { datos, cabeceras: respuesta.headers };
 }
 
 /** Copia al portapapeles sin salto de línea final. Silencioso si no se puede. */
@@ -157,7 +158,7 @@ async function principal() {
     if (!identificador) throw new Error('Hace falta un correo o una cédula.');
 
     process.stdout.write('Pidiendo el código… ');
-    const solicitud = await pedirJson(`${opciones.api}/auth/codigo`, { identificador });
+    const { datos: solicitud } = await pedirJson(`${opciones.api}/auth/codigo`, { identificador });
     console.log(c.verde('listo'));
 
     // La API responde igual exista o no la cuenta, para no filtrar quién está
@@ -181,11 +182,12 @@ async function principal() {
     if (!/^\d{6}$/.test(codigo)) throw new Error('El código son 6 dígitos.');
 
     process.stdout.write('Canjeando… ');
-    const sesion = await pedirJson(`${opciones.api}/auth/verificar`, { identificador, codigo });
-    if (!sesion.token) throw new Error('La API no devolvió un token.');
+    const respuestaSesion = await pedirJson(`${opciones.api}/auth/verificar`, { identificador, codigo });
+    const token = extraerTokenSesion(respuestaSesion.datos, respuestaSesion.cabeceras);
+    if (!token) throw new Error('La API no devolvió una sesión de acceso.');
     console.log(c.verde('listo\n'));
 
-    const carga = leerToken(sesion.token);
+    const carga = leerToken(token);
     const minutos = minutosRestantes(carga);
 
     console.log(`Rol:     ${c.fuerte(carga.rol)}`);
@@ -200,12 +202,12 @@ async function principal() {
       );
     }
 
-    console.log(`\n${c.gris('── token ──')}\n${sesion.token}\n${c.gris('───────────')}`);
+    console.log(`\n${c.gris('── token ──')}\n${token}\n${c.gris('───────────')}`);
 
-    if (copiar(sesion.token)) console.log(c.verde('✔ Copiado al portapapeles (sin salto de línea).'));
+    if (copiar(token)) console.log(c.verde('✔ Copiado al portapapeles (sin salto de línea).'));
 
     if (opciones.escribirConfig) {
-      const resultado = escribirEnClaude(sesion.token);
+      const resultado = escribirEnClaude(token);
       if (resultado.ok) {
         console.log(c.verde(`✔ Escrito en ${RUTA_CLAUDE}`));
         console.log(c.fuerte('\n→ Reinicia Claude Desktop con Cmd+Q y vuelve a abrirlo.\n'));
