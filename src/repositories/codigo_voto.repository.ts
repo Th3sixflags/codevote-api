@@ -92,6 +92,28 @@ export async function findVerificacionDeEstudiante(id: number, cedula: string) {
   return rows[0] ?? null;
 }
 
+/**
+ * Verificación pública por el código opaco del comprobante.
+ *
+ * La consulta deliberadamente no une estudiante, voto, lista_candidata ni
+ * candidato, y tampoco selecciona identificadores internos. Así, aun con un
+ * comprobante válido, el resultado solo demuestra que una participación fue
+ * registrada para una papeleta; no permite saber quién participó ni qué votó.
+ */
+export async function findVerificacionPublica(codigoVerificacion: string) {
+  const [rows] = await pool.query(
+    `SELECT
+       p.nombre_proceso, v.titulo_papeleta, cv.fecha_envio
+     FROM codigo_voto cv
+     JOIN votacion v ON v.id_votacion = cv.fk_id_votacion
+     JOIN proceso_electoral p ON p.id_proceso = v.fk_id_proceso
+     WHERE cv.codigo_verificacion = ?
+     LIMIT 1`,
+    [codigoVerificacion]
+  ) as [any[], any];
+  return rows[0] ?? null;
+}
+
 export async function create(data: CrearCodigoVotoDTO) {
   // `codigo_verificacion` es obligatorio y opaco: se genera aquí (UUID v4) y no
   // se acepta desde el body, para que nadie pueda fijar un valor predecible.

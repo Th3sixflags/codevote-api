@@ -72,7 +72,8 @@ CREATE TABLE IF NOT EXISTS recordatorio_programado (
 -- 3. Sanciones por no votar.
 CREATE TABLE IF NOT EXISTS sancion_electoral (
   id_sancion INT AUTO_INCREMENT PRIMARY KEY,
-  fk_cedula_estudiante CHAR(10) NOT NULL,
+  -- Debe coincidir con estudiante.cedula para que la FK sea válida en MySQL 8.
+  fk_cedula_estudiante VARCHAR(20) NOT NULL,
   fk_id_votacion INT NOT NULL,
   motivo VARCHAR(150) NOT NULL DEFAULT 'No participó en la votación',
   fecha_sancion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

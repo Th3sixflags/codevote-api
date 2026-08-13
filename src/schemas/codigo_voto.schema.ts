@@ -11,5 +11,11 @@ export const crearCodigoVotoSchema = z.object({
 
 export const actualizarCodigoVotoSchema = crearCodigoVotoSchema.partial();
 
+/**
+ * El código que recibe el elector es un UUID v4 aleatorio. Validarlo antes de
+ * consultar evita que esta ruta pública acepte IDs internos o texto arbitrario.
+ */
+export const codigoVerificacionPublicoSchema = z.string().uuid('El código de verificación no es válido.');
+
 export type CrearCodigoVotoDTO      = z.infer<typeof crearCodigoVotoSchema>;
 export type ActualizarCodigoVotoDTO = z.infer<typeof actualizarCodigoVotoSchema>;

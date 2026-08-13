@@ -16,6 +16,7 @@ import validacionRequisitoRoutes from './validacion_requisito.routes.js';
 import planTrabajoRoutes         from './plan_trabajo.routes.js';
 import votoRoutes                from './voto.routes.js';
 import codigoVotoRoutes          from './codigo_voto.routes.js';
+import verificacionPublicaRoutes from './verificacion_publica.routes.js';
 import actaResultadosRoutes      from './acta_resultados.routes.js';
 import veedorRoutes              from './veedor.routes.js';
 import veeduriaRoutes            from './veeduria.routes.js';
@@ -53,6 +54,7 @@ export function registerRoutes(app: Express) {
   // Votación y resultados
   app.use('/api/votos',                  votoRoutes);
   app.use('/api/codigos-voto',           codigoVotoRoutes);
+  app.use('/api/verificar-voto',         verificacionPublicaRoutes);
   app.use('/api/actas-resultados',       actaResultadosRoutes);
 
   // Veeduría

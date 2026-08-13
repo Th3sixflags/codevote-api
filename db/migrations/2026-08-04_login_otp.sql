@@ -30,7 +30,9 @@ USE codevote_db;
 -- 1. Tabla de códigos de acceso.
 CREATE TABLE IF NOT EXISTS codigo_acceso (
   id_codigo INT AUTO_INCREMENT PRIMARY KEY,
-  fk_cedula_estudiante CHAR(10) NOT NULL,
+  -- Debe coincidir exactamente con estudiante.cedula (VARCHAR(20)); MySQL no
+  -- admite una clave foránea CHAR(10) contra esa columna.
+  fk_cedula_estudiante VARCHAR(20) NOT NULL,
   -- SHA-256 en hexadecimal del código de 6 dígitos.
   codigo_hash CHAR(64) NOT NULL,
   creado_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

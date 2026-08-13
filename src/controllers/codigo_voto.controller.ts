@@ -1,5 +1,9 @@
 import { Request, Response } from 'express';
-import { crearCodigoVotoSchema, actualizarCodigoVotoSchema } from '../schemas/codigo_voto.schema.js';
+import {
+  crearCodigoVotoSchema,
+  actualizarCodigoVotoSchema,
+  codigoVerificacionPublicoSchema,
+} from '../schemas/codigo_voto.schema.js';
 import * as service from '../services/codigo_voto.service.js';
 import { institucionDeSesion } from '../utils/institucion.js';
 
@@ -35,6 +39,21 @@ export async function listarMisCodigos(req: Request, res: Response) {
  */
 export async function verificarMiCodigo(req: Request, res: Response) {
   const verificacion = await service.verificarMiComprobante(Number(req.params.id), req.user!.sub);
+  if (!verificacion) {
+    res.status(404).json({ error: 'Comprobante no encontrado.' });
+    return;
+  }
+  res.json(verificacion);
+}
+
+/**
+ * Verificación pública del comprobante. No requiere sesión: la posesión del
+ * UUID aleatorio es el comprobante. La respuesta está reducida por el servicio
+ * y no contiene ningún ID interno, identidad ni sentido del voto.
+ */
+export async function verificarPublicamente(req: Request, res: Response) {
+  const codigo = codigoVerificacionPublicoSchema.parse(req.params.codigoVerificacion);
+  const verificacion = await service.verificarComprobantePublico(codigo);
   if (!verificacion) {
     res.status(404).json({ error: 'Comprobante no encontrado.' });
     return;

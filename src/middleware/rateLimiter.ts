@@ -60,3 +60,16 @@ export const codigoRateLimiter = rateLimit({
   legacyHeaders:   false,
   message:         { error: `Se pidieron demasiados códigos desde esta red. Intenta de nuevo en ${VENTANA_MIN} minutos.` },
 });
+
+/**
+ * La verificación pública acepta un UUID de alta entropía, pero sigue teniendo
+ * un límite propio para evitar sondeo masivo o que consuma el cupo general.
+ * Ajustable con VERIFICACION_PUBLICA_RATE_LIMIT_MAX.
+ */
+export const verificacionPublicaRateLimiter = rateLimit({
+  windowMs:        ventanaMs,
+  limit:           entero('VERIFICACION_PUBLICA_RATE_LIMIT_MAX', 120),
+  standardHeaders: 'draft-8',
+  legacyHeaders:   false,
+  message:         { error: `Demasiadas verificaciones desde esta red. Intenta de nuevo en ${VENTANA_MIN} minutos.` },
+});

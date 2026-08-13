@@ -62,6 +62,23 @@ export async function verificarMiComprobante(id: number, cedula: string) {
   };
 }
 
+/**
+ * Contrato público mínimo: no se expone el código, IDs internos, hash,
+ * identidad del elector ni información de la opción emitida.
+ */
+export async function verificarComprobantePublico(codigoVerificacion: string) {
+  const registro = await repo.findVerificacionPublica(codigoVerificacion);
+  if (!registro) return null;
+
+  return {
+    valido: true,
+    proceso: registro.nombre_proceso,
+    papeleta: registro.titulo_papeleta,
+    fecha_registro: registro.fecha_envio,
+    estado: 'registrado',
+  };
+}
+
 // Crear y actualizar también responden con el comprobante, así que pasan por la
 // misma lista blanca: la cédula viaja en el body de entrada, pero no vuelve.
 export async function crearCodigoVoto(data: CrearCodigoVotoDTO, institucionId?: number) {
