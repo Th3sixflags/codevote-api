@@ -51,8 +51,10 @@ jobs:
           mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u root codevote_db < db/migrations/2026-08-12_p1_sesiones_auditoria_hash_actas.sql
           mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u root codevote_db < db/migrations/2026-08-13_sesiones_cookie_rotacion.sql
           mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u root codevote_db < db/migrations/2026-08-13_sesiones_cookie_rotacion.sql
+          mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u root codevote_db < db/migrations/2026-08-13_control_migraciones.sql
       - run: npm run lint
       - run: npm run build
+      - run: MIGRATIONS_OPERATOR=ci npm run migraciones:registrar -- 2026-08-13_control_migraciones.sql
       - run: npm test
 
   # 2) Despliega en el servidor AWS por SSH usando Docker Compose.

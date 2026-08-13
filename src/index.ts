@@ -12,6 +12,7 @@ import { iniciarCierreProgramado } from './tareas/cierreProgramado.js';
 import { iniciarAvisosProgramados } from './tareas/avisosProgramados.js';
 import { DIRECTORIO_UPLOADS, prepararDirectorios } from './config/uploads.js';
 import { auditarMutacionesHttp } from './middleware/auditoria.js';
+import { comprobarReadiness } from './services/operacion.service.js';
 
 const app  = express();
 const PORT = Number(process.env.PORT ?? 3000);
@@ -92,6 +93,13 @@ const estadoServicio = (_req: express.Request, res: express.Response) =>
 
 app.get('/health', estadoServicio);
 app.get('/api/health', estadoServicio);
+
+// Readiness para el balanceador y monitoreo: además del proceso, confirma que
+// MySQL responde y que el ledger de migraciones ya fue inicializado.
+app.get('/api/health/ready', async (_req, res) => {
+  const estado = await comprobarReadiness();
+  res.status(estado.listo ? 200 : 503).json(estado);
+});
 
 // El errorHandler debe registrarse siempre al final
 app.use(errorHandler);
