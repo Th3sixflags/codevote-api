@@ -76,6 +76,24 @@ export async function obtenerAdmins(req: Request, res: Response) {
   res.json(admins);
 }
 
+export async function listarMiembrosParaAdministrar(req: Request, res: Response) {
+  const id = Number(req.params.id);
+  const buscar = typeof req.query.buscar === 'string' ? req.query.buscar : '';
+  const miembros = await service.listarMiembrosParaAdministrar(id, buscar);
+  res.json(miembros);
+}
+
+export async function promoverMiembroAAdmin(req: Request, res: Response) {
+  const id = Number(req.params.id);
+  const cedula = String(req.params.cedula ?? '').trim();
+  if (!cedula) {
+    res.status(422).json({ error: 'Indica el miembro que deseas promover.' });
+    return;
+  }
+  const resultado = await service.promoverMiembroAAdmin(id, cedula);
+  res.json(resultado);
+}
+
 export async function asignarAdmin(req: Request, res: Response) {
   const id = Number(req.params.id);
   const data = asignarAdminSchema.parse(req.body);

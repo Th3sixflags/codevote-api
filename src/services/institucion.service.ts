@@ -53,6 +53,30 @@ export async function obtenerAdmins(id: number) {
   return await repo.findAdmins(id);
 }
 
+export async function listarMiembrosParaAdministrar(id: number, buscar?: string) {
+  const inst = await repo.findById(id);
+  if (!inst) throw new HttpError(404, 'Institución no encontrada.');
+  return repo.findMiembrosParaAdministrar(id, buscar?.trim() ?? '');
+}
+
+/** Promueve a un miembro activo de esta institución sin crear una cuenta nueva. */
+export async function promoverMiembroAAdmin(id: number, cedula: string) {
+  const inst = await repo.findById(id);
+  if (!inst) throw new HttpError(404, 'Institución no encontrada.');
+  if (!inst.activo) throw new HttpError(403, 'No se pueden asignar administradores a una institución suspendida.');
+
+  const miembro = await repo.findMiembrosParaAdministrar(id, cedula);
+  const encontrado = miembro.find((fila) => fila.cedula === cedula);
+  if (!encontrado) throw new HttpError(404, 'El miembro no pertenece a esta institución.');
+  if (encontrado.estado_academico !== 'activo') throw new HttpError(422, 'Solo se puede promover a miembros activos.');
+  if (encontrado.rol === 'admin') throw new HttpError(409, 'Este miembro ya es administrador.');
+  if (encontrado.rol !== 'estudiante') throw new HttpError(422, 'Solo los miembros con rol estudiante pueden ser promovidos a administrador.');
+
+  const promovido = await repo.promoteMiembroAAdmin(id, cedula);
+  if (!promovido) throw new HttpError(409, 'No se pudo promover al miembro; verifica que su estado no haya cambiado.');
+  return { mensaje: 'Administrador asignado correctamente.', admin: { ...encontrado, rol: 'admin' } };
+}
+
 export async function asignarAdmin(id: number, adminData: AsignarAdminDTO) {
   const inst = await repo.findById(id);
   if (!inst) throw new HttpError(404, 'Institución no encontrada.');

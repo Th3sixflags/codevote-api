@@ -16,6 +16,9 @@ describe('Asignación de Administradores a Institución', () => {
   let superadminToken: string;
   let adminToken: string;
   let institucionId: number;
+  let otraInstitucionId: number;
+  let cedulaMiembro: string;
+  let cedulaAjena: string;
 
   before(async () => {
     process.env.JWT_SECRET = 'secreto-de-prueba';
@@ -27,6 +30,20 @@ describe('Asignación de Administradores a Institución', () => {
       [`Inst Test ${rnd}`, `inst-test-${rnd}`]
     ) as any;
     institucionId = instResult.insertId;
+    const [otraInstResult] = await pool.query(
+      'INSERT INTO institucion (nombre, slug, activo) VALUES (?, ?, 1)',
+      [`Inst Ajena ${rnd}`, `inst-ajena-${rnd}`]
+    ) as any;
+    otraInstitucionId = otraInstResult.insertId;
+
+    cedulaMiembro = `miembro-${rnd}`;
+    cedulaAjena = `ajeno-${rnd}`;
+    await pool.query(
+      `INSERT INTO estudiante (cedula, nombres, apellidos, correo_institucional, estado_academico, rol, fk_id_institucion)
+       VALUES (?, 'Miembro', 'Local', ?, 'activo', 'estudiante', ?),
+              (?, 'Miembro', 'Ajeno', ?, 'activo', 'estudiante', ?)`,
+      [cedulaMiembro, `miembro-${rnd}@admin-test.com`, institucionId, cedulaAjena, `ajeno-${rnd}@admin-test.com`, otraInstitucionId]
+    );
 
     // Superadmin token
     superadminToken = jwt.sign(
@@ -44,7 +61,7 @@ describe('Asignación de Administradores a Institución', () => {
   after(async () => {
     // Teardown
     await pool.query('DELETE FROM estudiante WHERE correo_institucional LIKE "%@admin-test.com"');
-    await pool.query('DELETE FROM institucion WHERE id_institucion = ?', [institucionId]);
+    await pool.query('DELETE FROM institucion WHERE id_institucion IN (?, ?)', [institucionId, otraInstitucionId]);
     await pool.end();
   });
 
@@ -110,5 +127,33 @@ describe('Asignación de Administradores a Institución', () => {
       });
 
     assert.strictEqual(res.status, 403);
+  });
+
+  it('el selector de miembros solo lista usuarios de la institución elegida', async () => {
+    const res = await request(app)
+      .get(`/api/instituciones/${institucionId}/miembros`)
+      .set('Authorization', `Bearer ${superadminToken}`);
+
+    assert.strictEqual(res.status, 200, JSON.stringify(res.body));
+    assert.ok(res.body.some((miembro: any) => miembro.cedula === cedulaMiembro));
+    assert.ok(!res.body.some((miembro: any) => miembro.cedula === cedulaAjena));
+  });
+
+  it('SuperAdmin promueve únicamente a un miembro activo de la institución elegida', async () => {
+    const res = await request(app)
+      .patch(`/api/instituciones/${institucionId}/miembros/${cedulaMiembro}/administrador`)
+      .set('Authorization', `Bearer ${superadminToken}`);
+
+    assert.strictEqual(res.status, 200, JSON.stringify(res.body));
+    assert.strictEqual(res.body.admin.cedula, cedulaMiembro);
+    assert.strictEqual(res.body.admin.rol, 'admin');
+  });
+
+  it('no permite promover miembros de otra institución', async () => {
+    const res = await request(app)
+      .patch(`/api/instituciones/${institucionId}/miembros/${cedulaAjena}/administrador`)
+      .set('Authorization', `Bearer ${superadminToken}`);
+
+    assert.strictEqual(res.status, 404, JSON.stringify(res.body));
   });
 });

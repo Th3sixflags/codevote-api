@@ -18,6 +18,8 @@ router.patch('/:id', ctrl.actualizar);
 router.patch('/:id/toggle', ctrl.toggleActivo);
 router.get('/:id/stats', ctrl.obtenerEstadisticas);
 router.get('/:id/admins', ctrl.obtenerAdmins);
+router.get('/:id/miembros', ctrl.listarMiembrosParaAdministrar);
+router.patch('/:id/miembros/:cedula/administrador', ctrl.promoverMiembroAAdmin);
 router.post('/:id/admin', ctrl.asignarAdmin);
 
 export default router;

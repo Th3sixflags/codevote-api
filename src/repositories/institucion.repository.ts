@@ -105,6 +105,42 @@ export async function findAdmins(id: number) {
   return rows;
 }
 
+/**
+ * Miembros que un superadministrador puede promover dentro de una institución.
+ * Se limita deliberadamente a datos de contacto mínimos: no expone promedio,
+ * carrera ni credenciales en un flujo que únicamente necesita identificar a la
+ * persona elegida.
+ */
+export async function findMiembrosParaAdministrar(id: number, buscar = '') {
+  const filtroBusqueda = buscar
+    ? ' AND (cedula LIKE ? OR nombres LIKE ? OR apellidos LIKE ? OR correo_institucional LIKE ?)'
+    : '';
+  const valores: Array<string | number> = [id];
+  if (buscar) {
+    const patron = `%${buscar}%`;
+    valores.push(patron, patron, patron, patron);
+  }
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT cedula, nombres, apellidos, correo_institucional, estado_academico, rol
+     FROM estudiante
+     WHERE fk_id_institucion = ?${filtroBusqueda}
+     ORDER BY apellidos, nombres
+     LIMIT 30`,
+    valores
+  );
+  return rows;
+}
+
+export async function promoteMiembroAAdmin(id: number, cedula: string) {
+  const [result] = await pool.query<ResultSetHeader>(
+    `UPDATE estudiante
+     SET rol = 'admin'
+     WHERE cedula = ? AND fk_id_institucion = ? AND rol = 'estudiante' AND estado_academico = 'activo'`,
+    [cedula, id]
+  );
+  return Number(result.affectedRows ?? 0) > 0;
+}
+
 export async function assignAdmin(id: number, admin: AsignarAdminDTO) {
   const query = `
     INSERT INTO estudiante (cedula, nombres, apellidos, correo_institucional, estado_academico, rol, fk_id_institucion, password, debe_cambiar_password)
