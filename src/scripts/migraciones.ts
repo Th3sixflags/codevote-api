@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pool } from '../config/database.js';
+import { resolverBaseline } from '../utils/migracionesBaseline.js';
 
 const directorio = path.join(process.cwd(), 'db', 'migrations');
 
@@ -49,11 +50,22 @@ async function registrar(nombre: string) {
   console.log(`Registrada: ${nombre}`);
 }
 
-const [accion, nombre] = process.argv.slice(2);
+async function reconciliar(args: string[]) {
+  const nombres = resolverBaseline(args, process.env.MIGRATIONS_OPERATOR);
+  const disponibles = await archivos();
+  for (const nombre of nombres) {
+    if (!disponibles.includes(nombre)) throw new Error(`Falta db/migrations/${nombre}; no se puede reconciliar el baseline.`);
+    await registrar(nombre);
+  }
+  console.log(`Baseline reconciliado: ${nombres.length} migraciones históricas registradas; no se ejecutó SQL.`);
+}
+
+const [accion, ...argumentos] = process.argv.slice(2);
 try {
   if (accion === 'estado') await estado();
-  else if (accion === 'registrar' && nombre) await registrar(nombre);
-  else throw new Error('Uso: npm run migraciones:estado | npm run migraciones:registrar -- <archivo.sql>');
+  else if (accion === 'registrar' && argumentos.length === 1) await registrar(argumentos[0]);
+  else if (accion === 'reconciliar') await reconciliar(argumentos);
+  else throw new Error('Uso: npm run migraciones:estado | npm run migraciones:registrar -- <archivo.sql> | npm run migraciones:reconciliar -- --confirmar-base-existente --todas-historicas');
 } finally {
   await pool.end();
 }

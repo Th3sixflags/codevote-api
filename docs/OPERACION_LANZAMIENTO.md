@@ -36,6 +36,27 @@ sudo docker compose exec -T -e MIGRATIONS_OPERATOR="nombre.apellido" backend \
   npm run migraciones:registrar -- 2026-08-13_control_migraciones.sql
 ```
 
+### Baseline de una base existente
+
+Para una base que ya tenía migraciones aplicadas antes del ledger, el operador
+puede registrarlas **sin ejecutar ningún SQL histórico**. Es una declaración de
+estado, por lo que se exige el nombre del operador y dos flags literales; no se
+activa en instalaciones nuevas ni desde CI.
+
+```bash
+sudo docker compose exec -T \
+  -e MIGRATIONS_OPERATOR="nombre.apellido" backend \
+  npm run migraciones:reconciliar -- --confirmar-base-existente --todas-historicas
+
+sudo docker compose exec -T backend npm run migraciones:estado
+```
+
+El baseline cubre solo la lista histórica cerrada del repositorio, incluida
+`2026-08-13_sesiones_cookie_rotacion.sql`; no registra migraciones futuras. No
+usar este comando en una instalación nueva ni si no se tiene evidencia de que
+cada migración histórica ya fue aplicada. Si aparece `CHECKSUM_DISTINTO`, detener
+y revisar: jamás reemplazar el checksum ni reejecutar un SQL para ocultarlo.
+
 ## Backup y simulacro de recuperación
 
 En AWS, guardar el dump cifrado fuera de la instancia y comprobar su hash:
