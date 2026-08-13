@@ -36,6 +36,10 @@ const origenes = process.env.CORS_ORIGIN
   .map((o) => o.trim())
   .filter(Boolean);
 
+if (process.env.NODE_ENV === 'production' && (!origenes || origenes.length === 0)) {
+  throw new Error('CORS_ORIGIN es obligatorio en producción para usar cookies de sesión.');
+}
+
 app.use(cors({
   origin: origenes && origenes.length > 0 ? origenes : true,
   credentials: true,

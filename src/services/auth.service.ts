@@ -4,6 +4,7 @@ import * as repo from '../repositories/codigo_acceso.repository.js';
 import * as sesiones from '../repositories/sesion.repository.js';
 import { enviarCorreo, correoConfigurado } from '../config/correo.js';
 import { HttpError } from '../utils/httpError.js';
+import { hashRefreshToken, nuevoRefreshToken } from '../utils/sessionCookies.js';
 
 /**
  * Inicio de sesión con código de un solo uso (OTP) enviado al correo.
@@ -29,6 +30,8 @@ export const MAX_INTENTOS       = 5;
 /** Espera mínima entre dos envíos a la misma cuenta. */
 export const ESPERA_REENVIO_SEG = 60;
 const LONGITUD_CODIGO = 6;
+const ACCESS_EXPIRES_IN = process.env.JWT_EXPIRES_IN ?? '15m';
+const REFRESH_VIGENCIA_MS = Number(process.env.REFRESH_EXPIRES_DAYS ?? 7) * 24 * 60 * 60 * 1000;
 
 /** SHA-256 en hexadecimal. Es lo único que se guarda del código. */
 function hashear(codigo: string): string {
@@ -165,6 +168,7 @@ export async function solicitarCodigo(identificador: string, ip: string | null):
 
 export interface SesionIniciada {
   token: string;
+  refreshToken: string;
   usuario: {
     cedula: string;
     nombres: string;
@@ -174,6 +178,32 @@ export interface SesionIniciada {
     foto_url: string | null;
     fk_id_institucion?: number;
   };
+}
+
+function firmarToken(cuenta: any, idSesion: string) {
+  return jwt.sign({
+    sub: cuenta.cedula,
+    email: cuenta.correo_institucional,
+    rol: cuenta.rol,
+    fk_id_institucion: cuenta.rol === 'superadmin' ? undefined : cuenta.fk_id_institucion,
+    jti: idSesion,
+  }, process.env.JWT_SECRET!, { expiresIn: ACCESS_EXPIRES_IN as any });
+}
+
+async function iniciarSesion(cuenta: any, contexto: { ip?: string | null; userAgent?: string | null } | null) {
+  const idSesion = randomUUID();
+  const token = firmarToken(cuenta, idSesion);
+  const payload = jwt.decode(token) as jwt.JwtPayload;
+  if (!payload.exp) throw new Error('El JWT de sesión no contiene expiración.');
+  const refreshToken = nuevoRefreshToken();
+  const refreshExpira = new Date(Date.now() + REFRESH_VIGENCIA_MS);
+  const persistida = await sesiones.crearSiEstaDisponible({
+    idSesion, cedula: cuenta.cedula, expiraAt: refreshExpira,
+    ip: contexto?.ip ?? null, userAgent: contexto?.userAgent?.slice(0, 255) ?? null,
+  });
+  if (!persistida) throw new HttpError(503, 'El sistema de sesiones todavía no está disponible.');
+  await sesiones.guardarRefresh(idSesion, hashRefreshToken(refreshToken), refreshExpira);
+  return { token, refreshToken };
 }
 
 /** Verifica el código y devuelve el JWT. */
@@ -206,47 +236,11 @@ export async function verificarCodigo(
     throw new HttpError(401, generico);
   }
 
-  const idSesion = randomUUID();
-  const tokenConSesion = jwt.sign(
-    {
-      sub: cuenta.cedula,
-      email: cuenta.correo_institucional,
-      rol: cuenta.rol,
-      fk_id_institucion: cuenta.rol === 'superadmin' ? undefined : cuenta.fk_id_institucion,
-      jti: idSesion,
-    },
-    process.env.JWT_SECRET!,
-    { expiresIn: (process.env.JWT_EXPIRES_IN ?? '8h') as any }
-  );
-
-  const payload = jwt.decode(tokenConSesion) as jwt.JwtPayload;
-  if (!payload.exp) throw new Error('El JWT de sesión no contiene expiración.');
-
-  // Durante el despliegue, el código puede llegar unos minutos antes que la
-  // migración manual de AWS. En ese único caso se emite temporalmente el JWT
-  // histórico; en cuanto existe la tabla, todos los JWT nuevos son revocables.
-  const persistida = await sesiones.crearSiEstaDisponible({
-    idSesion,
-    cedula: cuenta.cedula,
-    expiraAt: new Date(payload.exp * 1000),
-    ip: contexto?.ip ?? null,
-    userAgent: contexto?.userAgent?.slice(0, 255) ?? null,
-  });
-  const token = persistida
-    ? tokenConSesion
-    : jwt.sign(
-        {
-          sub: cuenta.cedula,
-          email: cuenta.correo_institucional,
-          rol: cuenta.rol,
-          fk_id_institucion: cuenta.rol === 'superadmin' ? undefined : cuenta.fk_id_institucion,
-        },
-        process.env.JWT_SECRET!,
-        { expiresIn: (process.env.JWT_EXPIRES_IN ?? '8h') as any }
-      );
+  const { token, refreshToken } = await iniciarSesion(cuenta, contexto);
 
   return {
     token,
+    refreshToken,
     usuario: {
       cedula:               cuenta.cedula,
       nombres:              cuenta.nombres,
@@ -258,6 +252,25 @@ export async function verificarCodigo(
     },
   };
 }
+
+/** Rota el refresh opaco: consume el anterior, revoca su sesión y crea otra. */
+export async function refrescarSesion(refreshToken: string, contexto: { ip?: string | null; userAgent?: string | null }) {
+  const anterior = await sesiones.consumirRefresh(hashRefreshToken(refreshToken));
+  if (!anterior) throw new HttpError(401, 'La sesión ya no es válida. Inicia sesión nuevamente.');
+  const cuenta = await repo.buscarCuentaActiva(String(anterior.fk_cedula_estudiante));
+  if (!cuenta) throw new HttpError(401, 'La sesión ya no es válida. Inicia sesión nuevamente.');
+  await sesiones.revocar(String(anterior.id_sesion), cuenta.cedula, 'rotacion_refresh');
+  const nueva = await iniciarSesion(cuenta, contexto);
+  return { ...nueva, usuario: {
+    cedula: cuenta.cedula, nombres: cuenta.nombres, apellidos: cuenta.apellidos,
+    correo_institucional: cuenta.correo_institucional, rol: cuenta.rol,
+    foto_url: cuenta.foto_url ?? null,
+    fk_id_institucion: cuenta.rol === 'superadmin' ? undefined : cuenta.fk_id_institucion,
+  }};
+}
+
+export const VIGENCIA_ACCESS_MS = 15 * 60 * 1000;
+export const VIGENCIA_REFRESH_MS = REFRESH_VIGENCIA_MS;
 
 export async function cerrarSesion(cedula: string, idSesion?: string): Promise<boolean> {
   if (!idSesion) return false;

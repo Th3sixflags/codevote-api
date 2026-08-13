@@ -3,6 +3,8 @@ import jwt from 'jsonwebtoken';
 import { esAdministracion } from '../utils/accesoCarrera.js';
 import { pool } from '../config/database.js';
 import * as sesiones from '../repositories/sesion.repository.js';
+import { ACCESS_COOKIE, cookieDe } from '../utils/sessionCookies.js';
+import { protegerCsrfCookie } from './csrf.js';
 
 export interface JwtPayload {
   sub:   string;
@@ -16,17 +18,19 @@ export interface JwtPayload {
 
 declare global {
   namespace Express {
-    interface Request { user?: JwtPayload; }
+    interface Request { user?: JwtPayload; authPorCookie?: boolean; }
   }
 }
 
 export async function requireAuth(req: Request, res: Response, next: NextFunction) {
   const header = req.headers.authorization;
-  if (!header?.startsWith('Bearer ')) {
+  const bearer = header?.startsWith('Bearer ') ? header.split(' ')[1] : undefined;
+  const cookie = cookieDe(req, ACCESS_COOKIE);
+  const token = cookie ?? bearer;
+  if (!token) {
     res.status(401).json({ error: 'Token no proporcionado.' });
     return;
   }
-  const token = header.split(' ')[1];
   let payload: JwtPayload;
   try {
     payload = jwt.verify(token, process.env.JWT_SECRET!) as JwtPayload;
@@ -48,7 +52,8 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     }
 
     req.user = payload;
-    next();
+    req.authPorCookie = Boolean(cookie);
+    protegerCsrfCookie(req, res, next);
   } catch (err) {
     // Una caída de MySQL no convierte un JWT válido en "credenciales malas";
     // se propaga como fallo del servicio para que sea observable y reintentable.

@@ -108,6 +108,7 @@ function ejecutar(sqlCrudo: string, params: any[] = []): any {
     return { insertId: id };
   }
   if (sql.startsWith('INSERT INTO sesion')) return { insertId: 1 };
+  if (sql.startsWith('INSERT INTO sesion_refresh')) return { insertId: 1 };
   if (sql.startsWith('UPDATE codigo_acceso SET intentos = intentos + 1')) {
     const c = estado.codigos.find((x) => x.id_codigo === Number(params[0]));
     if (c) c.intentos += 1;
@@ -291,6 +292,32 @@ test('el código correcto devuelve un JWT con la cédula y el rol', async () => 
   assert.equal(payload.rol, 'estudiante');
   assert.equal(cuerpo.usuario.correo_institucional, CORREO);
   assert.ok(!('password' in cuerpo.usuario), 'la respuesta expone la contraseña');
+});
+
+test('en producción el OTP entrega cookies HttpOnly seguras y no un JWT en JSON', async () => {
+  await pedirCodigo();
+  const codigo = ultimoCodigoEmitido();
+  const entornoAnterior = process.env.NODE_ENV;
+  process.env.NODE_ENV = 'production';
+  try {
+    const respuesta = await fetch(`${baseUrl}/api/auth/verificar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identificador: CORREO, codigo }),
+    });
+    const cuerpo = await respuesta.json();
+    const cookies = respuesta.headers.get('set-cookie') ?? '';
+    assert.equal(respuesta.status, 200);
+    assert.ok(!('token' in cuerpo), 'el JWT no debe viajar en el body de producción');
+    assert.match(cookies, /codevote_access=/);
+    assert.match(cookies, /codevote_refresh=/);
+    assert.match(cookies, /HttpOnly/i);
+    assert.match(cookies, /Secure/i);
+    assert.match(cookies, /SameSite=Lax/i);
+    assert.ok(!cookies.includes(cuerpo.usuario.cedula), 'la cookie no debe codificar identidad visible');
+  } finally {
+    process.env.NODE_ENV = entornoAnterior;
+  }
 });
 
 test('el código sirve UNA sola vez', async () => {

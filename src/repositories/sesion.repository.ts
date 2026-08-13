@@ -84,3 +84,33 @@ export async function revocarTodas(
   ) as [any, any];
   return Number(result.affectedRows ?? 0);
 }
+
+export async function guardarRefresh(idSesion: string, hash: string, expiraAt: Date) {
+  await pool.query(
+    `INSERT INTO sesion_refresh (id_sesion, token_hash, expira_at)
+     VALUES (?, ?, ?)`,
+    [idSesion, hash, expiraAt]
+  );
+}
+
+/** Consume el refresh una sola vez. La fila queda marcada antes de emitir otra sesión. */
+export async function consumirRefresh(hash: string) {
+  const [rows] = await pool.query(
+    `SELECT r.id_sesion, s.fk_cedula_estudiante
+       FROM sesion_refresh r
+       JOIN sesion s ON s.id_sesion = r.id_sesion
+      WHERE r.token_hash = ?
+        AND r.usado_at IS NULL
+        AND r.expira_at > NOW()
+        AND s.revocada_at IS NULL
+      FOR UPDATE`,
+    [hash]
+  ) as [any[], any];
+  const fila = rows[0];
+  if (!fila) return null;
+  const [result] = await pool.query(
+    'UPDATE sesion_refresh SET usado_at = NOW() WHERE token_hash = ? AND usado_at IS NULL',
+    [hash]
+  ) as [any, any];
+  return Number(result.affectedRows) === 1 ? fila : null;
+}
