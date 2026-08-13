@@ -37,8 +37,6 @@ interface Proceso {
   id_proceso: number;
   nombre_proceso: string;
   estado: string;
-  fecha_inicio_votacion: string;
-  fecha_fin_votacion: string;
   archivado: boolean;
 }
 
@@ -59,9 +57,11 @@ const papeleta  = (id = 1) => estado.papeletas.find((v) => v.id_votacion === id)
 function puedeEntrarEnVotacion(p: Proceso, corte: string): boolean {
   if (!['planificado', 'convocado', 'inscripcion', 'campaña'].includes(p.estado)) return false;
   if (p.archivado) return false;
-  if (!p.fecha_inicio_votacion || p.fecha_inicio_votacion > corte) return false;
-  if (p.fecha_fin_votacion && p.fecha_fin_votacion <= corte) return false;
-  return estado.papeletas.some((v) => v.id_proceso === p.id_proceso);
+  return estado.papeletas.some((v) => (
+    v.id_proceso === p.id_proceso
+    && v.fecha_apertura <= corte
+    && v.fecha_cierre > corte
+  ));
 }
 
 function ejecutar(sqlCrudo: string, params: any[] = []): any {
@@ -77,7 +77,6 @@ function ejecutar(sqlCrudo: string, params: any[] = []): any {
         return v.estado === 'pendiente'
           && v.fecha_apertura <= corte
           && v.fecha_cierre > corte
-          && p.fecha_fin_votacion > corte
           && !['cancelado', 'finalizado'].includes(p.estado)
           && !p.archivado;
       })
@@ -139,7 +138,7 @@ beforeEach(() => {
   estado = {
     procesos: [{
       id_proceso: 1, nombre_proceso: 'Elecciones 2026', estado: 'campaña',
-      fecha_inicio_votacion: PASADA, fecha_fin_votacion: FUTURA, archivado: false,
+      archivado: false,
     }],
     papeletas: [{
       id_votacion: 1, titulo_papeleta: 'Consejo', estado: 'pendiente', id_proceso: 1,
@@ -184,7 +183,6 @@ test('una papeleta ya vencida no se abre: nunca llegó a estar abierta', async (
   // la misma pasada falsearía el historial; del cierre se encarga el cierre.
   papeleta().fecha_apertura = PASADA;
   papeleta().fecha_cierre   = '2020-01-02 18:00:00';
-  procesoDe(1).fecha_fin_votacion = '2020-01-02 18:00:00';
 
   await abrirPapeletasProgramadas();
 
