@@ -127,13 +127,11 @@ export interface EstadoDeVotacion {
   /** Ventana propia de la papeleta. */
   fecha_apertura: string | null;
   fecha_cierre: string | null;
-  /** Fin del periodo de votación del proceso: el plazo que manda. */
-  fecha_fin_votacion: string | null;
   fk_id_institucion: number;
 }
 
 /**
- * Estado de la votación y de su proceso, con las FECHAS además de los estados.
+ * Estado de la votación y de su proceso, con las FECHAS de la papeleta.
  *
  * Las fechas son imprescindibles: el cierre automático corre cada minuto, así
  * que `votacion.estado` puede seguir diciendo 'abierta' un rato después de la
@@ -150,7 +148,7 @@ export async function estadoDeVotacion(
   const [rows] = await executor.query(
     `SELECT v.estado AS votacion, p.estado AS proceso, v.fk_id_carrera AS carrera_votacion,
             p.fk_id_institucion,
-            v.fecha_apertura, v.fecha_cierre, p.fecha_fin_votacion,
+            v.fecha_apertura, v.fecha_cierre,
             (p.archivado_at IS NOT NULL) AS archivado
      FROM votacion v
      JOIN proceso_electoral p ON p.id_proceso = v.fk_id_proceso

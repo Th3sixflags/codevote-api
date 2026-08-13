@@ -52,9 +52,11 @@ jobs:
           mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u root codevote_db < db/migrations/2026-08-13_sesiones_cookie_rotacion.sql
           mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u root codevote_db < db/migrations/2026-08-13_sesiones_cookie_rotacion.sql
           mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u root codevote_db < db/migrations/2026-08-13_control_migraciones.sql
+          mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u root codevote_db < db/migrations/2026-08-13_votacion_por_papeleta.sql
       - run: npm run lint
       - run: npm run build
       - run: MIGRATIONS_OPERATOR=ci npm run migraciones:registrar -- 2026-08-13_control_migraciones.sql
+      - run: MIGRATIONS_OPERATOR=ci npm run migraciones:registrar -- 2026-08-13_votacion_por_papeleta.sql
       - run: npm test
 
   # 2) Despliega en el servidor AWS por SSH usando Docker Compose.
@@ -94,6 +96,8 @@ jobs:
             # comando no ejecuta DDL ni vuelve a correr la migración.
             sudo docker compose exec -T -e MIGRATIONS_OPERATOR=deploy backend \
               npm run migraciones:registrar -- 2026-08-13_control_migraciones.sql
+            sudo docker compose exec -T -e MIGRATIONS_OPERATOR=deploy backend \
+              npm run migraciones:registrar -- 2026-08-13_votacion_por_papeleta.sql
 
             # Comprobación de salud y readiness: exige proceso, MySQL y ledger.
             sleep 8

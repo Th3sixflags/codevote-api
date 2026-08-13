@@ -4,6 +4,7 @@ import type { FiltroCarrera } from '../repositories/votacion.repository.js';
 import { HttpError } from '../utils/httpError.js';
 import { procesoVisible } from '../utils/accesoCarrera.js';
 import { estaVencida } from '../utils/estadoVotacion.js';
+import { ahoraEnEcuador } from '../utils/zonaHoraria.js';
 import { cerrarPapeleta } from './cierre_votacion.service.js';
 import * as avisos from './avisos_electorales.service.js';
 import { validarFase } from './proceso_electoral.service.js';
@@ -26,6 +27,14 @@ export async function listarPorProceso(procesoId: number, filtro: FiltroCarrera 
   return repo.findByProceso(procesoId, filtro, institucionId);
 }
 
+/**
+ * Estado persistido al crear una papeleta. No se difiere al cron: una ventana
+ * que ya inició debe ser votable desde la respuesta de creación.
+ */
+export function estadoInicialDePapeleta(data: CrearVotacionDTO, ahora = ahoraEnEcuador()) {
+  return data.fecha_apertura <= ahora && data.fecha_cierre > ahora ? 'abierta' : 'pendiente';
+}
+
 export async function crearVotacion(data: CrearVotacionDTO, institucionId?: number) {
   await validarFase(data.fk_id_proceso, ['planificado', 'convocado'], institucionId);
 
@@ -40,7 +49,21 @@ export async function crearVotacion(data: CrearVotacionDTO, institucionId?: numb
       throw new HttpError(409, 'Ya existe una votación de esa carrera en este proceso electoral.');
     }
   }
-  const votacion = await repo.create(data);
+  // No se espera al cron de un minuto para una jornada que ya empezó. Así, si
+  // se crea a las 10:55 con apertura a las 10:45, queda utilizable en la misma
+  // respuesta. El cron conserva el papel de reconciliar lo que ocurra mientras
+  // el servidor esté apagado.
+  const ahora = ahoraEnEcuador();
+  const estadoInicial = estadoInicialDePapeleta(data, ahora);
+  const yaAbrio = estadoInicial === 'abierta';
+  const votacion = await repo.create({ ...data, estado: yaAbrio ? 'abierta' : (data.estado ?? 'pendiente') });
+
+  if (yaAbrio) {
+    const proceso = await repoProceso.findById(data.fk_id_proceso, institucionId);
+    if (proceso && ['planificado', 'convocado', 'inscripcion', 'campaña'].includes(String(proceso.estado))) {
+      await repoProceso.update(data.fk_id_proceso, { estado: 'votacion' });
+    }
+  }
 
   // Convocatoria: se avisa por correo al padrón que le corresponde esta papeleta
   // (global o de una carrera). Va aquí y no al crear el proceso porque la

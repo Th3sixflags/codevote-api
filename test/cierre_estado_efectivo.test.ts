@@ -26,7 +26,6 @@ const ABIERTA = {
   estado: 'abierta',
   fecha_apertura: '2026-01-01 08:00:00',
   fecha_cierre: '2099-12-31 23:59:59',
-  fecha_fin_votacion: '2099-12-31 23:59:59',
   estado_proceso: 'votacion',
   archivado: 0,
 };
@@ -45,7 +44,7 @@ test('una papeleta abierta y en plazo permanece abierta', () => {
 });
 
 test('un minuto antes del cierre todavía se puede votar', () => {
-  const d = disponibilidadDeVoto({ ...ABIERTA, fecha_fin_votacion: '2026-08-04 12:01:00' }, AHORA);
+  const d = disponibilidadDeVoto({ ...ABIERTA, fecha_cierre: '2026-08-04 12:01:00' }, AHORA);
   assert.equal(d.puede_votar, true);
 });
 
@@ -53,7 +52,7 @@ test('un minuto antes del cierre todavía se puede votar', () => {
 
 test('pasada la hora final ya no se puede votar, aunque el estado diga abierta', () => {
   // Este es el caso exacto que se coló: la tarea aún no ha pasado.
-  const d = disponibilidadDeVoto({ ...ABIERTA, fecha_fin_votacion: '2026-08-04 11:59:59' }, AHORA);
+  const d = disponibilidadDeVoto({ ...ABIERTA, fecha_cierre: '2026-08-04 11:59:59' }, AHORA);
 
   assert.equal(d.estado_efectivo, 'cerrada');
   assert.equal(d.puede_votar, false);
@@ -61,12 +60,11 @@ test('pasada la hora final ya no se puede votar, aunque el estado diga abierta',
 });
 
 test('justo en la hora final la votación ya está cerrada', () => {
-  const d = disponibilidadDeVoto({ ...ABIERTA, fecha_fin_votacion: AHORA }, AHORA);
+  const d = disponibilidadDeVoto({ ...ABIERTA, fecha_cierre: AHORA }, AHORA);
   assert.equal(d.puede_votar, false);
 });
 
-test('el cierre propio de la papeleta también vence, aunque el proceso siga', () => {
-  // Son dos plazos distintos y ninguno debería poder saltarse.
+test('el cierre propio de la papeleta vence aunque el proceso histórico tenga otra fecha', () => {
   const d = disponibilidadDeVoto({ ...ABIERTA, fecha_cierre: '2026-08-04 10:00:00' }, AHORA);
 
   assert.equal(d.estado_efectivo, 'cerrada');
@@ -166,20 +164,20 @@ test('la comparación se hace en hora de Ecuador, no en UTC', () => {
   assert.equal(ahora, '2026-08-04 21:00:00', 'ahoraEnEcuador no está usando America/Guayaquil');
   assert.equal(ZONA_ECUADOR, 'America/Guayaquil');
 
-  const d = disponibilidadDeVoto({ ...ABIERTA, fecha_fin_votacion: '2026-08-04 23:00:00' }, ahora);
+  const d = disponibilidadDeVoto({ ...ABIERTA, fecha_cierre: '2026-08-04 23:00:00' }, ahora);
   assert.equal(d.puede_votar, true, 'se cerró cinco horas antes de tiempo');
 });
 
 test('con la misma hora, una votación que cerró a las 20:00 sí está vencida', () => {
   const ahora = ahoraEnEcuador(new Date('2026-08-05T02:00:00Z')); // 21:00 en Ecuador
-  const d = disponibilidadDeVoto({ ...ABIERTA, fecha_fin_votacion: '2026-08-04 20:00:00' }, ahora);
+  const d = disponibilidadDeVoto({ ...ABIERTA, fecha_cierre: '2026-08-04 20:00:00' }, ahora);
   assert.equal(d.puede_votar, false);
 });
 
 test('acepta un Date además del texto, y lo interpreta en Ecuador', () => {
   // Por si alguna consulta no pasa por el pool con dateStrings.
   const fin = new Date('2026-08-04T12:00:00Z'); // 07:00 en Ecuador
-  const d = disponibilidadDeVoto({ ...ABIERTA, fecha_fin_votacion: fin }, AHORA);
+  const d = disponibilidadDeVoto({ ...ABIERTA, fecha_cierre: fin }, AHORA);
   assert.equal(d.puede_votar, false, 'un Date no se está normalizando a hora de Ecuador');
 });
 
@@ -187,7 +185,7 @@ test('acepta un Date además del texto, y lo interpreta en Ecuador', () => {
 
 test('sin fecha de fin, la papeleta no vence sola', () => {
   const d = disponibilidadDeVoto(
-    { ...ABIERTA, fecha_fin_votacion: null, fecha_cierre: null }, AHORA
+    { ...ABIERTA, fecha_cierre: null }, AHORA
   );
   assert.equal(d.puede_votar, true);
 });

@@ -41,7 +41,6 @@ export async function registrarVoto(data: CrearVotoDTO, cedula: string, instituc
     estado:             estado.votacion,
     fecha_apertura:     estado.fecha_apertura,
     fecha_cierre:       estado.fecha_cierre,
-    fecha_fin_votacion: estado.fecha_fin_votacion,
     estado_proceso:     estado.proceso,
     archivado:          estado.archivado,
   });
@@ -174,7 +173,6 @@ export async function obtenerResultados(votacionId: number, institucionId?: numb
       estado: estado.votacion,
       fecha_apertura: estado.fecha_apertura,
       fecha_cierre: estado.fecha_cierre,
-      fecha_fin_votacion: estado.fecha_fin_votacion,
       estado_proceso: estado.proceso,
       archivado: estado.archivado,
     }).estado_efectivo,
@@ -203,7 +201,6 @@ export async function obtenerResultadosEstudiante(votacionId: number, filtro: Fi
     estado: estado.votacion,
     fecha_apertura: estado.fecha_apertura,
     fecha_cierre: estado.fecha_cierre,
-    fecha_fin_votacion: estado.fecha_fin_votacion,
     estado_proceso: estado.proceso,
     archivado: estado.archivado,
   });

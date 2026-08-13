@@ -7,7 +7,7 @@ import { ahoraEnEcuador, formatearEnEcuador } from '../utils/zonaHoraria.js';
 /**
  * Cierre de papeletas.
  *
- * Una papeleta se cierra cuando su proceso pasa de `fecha_fin_votacion`. Al
+ * Una papeleta se cierra cuando pasa su propia `fecha_cierre`. Al
  * cerrarse:
  *   - deja de aceptar votos de inmediato (el servicio de voto exige
  *     `estado = 'abierta'`, así que no hay nada más que hacer);
@@ -170,7 +170,7 @@ async function avisarALaAdministracion(
 }
 
 /**
- * Cierra todas las papeletas cuyo proceso ya venció.
+ * Cierra todas las papeletas cuya ventana ya venció.
  *
  * La usa tanto la tarea de cada minuto como la reconciliación del arranque: si
  * el servidor estuvo apagado cuando venció una votación, al levantarse la
@@ -198,9 +198,9 @@ export async function cerrarPapeletasVencidas(): Promise<ResultadoCierre[]> {
   // también para los procesos cuyas papeletas ya estaban todas cerradas de antes
   // (cierre manual, o un reinicio a mitad de la pasada anterior): si no, un
   // proceso podría quedarse en 'votacion' para siempre.
-  for (const procesoId of await procesosPendientesDeFinalizar(corte, procesosTocados)) {
+  for (const procesoId of await procesosPendientesDeFinalizar(procesosTocados)) {
     try {
-      await finalizarProceso(procesoId, corte);
+      await finalizarProceso(procesoId);
     } catch (err) {
       console.error(`[cierre] no se pudo finalizar el proceso ${procesoId}`, err);
     }
@@ -214,17 +214,15 @@ export async function cerrarPapeletasVencidas(): Promise<ResultadoCierre[]> {
  * papeleta abierta, más los que ya estaban del todo cerrados y siguen sin
  * finalizar. El UPDATE de `finalizarSiTodoCerrado` es el que decide de verdad.
  */
-async function procesosPendientesDeFinalizar(
-  corte: string, tocados: Set<number>
-): Promise<number[]> {
+async function procesosPendientesDeFinalizar(tocados: Set<number>): Promise<number[]> {
   const candidatos = new Set(tocados);
-  for (const id of await repo.procesosVencidosSinFinalizar(corte)) candidatos.add(Number(id));
+  for (const id of await repo.procesosVencidosSinFinalizar()) candidatos.add(Number(id));
   return [...candidatos];
 }
 
 /** Finaliza el proceso y avisa una sola vez a quienes participaron. */
-async function finalizarProceso(procesoId: number, corte: string) {
-  if (!(await repo.finalizarSiTodoCerrado(procesoId, corte))) return;
+async function finalizarProceso(procesoId: number) {
+  if (!(await repo.finalizarSiTodoCerrado(procesoId))) return;
 
   const nombre = (await repo.nombreDeProceso(procesoId)) ?? 'Proceso electoral';
   console.info(`[cierre] proceso ${procesoId} ("${nombre}") finalizado: todas sus papeletas están cerradas`);

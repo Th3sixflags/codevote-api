@@ -25,7 +25,7 @@ function condicionInstitucion(institucionId?: number): { sql: string; params: an
   return { sql: ' AND p.fk_id_institucion = ?', params: [institucionId] };
 }
 
-// Se traen el estado del proceso, su fin de votación y la marca de archivado
+// Se traen el estado del proceso y la marca de archivado
 // porque son lo que decide el estado EFECTIVO de la papeleta (ver
 // utils/estadoVotacion.ts): sin ellos habría que consultarlos aparte en cada
 // pantalla, y el frontend acabaría deduciendo la regla por su cuenta.
@@ -34,7 +34,7 @@ const BASE_QUERY = `
     v.id_votacion, v.titulo_papeleta, v.fecha_apertura, v.fecha_cierre, v.estado, v.foto_url,
     v.fk_id_carrera, c.nombre_carrera,
     p.id_proceso, p.nombre_proceso, p.fk_id_institucion,
-    p.estado AS estado_proceso, p.fecha_fin_votacion,
+    p.estado AS estado_proceso,
     (p.archivado_at IS NOT NULL) AS archivado,
     EXISTS(SELECT 1 FROM voto x WHERE x.fk_id_votacion = v.id_votacion) AS tiene_votos,
     EXISTS(SELECT 1 FROM codigo_voto cv WHERE cv.fk_id_votacion = v.id_votacion) AS tiene_comprobantes,

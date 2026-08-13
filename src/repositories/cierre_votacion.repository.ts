@@ -9,19 +9,14 @@ export interface PapeletaVencida {
   nombre_carrera: string | null;
   id_proceso: number;
   nombre_proceso: string;
-  fecha_fin_votacion: string;
   fk_id_institucion: number;
 }
 
 /**
- * Papeletas sin cerrar que ya vencieron, por cualquiera de sus dos plazos.
+ * Papeletas sin cerrar que ya vencieron por su propio cierre.
  *
- * Vence con el `fecha_fin_votacion` del proceso o con el `fecha_cierre` de la
- * propia papeleta, lo que ocurra primero. Antes solo se miraba el del proceso,
- * así que una papeleta que cerraba antes que su proceso se quedaba abierta en la
- * base: la API ya la daba por cerrada (ver utils/estadoVotacion.ts, que sí mira
- * los dos), pero nunca llegaba a emitirse su acta. Ahora las dos reglas
- * coinciden.
+ * Cada papeleta es dueña de su horario. Un mismo proceso puede contener
+ * categorías con ventanas distintas, sin que una fecha global las recorte.
  *
  * Se recogen también las que siguen en 'pendiente'. Una papeleta cuya ventana
  * entera pasó con el servidor apagado nunca llegó a abrirse, pero tiene que
@@ -40,18 +35,15 @@ export async function papeletasVencidas(corteEnEcuador: string): Promise<Papelet
   const [rows] = await pool.query(
     `SELECT v.id_votacion, v.titulo_papeleta, v.fk_id_carrera,
             c.nombre_carrera,
-            p.id_proceso, p.nombre_proceso, p.fecha_fin_votacion, p.fk_id_institucion
+            p.id_proceso, p.nombre_proceso, p.fk_id_institucion
        FROM votacion v
        JOIN proceso_electoral p ON p.id_proceso = v.fk_id_proceso
        LEFT JOIN carrera c ON c.id_carrera = v.fk_id_carrera
       WHERE v.estado <> 'cerrada'
-        AND (
-             (p.fecha_fin_votacion IS NOT NULL AND p.fecha_fin_votacion <= ?)
-          OR (v.fecha_cierre       IS NOT NULL AND v.fecha_cierre       <= ?)
-        )
+        AND v.fecha_cierre IS NOT NULL AND v.fecha_cierre <= ?
         AND p.estado <> 'cancelado'
-      ORDER BY p.fecha_fin_votacion, v.id_votacion`,
-    [corteEnEcuador, corteEnEcuador]
+      ORDER BY v.fecha_cierre, v.id_votacion`,
+    [corteEnEcuador]
   ) as [any[], any];
   return rows as PapeletaVencida[];
 }
@@ -136,7 +128,6 @@ export async function emitirActa(datos: {
  * Condiciones, todas en el mismo UPDATE para que la comprobación y la escritura
  * no puedan separarse:
  *
- *   - su periodo de votación ya venció;
  *   - no le queda ninguna papeleta sin cerrar;
  *   - tiene al menos una papeleta (un proceso sin papeletas no "termina": nunca
  *     empezó, y marcarlo finalizado sería inventarse una elección);
@@ -148,46 +139,40 @@ export async function emitirActa(datos: {
  * si toca notificar. Es la misma garantía de idempotencia que el cierre de la
  * papeleta.
  */
-export async function finalizarSiTodoCerrado(
-  procesoId: number, corteEnEcuador: string
-): Promise<boolean> {
+export async function finalizarSiTodoCerrado(procesoId: number): Promise<boolean> {
   const [resultado] = await pool.query(
     `UPDATE proceso_electoral p
         SET p.estado = 'finalizado'
       WHERE p.id_proceso = ?
         AND p.estado NOT IN ('finalizado', 'cancelado')
         AND p.archivado_at IS NULL
-        AND p.fecha_fin_votacion IS NOT NULL
-        AND p.fecha_fin_votacion <= ?
         AND EXISTS (SELECT 1 FROM votacion v WHERE v.fk_id_proceso = p.id_proceso)
         AND NOT EXISTS (
           SELECT 1 FROM votacion v
            WHERE v.fk_id_proceso = p.id_proceso AND v.estado <> 'cerrada'
         )`,
-    [procesoId, corteEnEcuador]
+    [procesoId]
   ) as [any, any];
   return resultado.affectedRows > 0;
 }
 
 /**
- * Procesos ya vencidos que siguen sin finalizar y no tienen ninguna papeleta
- * abierta. Son los que quedaron a medias: se cerró su última papeleta a mano, o
- * el servidor se reinició justo después de cerrarlas.
+ * Procesos con todas sus papeletas cerradas que siguen sin finalizar. Son los
+ * que quedaron a medias: se cerró su última papeleta a mano, o el servidor se
+ * reinició justo después de cerrarlas.
  */
-export async function procesosVencidosSinFinalizar(corteEnEcuador: string): Promise<number[]> {
+export async function procesosVencidosSinFinalizar(): Promise<number[]> {
   const [rows] = await pool.query(
     `SELECT p.id_proceso
        FROM proceso_electoral p
       WHERE p.estado NOT IN ('finalizado', 'cancelado')
         AND p.archivado_at IS NULL
-        AND p.fecha_fin_votacion IS NOT NULL
-        AND p.fecha_fin_votacion <= ?
         AND EXISTS (SELECT 1 FROM votacion v WHERE v.fk_id_proceso = p.id_proceso)
         AND NOT EXISTS (
           SELECT 1 FROM votacion v
            WHERE v.fk_id_proceso = p.id_proceso AND v.estado <> 'cerrada'
         )`,
-    [corteEnEcuador]
+    []
   ) as [any[], any];
   return rows.map((r) => Number(r.id_proceso));
 }

@@ -163,8 +163,15 @@ export async function generarExpedientePDF(procesoId: number, institucionId?: nu
       doc.font('Helvetica-Bold').text('FECHA CONVOCATORIA:', margin + 20, metaY + 70);
       doc.font('Helvetica').text(new Date(proceso.fecha_convocatoria).toLocaleDateString('es-ES'), margin + 180, metaY + 70);
 
-      doc.font('Helvetica-Bold').text('PERIODO DE VOTACIÓN:', margin + 20, metaY + 95);
-      doc.font('Helvetica').text(`${new Date(proceso.fecha_inicio_votacion).toLocaleDateString('es-ES')} al ${new Date(proceso.fecha_fin_votacion).toLocaleDateString('es-ES')}`, margin + 180, metaY + 95);
+      doc.font('Helvetica-Bold').text('JORNADA DE VOTACIÓN:', margin + 20, metaY + 95);
+      const primeraApertura = votaciones.reduce<string | null>((minimo, v: any) =>
+        !minimo || String(v.fecha_apertura) < minimo ? String(v.fecha_apertura) : minimo, null);
+      const ultimoCierre = votaciones.reduce<string | null>((maximo, v: any) =>
+        !maximo || String(v.fecha_cierre) > maximo ? String(v.fecha_cierre) : maximo, null);
+      const periodo = primeraApertura && ultimoCierre
+        ? `${new Date(primeraApertura).toLocaleDateString('es-ES')} al ${new Date(ultimoCierre).toLocaleDateString('es-ES')}`
+        : 'Pendiente de configurar papeletas';
+      doc.font('Helvetica').text(periodo, margin + 180, metaY + 95);
 
       doc.y = metaY + 150;
       doc.fillColor('#777777').fontSize(10).font('Helvetica-Oblique').text(`Generado el: ${new Date().toLocaleString('es-ES')}`, { align: 'center' });

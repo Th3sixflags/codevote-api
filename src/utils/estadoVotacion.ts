@@ -27,8 +27,6 @@ export interface DatosDePapeleta {
   estado?: string | null;
   fecha_apertura?: string | Date | null;
   fecha_cierre?: string | Date | null;
-  /** Fin del periodo de votación del proceso: es el plazo que manda. */
-  fecha_fin_votacion?: string | Date | null;
   estado_proceso?: string | null;
   archivado?: boolean | number | null;
 }
@@ -58,12 +56,11 @@ function yaPaso(momento: string | Date | null | undefined, ahora: string): boole
  * ¿La papeleta debería estar cerrada por fecha, con independencia de lo que
  * diga `votacion.estado`?
  *
- * Vence con el plazo del proceso o con el cierre propio de la papeleta, lo que
- * ocurra primero: son dos plazos distintos y ninguno de los dos debería poder
- * saltarse.
+ * Cada papeleta es dueña de su cierre. El proceso puede tener varias ventanas
+ * de votación y no debe imponer una segunda fecha que las contradiga.
  */
 export function estaVencida(papeleta: DatosDePapeleta, ahora = ahoraEnEcuador()): boolean {
-  return yaPaso(papeleta.fecha_fin_votacion, ahora) || yaPaso(papeleta.fecha_cierre, ahora);
+  return yaPaso(papeleta.fecha_cierre, ahora);
 }
 
 /**

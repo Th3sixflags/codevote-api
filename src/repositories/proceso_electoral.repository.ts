@@ -6,6 +6,10 @@ import { CrearProcesoDTO, ActualizarProcesoDTO } from '../schemas/proceso_electo
 // que el frontend sepa de antemano si puede eliminarlo o solo cancelar/archivar.
 const BASE_QUERY = `
   SELECT p.*, c.nombre_carrera,
+    -- Las papeletas son la única fuente de verdad de la jornada. COALESCE
+    -- conserva la lectura de procesos históricos hasta que se reconcilien.
+    COALESCE((SELECT MIN(vv.fecha_apertura) FROM votacion vv WHERE vv.fk_id_proceso = p.id_proceso), p.fecha_inicio_votacion) AS fecha_inicio_votacion,
+    COALESCE((SELECT MAX(vv.fecha_cierre) FROM votacion vv WHERE vv.fk_id_proceso = p.id_proceso), p.fecha_fin_votacion) AS fecha_fin_votacion,
     EXISTS(SELECT 1 FROM votacion vo JOIN voto v ON v.fk_id_votacion = vo.id_votacion
            WHERE vo.fk_id_proceso = p.id_proceso) AS tiene_votos,
     EXISTS(SELECT 1 FROM votacion vo JOIN codigo_voto cv ON cv.fk_id_votacion = vo.id_votacion
@@ -83,7 +87,8 @@ export async function findAll(filtro: FiltroCarrera = undefined, institucionId?:
   const carrera = condicionCarrera(filtro);
   const inst = condicionInstitucion(institucionId);
   const [rows] = await pool.query(
-    `${BASE_QUERY} WHERE p.archivado_at IS NULL${carrera.sql}${inst.sql} ORDER BY p.fecha_inicio_votacion DESC`,
+    `${BASE_QUERY} WHERE p.archivado_at IS NULL${carrera.sql}${inst.sql}
+     ORDER BY COALESCE((SELECT MIN(vv.fecha_apertura) FROM votacion vv WHERE vv.fk_id_proceso = p.id_proceso), p.fecha_inicio_votacion) DESC`,
     [...carrera.params, ...inst.params]
   );
   return (rows as any[]).map(conBloqueo);
@@ -96,7 +101,7 @@ export async function findActuales(filtro: FiltroCarrera = undefined, institucio
   const [rows] = await pool.query(
     `${BASE_QUERY}
      WHERE p.estado NOT IN ('finalizado', 'cancelado') AND p.archivado_at IS NULL${carrera.sql}${inst.sql}
-     ORDER BY p.fecha_inicio_votacion ASC`,
+     ORDER BY COALESCE((SELECT MIN(vv.fecha_apertura) FROM votacion vv WHERE vv.fk_id_proceso = p.id_proceso), p.fecha_inicio_votacion) ASC`,
     [...carrera.params, ...inst.params]
   );
   return (rows as any[]).map(conBloqueo);
@@ -109,7 +114,7 @@ export async function findFinalizados(filtro: FiltroCarrera = undefined, institu
   const [rows] = await pool.query(
     `${BASE_QUERY}
      WHERE p.estado = 'finalizado' AND p.archivado_at IS NULL${carrera.sql}${inst.sql}
-     ORDER BY p.fecha_fin_votacion DESC`,
+     ORDER BY COALESCE((SELECT MAX(vv.fecha_cierre) FROM votacion vv WHERE vv.fk_id_proceso = p.id_proceso), p.fecha_fin_votacion) DESC`,
     [...carrera.params, ...inst.params]
   );
   return (rows as any[]).map(conBloqueo);
@@ -180,7 +185,8 @@ export async function create(data: CrearProcesoDTO & { fk_id_institucion?: numbe
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       data.nombre_proceso, data.tipo_proceso, data.fecha_convocatoria,
-      data.fecha_inicio_votacion, data.fecha_fin_votacion,
+      // Se dejan nulas: la ventana se define al crear las papeletas.
+      null, null,
       data.estado ?? 'planificado', data.descripcion ?? null,
       data.fk_id_carrera ?? null,
       data.fecha_inicio_inscripcion ?? null,

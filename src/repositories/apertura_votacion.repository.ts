@@ -37,8 +37,8 @@ export interface PapeletaPorAbrir {
  * Papeletas pendientes cuya hora de apertura ya pasó y que TODAVÍA están en
  * plazo.
  *
- * Se exige que no hayan vencido —ni por su propio `fecha_cierre` ni por el
- * `fecha_fin_votacion` del proceso— para no abrir una papeleta que habría que
+ * Se exige que no haya vencido por su propio `fecha_cierre` para no abrir una
+ * papeleta que habría que
  * cerrar en la misma pasada: una votación que nació caducada (porque el
  * servidor estuvo apagado toda su ventana) nunca llegó a estar abierta, y
  * fingir lo contrario falsearía el historial. El cierre la recoge y le emite su
@@ -60,11 +60,10 @@ export async function papeletasPorAbrir(corteEnEcuador: string): Promise<Papelet
         AND v.fecha_apertura IS NOT NULL
         AND v.fecha_apertura <= ?
         AND (v.fecha_cierre IS NULL OR v.fecha_cierre > ?)
-        AND (p.fecha_fin_votacion IS NULL OR p.fecha_fin_votacion > ?)
         AND p.estado NOT IN ('cancelado', 'finalizado')
         AND p.archivado_at IS NULL
       ORDER BY v.fecha_apertura, v.id_votacion`,
-    [corteEnEcuador, corteEnEcuador, corteEnEcuador]
+    [corteEnEcuador, corteEnEcuador]
   ) as [any[], any];
   return rows as PapeletaPorAbrir[];
 }
@@ -97,8 +96,8 @@ export async function abrirSiSiguePendiente(votacionId: number): Promise<boolean
  * y hacer retroceder un proceso sería peor que no tocarlo.
  */
 /**
- * Procesos cuya jornada de votación ya empezó y que siguen etiquetados en una
- * etapa previa. Son los que quedaron a medias: sus papeletas ya estaban
+ * Procesos con al menos una papeleta dentro de su jornada y que siguen
+ * etiquetados en una etapa previa. Son los que quedaron a medias: sus papeletas ya estaban
  * abiertas (a mano, o de una pasada anterior) y solo falta la etiqueta.
  */
 export async function procesosEnJornadaSinMarcar(corteEnEcuador: string): Promise<number[]> {
@@ -107,10 +106,12 @@ export async function procesosEnJornadaSinMarcar(corteEnEcuador: string): Promis
        FROM proceso_electoral p
       WHERE p.estado IN ('planificado', 'convocado', 'inscripcion', 'campaña')
         AND p.archivado_at IS NULL
-        AND p.fecha_inicio_votacion IS NOT NULL
-        AND p.fecha_inicio_votacion <= ?
-        AND (p.fecha_fin_votacion IS NULL OR p.fecha_fin_votacion > ?)
-        AND EXISTS (SELECT 1 FROM votacion v WHERE v.fk_id_proceso = p.id_proceso)`,
+        AND EXISTS (
+          SELECT 1 FROM votacion v
+           WHERE v.fk_id_proceso = p.id_proceso
+             AND v.fecha_apertura <= ?
+             AND v.fecha_cierre > ?
+        )`,
     [corteEnEcuador, corteEnEcuador]
   ) as [any[], any];
   return rows.map((r) => Number(r.id_proceso));
@@ -125,9 +126,12 @@ export async function marcarProcesoEnVotacion(
       WHERE id_proceso = ?
         AND estado IN ('planificado', 'convocado', 'inscripcion', 'campaña')
         AND archivado_at IS NULL
-        AND fecha_inicio_votacion IS NOT NULL
-        AND fecha_inicio_votacion <= ?
-        AND (fecha_fin_votacion IS NULL OR fecha_fin_votacion > ?)`,
+        AND EXISTS (
+          SELECT 1 FROM votacion v
+           WHERE v.fk_id_proceso = proceso_electoral.id_proceso
+             AND v.fecha_apertura <= ?
+             AND v.fecha_cierre > ?
+        )`,
     [procesoId, corteEnEcuador, corteEnEcuador]
   ) as [any, any];
   return resultado.affectedRows > 0;

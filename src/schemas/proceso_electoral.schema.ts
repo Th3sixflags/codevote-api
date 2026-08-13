@@ -8,8 +8,11 @@ const procesoBase = z.object({
   nombre_proceso:        z.string().min(1).max(120),
   tipo_proceso:          z.enum(['consejo_estudiantil', 'representante_carrera', 'referendum']),
   fecha_convocatoria:    z.string().regex(FECHA, 'Formato: YYYY-MM-DD'),
-  fecha_inicio_votacion: z.string().regex(FECHA_HORA, 'Formato: YYYY-MM-DD HH:MM:SS'),
-  fecha_fin_votacion:    z.string().regex(FECHA_HORA, 'Formato: YYYY-MM-DD HH:MM:SS'),
+  // Compatibilidad de lectura con clientes y procesos históricos. La ventana
+  // electoral vive exclusivamente en cada papeleta (`votacion`), por lo que
+  // un proceso nuevo no debe enviar estos campos.
+  fecha_inicio_votacion: z.union([z.string().regex(FECHA_HORA, 'Formato: YYYY-MM-DD HH:MM:SS'), z.null()]).optional(),
+  fecha_fin_votacion:    z.union([z.string().regex(FECHA_HORA, 'Formato: YYYY-MM-DD HH:MM:SS'), z.null()]).optional(),
   estado:                z.enum(['planificado', 'convocado', 'inscripcion', 'campaña', 'votacion', 'escrutinio', 'finalizado', 'cancelado']).optional(),
   descripcion:           z.string().max(250).optional(),
   // SIN USO: la carrera vive en cada votación (papeleta) del proceso. Se acepta
@@ -40,15 +43,14 @@ function reglas(v: ProcesoParcial, ctx: z.RefinementCtx) {
     });
   }
 
-  // Secuencia de fechas: convocatoria → inscripción → votación → posesión.
+  // Secuencia del proceso: convocatoria → inscripción → posesión. La jornada
+  // de votación se valida por papeleta para permitir varias ventanas horarias.
   //    El formato es fijo, así que comparar como texto respeta el orden.
   const convocatoria = v.fecha_convocatoria ? `${v.fecha_convocatoria} 00:00:00` : undefined;
   const secuencia: Array<[string, string | undefined | null]> = [
     ['fecha_convocatoria',       convocatoria],
     ['fecha_inicio_inscripcion', v.fecha_inicio_inscripcion],
     ['fecha_fin_inscripcion',    v.fecha_fin_inscripcion],
-    ['fecha_inicio_votacion',    v.fecha_inicio_votacion],
-    ['fecha_fin_votacion',       v.fecha_fin_votacion],
     ['fecha_posesion',           v.fecha_posesion],
   ];
   const presentes = secuencia.filter(([, valor]) => typeof valor === 'string') as Array<[string, string]>;
@@ -59,7 +61,7 @@ function reglas(v: ProcesoParcial, ctx: z.RefinementCtx) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: [campo],
-        message: `La secuencia de fechas debe ser convocatoria → inscripción → votación → posesión (${campo} no puede ser anterior a ${campoAnterior}).`,
+        message: `La secuencia de fechas debe ser convocatoria → inscripción → posesión (${campo} no puede ser anterior a ${campoAnterior}).`,
       });
     }
   }

@@ -18,6 +18,7 @@ import assert from 'node:assert/strict';
 import test, { after, before, beforeEach } from 'node:test';
 import { pool } from '../src/config/database.js';
 import { abrirPapeletasProgramadas } from '../src/services/apertura_votacion.service.js';
+import { estadoInicialDePapeleta } from '../src/services/votacion.service.js';
 import { ahoraEnEcuador } from '../src/utils/zonaHoraria.js';
 
 const PASADA   = '2020-01-01 08:00:00';  // ya ocurrió
@@ -156,6 +157,17 @@ test('una papeleta cuya hora de apertura ya pasó se abre sola', async () => {
   assert.equal(papeleta().estado, 'abierta');
   assert.equal(abiertas.length, 1);
   assert.equal(abiertas[0].id_votacion, 1);
+});
+
+test('al crear una papeleta dos horas después de abrir, queda abierta sin esperar al cron', () => {
+  const estadoInicial = estadoInicialDePapeleta({
+    fk_id_proceso: 1,
+    titulo_papeleta: 'Creada tarde',
+    fecha_apertura: '2026-08-13 08:45:00',
+    fecha_cierre: '2026-08-13 18:00:00',
+  }, '2026-08-13 10:55:00');
+
+  assert.equal(estadoInicial, 'abierta');
 });
 
 test('una papeleta cuya hora todavía no llega NO se abre', async () => {
