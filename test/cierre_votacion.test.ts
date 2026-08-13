@@ -1,7 +1,7 @@
 /**
  * Cierre automático de papeletas.
  *
- * Una papeleta se cierra cuando su proceso pasa de `fecha_fin_votacion`. Al
+ * Una papeleta se cierra cuando pasa su propia `fecha_cierre`. Al
  * cerrarse deja de aceptar votos, su escrutinio pasa a oficial, se emite el
  * acta (rastro de auditoría con solo cifras agregadas) y se avisa a la
  * administración una única vez.
@@ -25,7 +25,8 @@ interface Papeleta {
   id_proceso: number;
   nombre_proceso: string;
   estado_proceso: string;
-  fecha_fin_votacion: string | null;
+  fecha_cierre: string | null;
+  fk_id_institucion: number;
 }
 
 let papeletas: Papeleta[];
@@ -43,18 +44,18 @@ function ejecutar(sqlCrudo: string, params: any[] = []): any {
   const sql = sqlCrudo.replace(/\s+/g, ' ').trim();
 
   // Papeletas vencidas: se compara en hora de Ecuador, con el corte como parámetro.
-  if (sql.includes('FROM votacion v') && sql.includes('p.fecha_fin_votacion <= ?')) {
+  if (sql.includes('FROM votacion v') && sql.includes('v.fecha_cierre <= ?')) {
     const corte = params[0];
     return papeletas.filter((p) =>
-      p.estado === 'abierta'
-      && p.fecha_fin_votacion != null
-      && p.fecha_fin_votacion <= corte
+      p.estado !== 'cerrada'
+      && p.fecha_cierre != null
+      && p.fecha_cierre <= corte
       && p.estado_proceso !== 'cancelado');
   }
   // Cierre condicionado: solo prospera si sigue abierta (idempotencia).
   if (sql.startsWith("UPDATE votacion SET estado = 'cerrada'")) {
     const p = papeletas.find((x) => x.id_votacion === Number(params[0]));
-    if (!p || p.estado !== 'abierta') return { affectedRows: 0 };
+    if (!p || p.estado === 'cerrada') return { affectedRows: 0 };
     p.estado = 'cerrada';
     return { affectedRows: 1 };
   }
@@ -85,6 +86,13 @@ function ejecutar(sqlCrudo: string, params: any[] = []): any {
     notificaciones.push({ cedula: params[0], titulo: params[2] });
     return { insertId: notificaciones.length };
   }
+  // Reconciliación posterior: con una papeleta aún abierta no hay procesos que
+  // finalizar. Tras cerrar la única papeleta el servicio intenta finalizarlo;
+  // esta transición se cubre exhaustivamente en cierre_automatico.test.ts.
+  if (sql.startsWith('SELECT p.id_proceso FROM proceso_electoral p')) return [];
+  if (sql.startsWith("UPDATE proceso_electoral p SET p.estado = 'finalizado'")) {
+    return { affectedRows: 0 };
+  }
 
   throw new Error(`consulta inesperada en la prueba: ${sql.slice(0, 140)}`);
 }
@@ -102,7 +110,8 @@ beforeEach(() => {
     id_proceso: 1,
     nombre_proceso: 'Elecciones Consejo 2026',
     estado_proceso: 'votacion',
-    fecha_fin_votacion: enMinutos(-5), // venció hace 5 minutos
+    fecha_cierre: enMinutos(-5), // venció hace 5 minutos
+    fk_id_institucion: 1,
   }];
 });
 
@@ -114,7 +123,7 @@ after(async () => {
 // --- Antes y después de la hora --------------------------------------------
 
 test('antes de la hora la papeleta sigue abierta', async () => {
-  papeletas[0].fecha_fin_votacion = enMinutos(30); // aún falta media hora
+  papeletas[0].fecha_cierre = enMinutos(30); // aún falta media hora
 
   const cerradas = await cerrarPapeletasVencidas();
 
@@ -232,7 +241,7 @@ test('cerrar directamente una papeleta ya cerrada no repite nada', async () => {
 
 test('si venció con el servidor apagado, la primera pasada al arrancar la cierra', async () => {
   // Vencida hace dos horas: nadie la cerró porque el backend estaba caído.
-  papeletas[0].fecha_fin_votacion = enMinutos(-120);
+  papeletas[0].fecha_cierre = enMinutos(-120);
 
   const cerradas = await cerrarPapeletasVencidas();
 
@@ -263,7 +272,7 @@ test('la hora del aviso se muestra en formato de Ecuador', () => {
 });
 
 test('una papeleta que vence justo ahora entra en el corte', async () => {
-  papeletas[0].fecha_fin_votacion = ahoraEnEcuador();
+  papeletas[0].fecha_cierre = ahoraEnEcuador();
 
   const cerradas = await cerrarPapeletasVencidas();
 
