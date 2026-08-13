@@ -19,6 +19,8 @@ describe('Asignación de Administradores a Institución', () => {
   let otraInstitucionId: number;
   let cedulaMiembro: string;
   let cedulaAjena: string;
+  let cedulaAdminCreado: string;
+  let cedulaDuplicada: string;
 
   before(async () => {
     process.env.JWT_SECRET = 'secreto-de-prueba';
@@ -36,12 +38,18 @@ describe('Asignación de Administradores a Institución', () => {
     ) as any;
     otraInstitucionId = otraInstResult.insertId;
 
-    cedulaMiembro = `miembro-${rnd}`;
-    cedulaAjena = `ajeno-${rnd}`;
+    // `estudiante.cedula` admite hasta 20 caracteres. Las cédulas numéricas
+    // mantienen la prueba fiel al formato de producción y evitan que un
+    // Date.now() prefijado convierta el fixture en una cadena demasiado larga.
+    const sufijo = String(rnd).slice(-8);
+    cedulaMiembro = `98${sufijo}`;
+    cedulaAjena = `97${sufijo}`;
+    cedulaAdminCreado = `96${sufijo}`;
+    cedulaDuplicada = `95${sufijo}`;
     await pool.query(
-      `INSERT INTO estudiante (cedula, nombres, apellidos, correo_institucional, estado_academico, rol, fk_id_institucion)
-       VALUES (?, 'Miembro', 'Local', ?, 'activo', 'estudiante', ?),
-              (?, 'Miembro', 'Ajeno', ?, 'activo', 'estudiante', ?)`,
+      `INSERT INTO estudiante (cedula, nombres, apellidos, correo_institucional, estado_academico, rol, fk_id_institucion, password, debe_cambiar_password)
+       VALUES (?, 'Miembro', 'Local', ?, 'activo', 'estudiante', ?, '', 0),
+              (?, 'Miembro', 'Ajeno', ?, 'activo', 'estudiante', ?, '', 0)`,
       [cedulaMiembro, `miembro-${rnd}@admin-test.com`, institucionId, cedulaAjena, `ajeno-${rnd}@admin-test.com`, otraInstitucionId]
     );
 
@@ -59,8 +67,27 @@ describe('Asignación de Administradores a Institución', () => {
   });
 
   after(async () => {
-    // Teardown
-    await pool.query('DELETE FROM estudiante WHERE correo_institucional LIKE "%@admin-test.com"');
+    // Limpieza exacta del fixture. No se usa un LIKE global: otras pruebas o
+    // datos de desarrollo pueden tener correos similares y relaciones propias.
+    const cedulas = [cedulaMiembro, cedulaAjena, cedulaAdminCreado, cedulaDuplicada];
+    const referenciasDeEstudiante = [
+      ['asignacion_candidatura', 'fk_cedula_estudiante'],
+      ['codigo_voto', 'fk_cedula_estudiante'],
+      ['notificacion', 'fk_cedula_estudiante'],
+      ['codigo_acceso', 'fk_cedula_estudiante'],
+      ['candidato', 'fk_cedula_estudiante'],
+      ['lista_candidata', 'fk_cedula_responsable'],
+      ['historial_importacion', 'cedula_importador'],
+    ];
+    const placeholders = cedulas.map(() => '?').join(', ');
+
+    for (const [tabla, columna] of referenciasDeEstudiante) {
+      await pool.query(`DELETE FROM ${tabla} WHERE ${columna} IN (${placeholders})`, cedulas);
+    }
+    await pool.query(
+      `DELETE FROM estudiante WHERE cedula IN (${placeholders})`,
+      cedulas
+    );
     await pool.query('DELETE FROM institucion WHERE id_institucion IN (?, ?)', [institucionId, otraInstitucionId]);
     await pool.end();
   });
@@ -70,7 +97,7 @@ describe('Asignación de Administradores a Institución', () => {
       .post(`/api/instituciones/${institucionId}/admin`)
       .set('Authorization', `Bearer ${superadminToken}`)
       .send({
-        cedula: `111-${Date.now()}`,
+        cedula: cedulaAdminCreado,
         nombres: 'Nuevo',
         apellidos: 'Admin',
         correo_institucional: `nuevo-${Date.now()}@admin-test.com`
@@ -94,7 +121,7 @@ describe('Asignación de Administradores a Institución', () => {
   });
 
   it('Falla si la cédula o correo ya existen', async () => {
-    const cedula = `dup-123`;
+    const cedula = cedulaDuplicada;
     const correo = `dup-${Date.now()}@admin-test.com`;
 
     // Primera asignación exitosa
