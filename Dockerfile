@@ -21,6 +21,10 @@ RUN npm ci --omit=dev
 # Código ya compilado
 COPY --from=build /app/dist ./dist
 
+# El ledger de migraciones calcula checksums de estos SQL dentro del
+# contenedor. Copiarlos no los ejecuta automáticamente.
+COPY db/migrations ./db/migrations
+
 # Especificación OpenAPI que Swagger UI sirve en /api/docs
 COPY openapi.yaml ./
 

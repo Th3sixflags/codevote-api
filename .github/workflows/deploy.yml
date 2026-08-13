@@ -90,8 +90,14 @@ jobs:
             # (el contenedor se llama codevote-api, pero Compose usa el servicio).
             sudo docker compose up -d --build backend
 
-            # Comprobación de salud: espera a que el backend levante.
+            # Registra el checksum del SQL que el operador ya aplicó. Este
+            # comando no ejecuta DDL ni vuelve a correr la migración.
+            sudo docker compose exec -T -e MIGRATIONS_OPERATOR=deploy backend \
+              npm run migraciones:registrar -- 2026-08-13_control_migraciones.sql
+
+            # Comprobación de salud y readiness: exige proceso, MySQL y ledger.
             sleep 8
             curl --fail --silent http://127.0.0.1:3000/health > /dev/null
+            curl --fail --silent http://127.0.0.1:3000/api/health/ready > /dev/null
             echo "Backend desplegado correctamente."
           REMOTE

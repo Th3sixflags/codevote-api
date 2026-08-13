@@ -15,11 +15,12 @@ export async function comprobarReadiness() {
     }
 
     const [migraciones] = await pool.query('SELECT COUNT(*) AS total FROM schema_migrations') as [Array<{ total: number }>, unknown];
+    const registradas = Number(migraciones[0]?.total ?? 0);
     return {
-      listo: true,
+      listo: registradas > 0,
       base_datos: 'ok',
-      migraciones: 'ok',
-      migraciones_registradas: Number(migraciones[0]?.total ?? 0),
+      migraciones: registradas > 0 ? 'ok' : 'pendiente',
+      migraciones_registradas: registradas,
       latencia_ms: Math.round(performance.now() - inicio),
     };
   } catch {

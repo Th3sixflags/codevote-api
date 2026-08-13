@@ -36,3 +36,15 @@ test('readiness no declara listo un servidor sin ledger', async () => {
     latencia_ms: estado.latencia_ms,
   });
 });
+
+test('readiness no declara listo un ledger sin migraciones registradas', async () => {
+  (pool as any).query = async (sql: string) => {
+    if (sql.includes('information_schema.TABLES')) return [[{ total: 1 }], []];
+    if (sql.includes('FROM schema_migrations')) return [[{ total: 0 }], []];
+    return [[{ disponible: 1 }], []];
+  };
+  const estado = await comprobarReadiness();
+  assert.equal(estado.listo, false);
+  assert.equal(estado.migraciones, 'pendiente');
+  assert.equal(estado.migraciones_registradas, 0);
+});

@@ -95,7 +95,7 @@ app.get('/health', estadoServicio);
 app.get('/api/health', estadoServicio);
 
 // Readiness para el balanceador y monitoreo: además del proceso, confirma que
-// MySQL responde y que el ledger de migraciones ya fue inicializado.
+// MySQL responde y que el ledger de migraciones contiene al menos un registro.
 app.get('/api/health/ready', async (_req, res) => {
   const estado = await comprobarReadiness();
   res.status(estado.listo ? 200 : 503).json(estado);

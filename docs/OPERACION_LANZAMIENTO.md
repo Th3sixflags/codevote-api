@@ -26,6 +26,16 @@ npm run migraciones:estado
 registro no ejecuta DDL: solo deja evidencia del archivo que el operador ya
 aplicó. Nunca se debe registrar una migración sin haberla aplicado y validado.
 
+La imagen de backend incluye `db/migrations` únicamente para calcular
+checksums. Tras el despliegue, CI registra
+`2026-08-13_control_migraciones.sql` dentro del contenedor; si se necesita una
+recuperación manual, usar:
+
+```bash
+sudo docker compose exec -T -e MIGRATIONS_OPERATOR="nombre.apellido" backend \
+  npm run migraciones:registrar -- 2026-08-13_control_migraciones.sql
+```
+
 ## Backup y simulacro de recuperación
 
 En AWS, guardar el dump cifrado fuera de la instancia y comprobar su hash:
