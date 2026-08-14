@@ -49,6 +49,9 @@ async function sesionNueva() {
   assert.equal(await sesiones.crearSiEstaDisponible({
     idSesion,
     cedula,
+    // La sesión debe quedar ligada al mismo tenant que el JWT. Sin esta
+    // columna el middleware de P1 la rechaza como sesión huérfana.
+    institucionId,
     expiraAt: new Date(Date.now() + 60 * 60 * 1000),
     ip: '127.0.0.1',
     userAgent: 'prueba-p1',
