@@ -21,7 +21,7 @@ USE codevote_db;
 --    autenticación, no un rol específico).
 -- -----------------------------------------------------------------------------
 ALTER TABLE estudiante
-  MODIFY COLUMN rol ENUM('estudiante', 'admin', 'candidato') NOT NULL DEFAULT 'estudiante';
+  MODIFY COLUMN rol ENUM('estudiante', 'admin', 'candidato', 'superadmin') NOT NULL DEFAULT 'estudiante';
 
 -- -----------------------------------------------------------------------------
 -- 2. Archivado de procesos electorales (columna archivado_at).
