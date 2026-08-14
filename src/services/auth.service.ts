@@ -86,7 +86,7 @@ export function componerCorreoDeCodigo(datos: { nombres: string; codigo: string;
     '',
     `CÓDIGO DE ACCESO: ${datos.codigo}`,
     '',
-    `Válido durante ${datos.minutos} minutos y para un solo uso.`,
+    `Válido durante ${datos.minutos} minutos y funciona una sola vez.`,
     '',
     'Si no solicitaste este código, ignora este mensaje. Nadie podrá acceder sin él.',
     '',
