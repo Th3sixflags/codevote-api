@@ -65,42 +65,63 @@ export function enmascararCorreo(correo: string): string {
   return `${usuario[0]}${'*'.repeat(Math.min(usuario.length - 2, 8))}${usuario.at(-1)}@${dominio}`;
 }
 
+/** Escapa texto controlado por el usuario antes de interpolarlo en un correo HTML. */
+function escaparHtml(valor: string): string {
+  return String(valor).replace(/[&<>\"']/g, (caracter) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  })[caracter] ?? caracter);
+}
+
 /** Texto del correo con el código. Aparte del envío, para poder comprobarlo sin SMTP. */
 export function componerCorreoDeCodigo(datos: { nombres: string; codigo: string; minutos: number }) {
+  const nombre = escaparHtml(datos.nombres);
   const texto = [
-    `Hola ${datos.nombres}:`,
+    `Hola ${datos.nombres},`,
     '',
-    'Tu código para entrar a CodeVote es:',
+    'Solicitaste un código para acceder a CodeVote.',
     '',
-    `    ${datos.codigo}`,
+    `CÓDIGO DE ACCESO: ${datos.codigo}`,
     '',
-    `Caduca en ${datos.minutos} minutos y sirve una sola vez.`,
+    `Válido durante ${datos.minutos} minutos y para un solo uso.`,
     '',
-    'Si no fuiste tú quien lo pidió, ignora este mensaje: sin el código nadie',
-    'puede entrar a tu cuenta.',
+    'Si no solicitaste este código, ignora este mensaje. Nadie podrá acceder sin él.',
     '',
-    'CodeVote · Plataforma de Votaciones Institucionales',
+    'CodeVote · Votaciones digitales seguras',
   ].join('\n');
 
   const html = `
-    <div style="font-family:system-ui,-apple-system,'Segoe UI',sans-serif;max-width:480px;margin:0 auto;color:#201d1f">
-      <p style="font-size:15px">Hola <strong>${datos.nombres}</strong>:</p>
-      <p style="font-size:15px">Tu código para entrar a CodeVote es:</p>
-      <p style="margin:24px 0;text-align:center">
-        <span style="display:inline-block;padding:14px 28px;background:#f7f3f0;border-radius:10px;
-                     font-size:32px;font-weight:700;letter-spacing:8px;color:#4b0d2b">${datos.codigo}</span>
-      </p>
-      <p style="font-size:14px;color:#5b5457">
-        Caduca en ${datos.minutos} minutos y sirve una sola vez.
-      </p>
-      <p style="font-size:13px;color:#5b5457">
-        Si no fuiste tú quien lo pidió, ignora este mensaje: sin el código nadie puede entrar a tu cuenta.
-      </p>
-      <hr style="border:0;border-top:1px solid #e7e1dd;margin:24px 0">
-      <p style="font-size:12px;color:#8a8184">CodeVote · Plataforma de Votaciones Institucionales</p>
+    <div style="margin:0;padding:32px 12px;background:#eef2ef;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;color:#172019">
+      <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #dce5df;border-radius:18px;overflow:hidden">
+        <tr>
+          <td style="padding:24px 32px;background:#344b43;color:#f2eee7">
+            <div style="font-size:20px;font-weight:800;letter-spacing:.02em">CODE<span style="color:#9fb3a5">VOTE</span></div>
+            <div style="margin-top:5px;font-size:11px;letter-spacing:.16em;color:#c7d4cc">VOTACIONES DIGITALES SEGURAS</div>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:36px 32px 30px">
+            <div style="font-size:12px;font-weight:800;letter-spacing:.14em;color:#607067">ACCESO INSTITUCIONAL</div>
+            <h1 style="margin:10px 0 12px;font-size:26px;line-height:1.2;color:#172019">Tu código de acceso</h1>
+            <p style="margin:0;font-size:16px;line-height:1.6;color:#607067">Hola <strong style="color:#344b43">${nombre}</strong>, usa este código para continuar en CodeVote.</p>
+            <div style="margin:28px 0 22px;padding:22px 16px;text-align:center;background:#f2eee7;border:1px solid #dce5df;border-radius:14px">
+              <div style="font-size:11px;font-weight:800;letter-spacing:.16em;color:#607067">CÓDIGO DE UN SOLO USO</div>
+              <div style="margin-top:10px;font-size:34px;line-height:1;font-weight:800;letter-spacing:9px;color:#344b43">${datos.codigo}</div>
+            </div>
+            <p style="margin:0;font-size:14px;line-height:1.6;color:#607067"><strong style="color:#344b43">Válido durante ${datos.minutos} minutos.</strong><br>Después de ese tiempo tendrás que solicitar un código nuevo.</p>
+            <div style="margin-top:24px;padding:14px 16px;background:#eef5f0;border-left:3px solid #9fb3a5;border-radius:6px;font-size:13px;line-height:1.55;color:#4f6258">Si no solicitaste este acceso, ignora este mensaje. Tu cuenta permanece protegida.</div>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:18px 32px;background:#f7f8f6;border-top:1px solid #e4ebe6;font-size:12px;line-height:1.5;color:#718078">Este correo fue generado automáticamente. No compartas tu código con nadie.<br><strong style="color:#344b43">CodeVote</strong> · Participación clara, segura y verificable.</td>
+        </tr>
+      </table>
     </div>`;
 
-  return { asunto: `${datos.codigo} es tu código de acceso a CodeVote`, texto, html };
+  return { asunto: `${datos.codigo} · Código de acceso a CodeVote`, texto, html };
 }
 
 export interface SolicitudDeCodigo {
