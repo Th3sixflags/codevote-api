@@ -118,7 +118,7 @@ test('crear lista como candidato lo registra automáticamente como presidente', 
     metodo: 'POST', token: tokenOtroCand, cuerpo: { nombre_lista: 'Unidad Estudiantil' },
   });
 
-  assert.equal(http, 201);
+  assert.equal(http, 201, JSON.stringify(cuerpo));
   assert.equal(cuerpo.fk_cedula_responsable, OTRO_CAND, 'la cédula del responsable no quedó en la lista');
 
   const nueva = estado.listas.find((l) => l.nombre_lista === 'Unidad Estudiantil')!;
@@ -136,7 +136,7 @@ test('agregar un integrante lo deja con rol estudiante y sin asignación', async
     cuerpo: { cargo: 'Secretario', fk_cedula_estudiante: LIBRE },
   });
 
-  assert.equal(http, 201);
+  assert.equal(http, 201, JSON.stringify(cuerpo));
   assert.equal(cuerpo.cargo, 'Secretario');
   assert.equal(cuerpo.es_responsable, false);
 
@@ -267,6 +267,6 @@ test('el cargo se acepta en minúsculas y se normaliza a la forma capitalizada',
     metodo: 'POST', cuerpo: { cargo: 'vicepresidente', fk_cedula_estudiante: LIBRE },
   });
 
-  assert.equal(http, 201);
+  assert.equal(http, 201, JSON.stringify(cuerpo));
   assert.equal(cuerpo.cargo, 'Vicepresidente');
 });

@@ -172,7 +172,7 @@ export function instalarDoble(
     if (propio) return propio;
 
     // --- asignacion_candidatura -------------------------------------------
-    if (sql.includes('FROM asignacion_candidatura a')) {
+    if (sql.startsWith('SELECT ') && sql.includes('FROM asignacion_candidatura a')) {
       const soloActivas = sql.includes("a.estado = 'activa'");
       const asig = e.asignaciones.find((a) =>
         a.fk_cedula_estudiante === params[0] && (!soloActivas || a.estado === 'activa'));
@@ -201,7 +201,9 @@ export function instalarDoble(
       else e.asignaciones.push({ fk_cedula_estudiante: cedula, fk_id_votacion: votacionId, estado: 'activa' });
       return [];
     }
-    if (sql.startsWith('DELETE FROM asignacion_candidatura')) {
+
+
+    if (sql.startsWith('DELETE FROM asignacion_candidatura') || norm(sql).startsWith('DELETE a FROM asignacion_candidatura')) {
       const antes = e.asignaciones.length;
       e.asignaciones = e.asignaciones.filter((a) => a.fk_cedula_estudiante !== params[0]);
       return { affectedRows: antes - e.asignaciones.length };
@@ -209,6 +211,11 @@ export function instalarDoble(
 
     // --- votacion ----------------------------------------------------------
     if (sql.includes('FROM votacion v') && sql.includes('v.id_votacion = ?')) {
+      if (sql.includes('SELECT p.fk_id_institucion')) {
+        const v = e.votaciones.find((x) => x.id_votacion === Number(params[0]));
+        const p = v ? e.procesos.find((x) => x.id_proceso === v.id_proceso) : null;
+        return p ? [{ fk_id_institucion: p.fk_id_institucion ?? 1 }] : [];
+      }
       const v = e.votaciones.find((x) => x.id_votacion === Number(params[0]));
       return v ? [{ ...v, tiene_votos: 0, tiene_comprobantes: 0, tiene_actas: 0, tiene_veedurias: 0 }] : [];
     }
@@ -367,10 +374,10 @@ export function instalarDoble(
       const est = e.estudiantes.find((x) => x.cedula === params[0]);
       return [{ fk_id_carrera: est?.id_carrera ?? null }];
     }
-    if (sql.startsWith('UPDATE estudiante')) {
+    if (sql.startsWith('UPDATE estudiante') || sql.startsWith('UPDATE estudiante_institucion')) {
       // El rol nuevo se lee del SET, no del WHERE (que también nombra el rol).
       const asciende = /SET (e\.)?rol = 'candidato'/.test(sql);
-      const est = e.estudiantes.find((x) => x.cedula === params[params.length - 1]);
+      const est = e.estudiantes.find((x) => x.cedula === params[0]);
       if (est && est.rol !== 'admin') {
         // Al degradar se respeta el NOT EXISTS: sigue siendo 'candidato' si
         // todavía es responsable de alguna lista.

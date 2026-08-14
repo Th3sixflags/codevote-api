@@ -67,7 +67,7 @@ before(() => {
     // Normalizar espacios y saltos de línea para el match
     const normalizedSql = s.replace(/\s+/g, ' ');
 
-    if (normalizedSql.includes('SELECT CEDULA, NOMBRES, APELLIDOS, CORREO_INSTITUCIONAL, ROL, FOTO_URL, FK_ID_INSTITUCION FROM ESTUDIANTE')) {
+    if (normalizedSql.includes('SELECT E.CEDULA, E.NOMBRES, E.APELLIDOS, E.CORREO_INSTITUCIONAL, E.ROL, E.FOTO_URL, E.FK_ID_INSTITUCION, I.SLUG AS INSTITUCION_SLUG, I.NOMBRE AS INSTITUCION_NOMBRE FROM ( SELECT ID_MEMBRESIA, CEDULA, FK_ID_INSTITUCION, NOMBRES, APELLIDOS, CORREO_INSTITUCIONAL, ESTADO_ACADEMICO, MEMBRESIA_ACTIVA, ROL, FOTO_URL FROM ESTUDIANTE_POR_INSTITUCION')) {
       const identificador = params?.[0];
       const user = Object.values(dbState).find(u => u.correo_institucional === identificador || u.cedula === identificador);
       return [user ? [user] : []];

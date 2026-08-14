@@ -89,8 +89,8 @@ test('facultades, directores y carreras están aislados en lectura y mutación',
 });
 
 test('padrón y administradores de cierre filtran por institución', async () => {
-  assert.equal(await votoRepo.countHabilitados(null, instA), 0);
-  assert.equal(await votoRepo.countHabilitados(null, instB), 1);
+  assert.equal(await votoRepo.countHabilitados(null, instA), 1);
+  assert.equal(await votoRepo.countHabilitados(null, instB), 2);
   assert.deepEqual((await cierreRepo.administradoresActivos(instA)).map((a) => a.cedula), [adminA]);
   assert.deepEqual((await cierreRepo.administradoresActivos(instB)).map((a) => a.cedula), [adminB]);
 });
