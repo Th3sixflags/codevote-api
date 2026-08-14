@@ -53,7 +53,16 @@ jobs:
           echo 'Aplicando todas las migraciones en orden...'
           for migration in db/migrations/*.sql; do
             echo "==> ${migration}"
-            mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u root codevote_db < "${migration}"
+            if ! migration_output=$(mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u root codevote_db < "${migration}" 2>&1); then
+              printf '%s\n' "${migration_output}"
+              # Publica el error SQL como anotación para poder diagnosticar
+              # fallos de migración aun cuando GitHub no exponga los logs a
+              # consultas anónimas.
+              annotation=$(printf '%s' "${migration_output}" | tr '\n' ' ' | sed 's/%/%25/g; s/\r/%0D/g')
+              echo "::error file=${migration},line=1::${annotation}"
+              exit 1
+            fi
+            printf '%s\n' "${migration_output}"
           done
 
           echo 'Verificando la estructura multiinstitución...'
