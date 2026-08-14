@@ -53,19 +53,34 @@ SELECT cedula, fk_id_institucion, nombres, apellidos, correo_institucional,
 -- en estudiante (por ejemplo importadores externos y fixtures). La vista no
 -- duplica una membresía ya migrada y permite una transición gradual.
 CREATE OR REPLACE VIEW estudiante_por_institucion AS
-SELECT m.id_membresia, m.cedula, m.fk_id_institucion, m.nombres, m.apellidos,
-       m.correo_institucional, m.promedio, m.estado_academico, m.fk_id_carrera,
-       m.fecha_ingreso, m.membresia_activa, m.rol, m.foto_url
+SELECT m.id_membresia,
+       CONVERT(m.cedula USING utf8mb4) COLLATE utf8mb4_unicode_ci,
+       m.fk_id_institucion,
+       CONVERT(m.nombres USING utf8mb4) COLLATE utf8mb4_unicode_ci,
+       CONVERT(m.apellidos USING utf8mb4) COLLATE utf8mb4_unicode_ci,
+       CONVERT(m.correo_institucional USING utf8mb4) COLLATE utf8mb4_unicode_ci,
+       m.promedio, m.estado_academico, m.fk_id_carrera,
+       m.fecha_ingreso, m.membresia_activa,
+       CONVERT(m.rol USING utf8mb4) COLLATE utf8mb4_unicode_ci,
+       CONVERT(m.foto_url USING utf8mb4) COLLATE utf8mb4_unicode_ci
   FROM estudiante_institucion m
 UNION ALL
-SELECT NULL AS id_membresia, e.cedula, e.fk_id_institucion, e.nombres, e.apellidos,
-       e.correo_institucional, e.promedio, e.estado_academico, e.fk_id_carrera,
-       e.fecha_ingreso, e.membresia_activa, e.rol, e.foto_url
+SELECT NULL AS id_membresia,
+       CONVERT(e.cedula USING utf8mb4) COLLATE utf8mb4_unicode_ci,
+       e.fk_id_institucion,
+       CONVERT(e.nombres USING utf8mb4) COLLATE utf8mb4_unicode_ci,
+       CONVERT(e.apellidos USING utf8mb4) COLLATE utf8mb4_unicode_ci,
+       CONVERT(e.correo_institucional USING utf8mb4) COLLATE utf8mb4_unicode_ci,
+       e.promedio, e.estado_academico, e.fk_id_carrera,
+       e.fecha_ingreso, e.membresia_activa,
+       CONVERT(e.rol USING utf8mb4) COLLATE utf8mb4_unicode_ci,
+       CONVERT(e.foto_url USING utf8mb4) COLLATE utf8mb4_unicode_ci
   FROM estudiante e
  WHERE e.fk_id_institucion IS NOT NULL
    AND NOT EXISTS (
      SELECT 1 FROM estudiante_institucion m
-      WHERE m.cedula = e.cedula AND m.fk_id_institucion = e.fk_id_institucion
+      WHERE CONVERT(m.cedula USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(e.cedula USING utf8mb4) COLLATE utf8mb4_unicode_ci
+        AND m.fk_id_institucion = e.fk_id_institucion
    );
 
 -- La institución elegida en el login queda ligada a la sesión revocable. Esto

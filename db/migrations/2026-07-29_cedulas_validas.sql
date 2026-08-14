@@ -60,17 +60,21 @@ INSERT INTO mapa_cedula (vieja, nueva) VALUES
 SET FOREIGN_KEY_CHECKS = 0;
 START TRANSACTION;
 
-UPDATE candidato       c JOIN mapa_cedula m ON m.vieja = c.fk_cedula_estudiante  SET c.fk_cedula_estudiante  = m.nueva;
-UPDATE codigo_voto    cv JOIN mapa_cedula m ON m.vieja = cv.fk_cedula_estudiante SET cv.fk_cedula_estudiante = m.nueva;
-UPDATE notificacion    n JOIN mapa_cedula m ON m.vieja = n.fk_cedula_estudiante  SET n.fk_cedula_estudiante  = m.nueva;
-UPDATE lista_candidata l JOIN mapa_cedula m ON m.vieja = l.fk_cedula_responsable SET l.fk_cedula_responsable = m.nueva;
-UPDATE estudiante      e JOIN mapa_cedula m ON m.vieja = e.cedula                SET e.cedula                = m.nueva;
+-- Fuerza la misma regla de comparación en ambos lados del JOIN. Esto hace
+-- que la migración sea reproducible tanto en bases creadas con
+-- utf8mb4_unicode_ci como en instalaciones MySQL 8.4 cuyo default es
+-- utf8mb4_0900_ai_ci.
+UPDATE candidato       c JOIN mapa_cedula m ON CONVERT(m.vieja USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(c.fk_cedula_estudiante USING utf8mb4) COLLATE utf8mb4_unicode_ci  SET c.fk_cedula_estudiante  = m.nueva;
+UPDATE codigo_voto    cv JOIN mapa_cedula m ON CONVERT(m.vieja USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(cv.fk_cedula_estudiante USING utf8mb4) COLLATE utf8mb4_unicode_ci SET cv.fk_cedula_estudiante = m.nueva;
+UPDATE notificacion    n JOIN mapa_cedula m ON CONVERT(m.vieja USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(n.fk_cedula_estudiante USING utf8mb4) COLLATE utf8mb4_unicode_ci  SET n.fk_cedula_estudiante  = m.nueva;
+UPDATE lista_candidata l JOIN mapa_cedula m ON CONVERT(m.vieja USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(l.fk_cedula_responsable USING utf8mb4) COLLATE utf8mb4_unicode_ci SET l.fk_cedula_responsable = m.nueva;
+UPDATE estudiante      e JOIN mapa_cedula m ON CONVERT(m.vieja USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(e.cedula USING utf8mb4) COLLATE utf8mb4_unicode_ci                SET e.cedula                = m.nueva;
 
 COMMIT;
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- Verificación: no deben quedar referencias huérfanas (todo debe dar 0).
-SELECT 'candidato huérfanos'  AS chequeo, COUNT(*) AS filas FROM candidato       c LEFT JOIN estudiante e ON e.cedula = c.fk_cedula_estudiante  WHERE e.cedula IS NULL
-UNION ALL SELECT 'codigo_voto huérfanos',  COUNT(*) FROM codigo_voto            cv LEFT JOIN estudiante e ON e.cedula = cv.fk_cedula_estudiante WHERE e.cedula IS NULL
-UNION ALL SELECT 'notificacion huérfanas', COUNT(*) FROM notificacion            n LEFT JOIN estudiante e ON e.cedula = n.fk_cedula_estudiante  WHERE e.cedula IS NULL
-UNION ALL SELECT 'listas sin responsable', COUNT(*) FROM lista_candidata         l LEFT JOIN estudiante e ON e.cedula = l.fk_cedula_responsable WHERE l.fk_cedula_responsable IS NOT NULL AND e.cedula IS NULL;
+SELECT CONVERT('candidato huérfanos' USING utf8mb4) COLLATE utf8mb4_unicode_ci AS chequeo, COUNT(*) AS filas FROM candidato       c LEFT JOIN estudiante e ON CONVERT(e.cedula USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(c.fk_cedula_estudiante USING utf8mb4) COLLATE utf8mb4_unicode_ci  WHERE e.cedula IS NULL
+UNION ALL SELECT CONVERT('codigo_voto huérfanos' USING utf8mb4) COLLATE utf8mb4_unicode_ci, COUNT(*) FROM codigo_voto            cv LEFT JOIN estudiante e ON CONVERT(e.cedula USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(cv.fk_cedula_estudiante USING utf8mb4) COLLATE utf8mb4_unicode_ci WHERE e.cedula IS NULL
+UNION ALL SELECT CONVERT('notificacion huérfanas' USING utf8mb4) COLLATE utf8mb4_unicode_ci, COUNT(*) FROM notificacion            n LEFT JOIN estudiante e ON CONVERT(e.cedula USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(n.fk_cedula_estudiante USING utf8mb4) COLLATE utf8mb4_unicode_ci  WHERE e.cedula IS NULL
+UNION ALL SELECT CONVERT('listas sin responsable' USING utf8mb4) COLLATE utf8mb4_unicode_ci, COUNT(*) FROM lista_candidata         l LEFT JOIN estudiante e ON CONVERT(e.cedula USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(l.fk_cedula_responsable USING utf8mb4) COLLATE utf8mb4_unicode_ci WHERE l.fk_cedula_responsable IS NOT NULL AND e.cedula IS NULL;
