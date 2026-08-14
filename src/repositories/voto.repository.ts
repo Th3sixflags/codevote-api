@@ -36,7 +36,7 @@ export async function yaVotoEstudiante(
   executor: EjecutorSql = pool as any
 ): Promise<boolean> {
   const [rows] = await executor.query(
-    'SELECT 1 FROM codigo_voto WHERE fk_id_votacion = ? AND fk_cedula_estudiante = ? LIMIT 1',
+    'SELECT 1 FROM codigo_voto WHERE fk_id_votacion = ? AND fk_cedula_estudiante = ? AND estado_codigo = \'usado\' LIMIT 1',
     [votacionId, cedula]
   ) as [any[], any];
   return rows.length > 0;
