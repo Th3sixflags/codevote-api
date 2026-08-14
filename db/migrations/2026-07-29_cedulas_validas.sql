@@ -25,8 +25,12 @@ SET NAMES utf8mb4;
 USE codevote_db;
 
 CREATE TEMPORARY TABLE mapa_cedula (
-  vieja CHAR(10) PRIMARY KEY,
-  nueva CHAR(10) NOT NULL UNIQUE
+  -- Declara la misma collation que las columnas de cédula del esquema. En
+  -- MySQL 8.4 el charset por defecto del servidor puede ser 0900_ai_ci,
+  -- mientras que CodeVote usa utf8mb4_unicode_ci; sin esta definición los
+  -- JOIN de actualización fallan con ER_CANT_AGGREGATE_NCOLLATIONS.
+  vieja CHAR(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci PRIMARY KEY,
+  nueva CHAR(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL UNIQUE
 );
 
 INSERT INTO mapa_cedula (vieja, nueva) VALUES
