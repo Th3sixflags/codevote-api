@@ -1,9 +1,11 @@
 import { cerrarPapeletasVencidas } from '../services/cierre_votacion.service.js';
 import { abrirPapeletasProgramadas } from '../services/apertura_votacion.service.js';
+import { avanzarEtapasPrevias } from '../services/etapas_proceso.service.js';
 import { reconciliarArchivados } from '../repositories/archivado.repository.js';
 
 /**
  * Ciclo de vida automático de las papeletas: APERTURA y CIERRE.
+ * También avanza las etapas previas del proceso electoral.
  *
  * Se comprueba cada minuto, que es la granularidad con la que se programan las
  * votaciones. Se usa `setInterval` en vez de una librería de cron porque no
@@ -34,6 +36,9 @@ async function pasada(motivo: 'arranque' | 'programada') {
   }
   enCurso = true;
   try {
+    // 0. Avanzar etapas tempranas del proceso
+    await avanzarEtapasPrevias();
+
     // Primero abrir: el cierre solo recoge papeletas ya abiertas.
     const abiertas = await abrirPapeletasProgramadas();
     if (abiertas.length > 0) {
