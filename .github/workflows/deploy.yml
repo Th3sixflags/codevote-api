@@ -1,8 +1,13 @@
 name: Desplegar backend
 
-# Se ejecuta en cada push a master (la rama por defecto del repo).
+# La verificación se ejecuta en master, ramas de validación y PR hacia master.
+# El despliegue queda estrictamente limitado a pushes sobre master.
 on:
   push:
+    branches:
+      - master
+      - 'validacion-*'
+  pull_request:
     branches: [master]
 
 jobs:
@@ -75,6 +80,7 @@ jobs:
   # 2) Despliega en el servidor AWS por SSH usando Docker Compose.
   desplegar:
     needs: verificar
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     steps:
       - name: Configurar la clave SSH
