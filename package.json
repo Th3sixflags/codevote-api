@@ -11,7 +11,8 @@
     "test": "node --import tsx --test --test-force-exit --test-concurrency=1 test/*.test.ts",
     "migraciones:estado": "node dist/scripts/migraciones.js estado",
     "migraciones:registrar": "node dist/scripts/migraciones.js registrar",
-    "migraciones:reconciliar": "node dist/scripts/migraciones.js reconciliar"
+    "migraciones:reconciliar": "node dist/scripts/migraciones.js reconciliar",
+    "migraciones:reconciliar-aws": "node dist/scripts/aws_reconciliar.js"
   },
   "keywords": [],
   "author": "",
