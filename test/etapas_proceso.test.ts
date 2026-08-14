@@ -33,10 +33,15 @@ test('Transiciones automáticas de etapas tempranas del proceso', async (t) => {
   });
 
   await t.test('avanzarEtapasPrevias mueve a campaña si la inscripcion ya pasó', async () => {
-    // Forzamos fecha de fin de inscripción en el pasado
+    // Forzamos fecha de fin de inscripción en el pasado usando hora local calculada
+    // en lugar de NOW() para evitar desajustes de zona horaria en CI (GitHub Actions)
+    const d = new Date();
+    d.setHours(d.getHours() - 1);
+    const haceUnaHora = ahoraEnEcuador(d);
+
     await pool.query(
-      `UPDATE proceso_electoral SET fecha_fin_inscripcion = DATE_SUB(NOW(), INTERVAL 1 HOUR) WHERE id_proceso = ?`,
-      [procesoId]
+      `UPDATE proceso_electoral SET fecha_fin_inscripcion = ? WHERE id_proceso = ?`,
+      [haceUnaHora, procesoId]
     );
 
     const modificados = await avanzarEtapasPrevias();
