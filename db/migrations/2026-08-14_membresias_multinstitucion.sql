@@ -54,15 +54,15 @@ SELECT cedula, fk_id_institucion, nombres, apellidos, correo_institucional,
 -- duplica una membresía ya migrada y permite una transición gradual.
 CREATE OR REPLACE VIEW estudiante_por_institucion AS
 SELECT m.id_membresia,
-       CONVERT(m.cedula USING utf8mb4) COLLATE utf8mb4_unicode_ci,
+       CONVERT(m.cedula USING utf8mb4) COLLATE utf8mb4_unicode_ci AS cedula,
        m.fk_id_institucion,
-       CONVERT(m.nombres USING utf8mb4) COLLATE utf8mb4_unicode_ci,
-       CONVERT(m.apellidos USING utf8mb4) COLLATE utf8mb4_unicode_ci,
-       CONVERT(m.correo_institucional USING utf8mb4) COLLATE utf8mb4_unicode_ci,
+       CONVERT(m.nombres USING utf8mb4) COLLATE utf8mb4_unicode_ci AS nombres,
+       CONVERT(m.apellidos USING utf8mb4) COLLATE utf8mb4_unicode_ci AS apellidos,
+       CONVERT(m.correo_institucional USING utf8mb4) COLLATE utf8mb4_unicode_ci AS correo_institucional,
        m.promedio, m.estado_academico, m.fk_id_carrera,
        m.fecha_ingreso, m.membresia_activa,
-       CONVERT(m.rol USING utf8mb4) COLLATE utf8mb4_unicode_ci,
-       CONVERT(m.foto_url USING utf8mb4) COLLATE utf8mb4_unicode_ci
+       CONVERT(m.rol USING utf8mb4) COLLATE utf8mb4_unicode_ci AS rol,
+       CONVERT(m.foto_url USING utf8mb4) COLLATE utf8mb4_unicode_ci AS foto_url
   FROM estudiante_institucion m
 UNION ALL
 SELECT NULL AS id_membresia,
