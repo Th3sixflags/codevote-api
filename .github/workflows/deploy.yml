@@ -40,25 +40,36 @@ jobs:
       - run: npm ci
       - name: Preparar MySQL de pruebas
         run: |
+          set -euo pipefail
+          echo 'Cargando esquema base y datos semilla en una base nueva...'
           mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u root codevote_db < db/schema.sql
-          mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u root codevote_db < db/migrations/2026-08-04_login_otp.sql
-          mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u root codevote_db < db/migrations/2026-08-04_recordatorios_y_sanciones.sql
-          mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u root codevote_db < db/migrations/2026-08-12_aislamiento_institucional.sql
-          mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u root codevote_db < db/migrations/2026-08-12_aislamiento_institucional.sql
-          mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u root codevote_db < db/migrations/2026-08-12_unificar_collation_rutas_archivos.sql
-          mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u root codevote_db < db/migrations/2026-08-12_unificar_collation_rutas_archivos.sql
-          mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u root codevote_db < db/migrations/2026-08-12_p1_sesiones_auditoria_hash_actas.sql
-          mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u root codevote_db < db/migrations/2026-08-12_p1_sesiones_auditoria_hash_actas.sql
-          mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u root codevote_db < db/migrations/2026-08-13_sesiones_cookie_rotacion.sql
-          mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u root codevote_db < db/migrations/2026-08-13_sesiones_cookie_rotacion.sql
-          mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u root codevote_db < db/migrations/2026-08-13_control_migraciones.sql
-          mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u root codevote_db < db/migrations/2026-08-13_votacion_por_papeleta.sql
-          mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u root codevote_db < db/migrations/2026-08-14_membresias_multinstitucion.sql
+          mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u root codevote_db < db/seed.sql
+
+          echo 'Aplicando todas las migraciones en orden...'
+          for migration in db/migrations/*.sql; do
+            echo "==> ${migration}"
+            mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u root codevote_db < "${migration}"
+          done
+
+          echo 'Verificando la estructura multiinstitución...'
+          mysql --protocol=TCP -N -B -h 127.0.0.1 -P 3306 -u root codevote_db <<'SQL'
+          SELECT COUNT(*) FROM estudiante_institucion;
+          SELECT COUNT(*) FROM estudiante_por_institucion;
+          SELECT COUNT(*) FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME IN ('codigo_acceso', 'sesion')
+              AND COLUMN_NAME = 'fk_id_institucion';
+          SELECT COUNT(*) FROM information_schema.TABLES
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schema_migrations';
+          SQL
       - run: npm run lint
       - run: npm run build
-      - run: MIGRATIONS_OPERATOR=ci npm run migraciones:registrar -- 2026-08-13_control_migraciones.sql
-      - run: MIGRATIONS_OPERATOR=ci npm run migraciones:registrar -- 2026-08-13_votacion_por_papeleta.sql
-      - run: MIGRATIONS_OPERATOR=ci npm run migraciones:registrar -- 2026-08-14_membresias_multinstitucion.sql
+      - name: Registrar todas las migraciones aplicadas en el ledger
+        run: |
+          set -euo pipefail
+          for migration in db/migrations/*.sql; do
+            MIGRATIONS_OPERATOR=ci npm run migraciones:registrar -- "$(basename "${migration}")"
+          done
       - run: npm test
 
   # 2) Despliega en el servidor AWS por SSH usando Docker Compose.
@@ -100,6 +111,8 @@ jobs:
               npm run migraciones:registrar -- 2026-08-13_control_migraciones.sql
             sudo docker compose exec -T -e MIGRATIONS_OPERATOR=deploy backend \
               npm run migraciones:registrar -- 2026-08-13_votacion_por_papeleta.sql
+            sudo docker compose exec -T -e MIGRATIONS_OPERATOR=deploy backend \
+              npm run migraciones:registrar -- 2026-08-14_membresias_multinstitucion.sql
 
             # Comprobación de salud y readiness: exige proceso, MySQL y ledger.
             sleep 8
