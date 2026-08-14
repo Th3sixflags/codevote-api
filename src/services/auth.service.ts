@@ -156,7 +156,7 @@ export async function solicitarCodigo(identificador: string, ip: string | null):
       throw new HttpError(503, 'No pudimos enviar el correo con tu código. Inténtalo en unos minutos o avisa a la comisión electoral.');
     }
     console.warn(
-      `[auth] SMTP ${correoConfigurado ? 'falló' : 'sin configurar'}: el código de ${cuenta.correo_institucional} es ${codigo}`
+      `[auth] SMTP ${correoConfigurado() ? 'falló' : 'sin configurar'}: el código de ${cuenta.correo_institucional} es ${codigo}`
     );
   }
 

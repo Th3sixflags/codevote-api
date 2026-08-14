@@ -14,21 +14,62 @@ import nodemailer, { type Transporter } from 'nodemailer';
  *   SMTP_SECURE=true  -> TLS directo (puerto 465). Por defecto STARTTLS (587).
  */
 
-const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM } = process.env;
+interface ConfiguracionSMTP {
+  host: string;
+  port: number;
+  user: string;
+  password: string;
+  from?: string;
+  secure: boolean;
+}
 
-export const correoConfigurado = Boolean(SMTP_HOST && SMTP_USER && SMTP_PASSWORD);
+/**
+ * Lee las variables en el momento del envío. En contenedores y procesos
+ * administrados la configuración puede inyectarse después de cargar el módulo;
+ * capturar `process.env` al importar dejaba un transporte permanentemente vacío.
+ */
+function leerConfiguracion(): ConfiguracionSMTP | null {
+  const host = process.env.SMTP_HOST?.trim();
+  const user = process.env.SMTP_USER?.trim();
+  const password = process.env.SMTP_PASSWORD?.trim();
+  if (!host || !user || !password) return null;
+
+  const port = Number(process.env.SMTP_PORT ?? 587);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    console.error('[correo] SMTP_PORT no es válido; usa 587 (STARTTLS) o 465 (TLS).');
+    return null;
+  }
+
+  return {
+    host,
+    port,
+    user,
+    password,
+    from: process.env.SMTP_FROM?.trim() || user,
+    // 465 siempre necesita TLS directo; 587 usa STARTTLS por defecto.
+    secure: process.env.SMTP_SECURE === 'true' || port === 465,
+  };
+}
+
+export function correoConfigurado(): boolean {
+  return leerConfiguracion() !== null;
+}
 
 let transporte: Transporter | null = null;
+let huellaTransporte = '';
 
 function obtenerTransporte(): Transporter | null {
-  if (!correoConfigurado) return null;
-  if (!transporte) {
+  const configuracion = leerConfiguracion();
+  if (!configuracion) return null;
+  const huella = [configuracion.host, configuracion.port, configuracion.user, configuracion.password, configuracion.secure].join('|');
+  if (!transporte || huella !== huellaTransporte) {
     transporte = nodemailer.createTransport({
-      host: SMTP_HOST,
-      port: Number(SMTP_PORT ?? 587),
-      secure: process.env.SMTP_SECURE === 'true',
-      auth: { user: SMTP_USER, pass: SMTP_PASSWORD },
+      host: configuracion.host,
+      port: configuracion.port,
+      secure: configuracion.secure,
+      auth: { user: configuracion.user, pass: configuracion.password },
     });
+    huellaTransporte = huella;
   }
   return transporte;
 }
@@ -60,16 +101,22 @@ export async function enviarCorreo(correo: Correo): Promise<boolean> {
   }
 
   try {
+    const configuracion = leerConfiguracion();
     await cliente.sendMail({
-      from: SMTP_FROM || SMTP_USER,
+      from: configuracion?.from,
       to: destinatarios.join(', '),
       subject: correo.asunto,
       text: correo.texto,
       html: correo.html,
     });
     return true;
-  } catch (err) {
-    console.error('[correo] no se pudo enviar', correo.asunto, err);
+  } catch (err: any) {
+    console.error('[correo] no se pudo enviar', correo.asunto, {
+      code: err?.code,
+      responseCode: err?.responseCode,
+      response: err?.response,
+      message: err?.message,
+    });
     return false;
   }
 }
