@@ -14,8 +14,8 @@ const ipDe = (req: Request) => (req.ip ?? null);
  * averiguar qué correos o cédulas están registrados.
  */
 export async function solicitarCodigo(req: Request, res: Response) {
-  const { identificador } = solicitarCodigoSchema.parse(req.body);
-  const resultado = await service.solicitarCodigo(identificador, ipDe(req));
+  const { identificador, institucion_slug } = solicitarCodigoSchema.parse(req.body);
+  const resultado = await service.solicitarCodigo(identificador, ipDe(req), institucion_slug);
 
   res.json({
     ...resultado,
@@ -26,11 +26,11 @@ export async function solicitarCodigo(req: Request, res: Response) {
 
 /** POST /api/auth/verificar — canjea el código por la sesión (JWT). */
 export async function verificarCodigo(req: Request, res: Response) {
-  const { identificador, codigo } = verificarCodigoSchema.parse(req.body);
+  const { identificador, codigo, institucion_slug } = verificarCodigoSchema.parse(req.body);
   const sesion = await service.verificarCodigo(identificador, codigo, {
     ip: ipDe(req),
     userAgent: req.get('user-agent') ?? null,
-  });
+  }, institucion_slug);
   fijarCookiesDeSesion(res, sesion.token, sesion.refreshToken, service.VIGENCIA_ACCESS_MS, service.VIGENCIA_REFRESH_MS);
   // En producción el JWT nunca sale por JSON. El modo de pruebas conserva el
   // contrato antiguo para no romper clientes de test mientras migran a cookies.

@@ -15,9 +15,10 @@ const BASE_QUERY = `
     (l.fk_cedula_responsable IS NOT NULL
      AND l.fk_cedula_responsable = c.fk_cedula_estudiante) AS es_responsable
   FROM candidato c
-  JOIN estudiante e ON e.cedula = c.fk_cedula_estudiante
   JOIN lista_candidata l ON l.id_lista = c.fk_id_lista
   JOIN proceso_electoral p ON p.id_proceso = l.fk_id_proceso
+  JOIN estudiante_por_institucion e
+    ON e.cedula = c.fk_cedula_estudiante AND e.fk_id_institucion = p.fk_id_institucion
 `;
 
 function condicionInstitucion(institucionId?: number): { sql: string; params: any[] } {

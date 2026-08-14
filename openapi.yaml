@@ -160,9 +160,10 @@ paths:
         correos del dominio `@uide.edu.ec` o una cédula ecuatoriana válida.
 
 
-        **La respuesta es siempre la misma exista o no la cuenta**: si no hay
-        una cuenta activa, `correo_enmascarado` llega en `null` y no se envía
-        nada. Así este endpoint no sirve para averiguar quién está registrado.
+        Si una cédula pertenece a varias instituciones, responde 409 con los
+        slugs públicos disponibles y exige reenviar `institucion_slug`. Un
+        correo único no necesita selector. Si no hay una cuenta activa,
+        `correo_enmascarado` llega en `null` y no se envía nada.
       requestBody:
         required: true
         content:
@@ -176,6 +177,10 @@ paths:
                   type: string
                   description: Correo @uide.edu.ec o cédula de 10 dígitos.
                   example: stchinininca@uide.edu.ec
+                institucion_slug:
+                  type: string
+                  description: Slug público requerido cuando la cédula es ambigua.
+                  example: institucion-b
       responses:
         '200':
           description: Solicitud recibida (se haya enviado o no un código)
@@ -193,6 +198,12 @@ paths:
                   espera_reenvio_segundos: { type: integer, example: 60 }
                   mensaje:                 { type: string }
         '422': { $ref: '#/components/responses/ValidacionFallida' }
+        '409':
+          description: La cuenta pertenece a varias instituciones y debe seleccionarse una.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '429':
           description: Se pidió otro código antes de la espera mínima, o demasiados desde esta red
           content:
@@ -237,6 +248,10 @@ paths:
                   type: string
                   description: 6 dígitos. Se admiten espacios y guiones al pegarlo.
                   example: "482913"
+                institucion_slug:
+                  type: string
+                  description: El mismo slug elegido al solicitar el código, si la cédula era ambigua.
+                  example: institucion-b
       responses:
         '200':
           description: Autenticación correcta

@@ -172,7 +172,7 @@ export async function agregarCandidato(cedula: string, listaId: number, data: Ag
     throw new HttpError(409, 'Ya formas parte de tu lista como Presidente.');
   }
 
-  const estudiante = await estudianteRepo.findByCedula(data.fk_cedula_estudiante);
+  const estudiante = await estudianteRepo.findByCedula(data.fk_cedula_estudiante, institucionId);
   if (!estudiante) {
     throw new HttpError(404, 'El estudiante indicado no existe.');
   }
@@ -293,7 +293,7 @@ export async function enviarARevision(cedula: string, listaId: number, instituci
 
   // Validar todos
   for (const integrante of integrantes) {
-    const estudiante = await estudianteRepo.findByCedula(integrante.fk_cedula_estudiante);
+    const estudiante = await estudianteRepo.findByCedula(integrante.fk_cedula_estudiante, institucionId);
     if (estudiante) {
       try {
         validarRequisitosCandidato(estudiante, config, carreraExigida, votacionLista?.nombre_carrera);

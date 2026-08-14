@@ -22,6 +22,9 @@ async function validarCarreraDeInstitucion(carreraId: number | undefined, instit
 
 export async function crearEstudiante(data: CrearEstudianteDTO, institucionId?: number) {
   const tenant = institucionObligatoria(institucionId);
+  if (await repo.findByCedula(data.cedula, tenant)) {
+    throw new HttpError(409, 'La persona ya pertenece a esta institución.');
+  }
   await validarCarreraDeInstitucion(data.fk_id_carrera, tenant);
   return repo.create(data, tenant);
 }

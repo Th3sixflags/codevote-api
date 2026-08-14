@@ -85,6 +85,50 @@ CREATE TABLE estudiante (
     REFERENCES carrera(id_carrera, fk_id_institucion)
 );
 
+-- Membresía por institución. La identidad (cédula) sigue siendo global para
+-- conservar las referencias históricas; estos campos pertenecen al tenant y
+-- permiten que una persona aparezca en varias instituciones.
+CREATE TABLE estudiante_institucion (
+  id_membresia BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  cedula VARCHAR(20) NOT NULL,
+  fk_id_institucion INT NOT NULL,
+  nombres VARCHAR(80) NOT NULL,
+  apellidos VARCHAR(80) NOT NULL,
+  correo_institucional VARCHAR(120) NOT NULL,
+  promedio DECIMAL(5,2) NULL,
+  estado_academico ENUM('activo', 'inactivo', 'egresado', 'graduado') NOT NULL DEFAULT 'activo',
+  fk_id_carrera INT NULL,
+  fecha_ingreso DATE NULL DEFAULT NULL,
+  membresia_activa TINYINT(1) NOT NULL DEFAULT 1,
+  rol ENUM('estudiante', 'admin', 'candidato', 'superadmin') NOT NULL DEFAULT 'estudiante',
+  foto_url VARCHAR(255) NULL DEFAULT NULL,
+  creado_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  actualizado_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_membresia_cedula_institucion (cedula, fk_id_institucion),
+  UNIQUE KEY uq_membresia_correo_institucion (correo_institucional, fk_id_institucion),
+  KEY idx_membresia_institucion (fk_id_institucion, estado_academico, membresia_activa),
+  CONSTRAINT fk_membresia_persona FOREIGN KEY (cedula) REFERENCES estudiante(cedula) ON DELETE CASCADE,
+  CONSTRAINT fk_membresia_institucion FOREIGN KEY (fk_id_institucion) REFERENCES institucion(id_institucion),
+  CONSTRAINT fk_membresia_carrera_tenant FOREIGN KEY (fk_id_carrera, fk_id_institucion)
+    REFERENCES carrera(id_carrera, fk_id_institucion)
+);
+
+CREATE OR REPLACE VIEW estudiante_por_institucion AS
+SELECT m.id_membresia, m.cedula, m.fk_id_institucion, m.nombres, m.apellidos,
+       m.correo_institucional, m.promedio, m.estado_academico, m.fk_id_carrera,
+       m.fecha_ingreso, m.membresia_activa, m.rol, m.foto_url
+  FROM estudiante_institucion m
+UNION ALL
+SELECT NULL AS id_membresia, e.cedula, e.fk_id_institucion, e.nombres, e.apellidos,
+       e.correo_institucional, e.promedio, e.estado_academico, e.fk_id_carrera,
+       e.fecha_ingreso, e.membresia_activa, e.rol, e.foto_url
+  FROM estudiante e
+ WHERE e.fk_id_institucion IS NOT NULL
+   AND NOT EXISTS (
+     SELECT 1 FROM estudiante_institucion m
+      WHERE m.cedula = e.cedula AND m.fk_id_institucion = e.fk_id_institucion
+   );
+
 -- 5. responsable
 CREATE TABLE responsable (
   id_responsable INT AUTO_INCREMENT PRIMARY KEY,
@@ -338,6 +382,7 @@ CREATE TABLE historial_importacion (
 CREATE TABLE sesion (
   id_sesion CHAR(36) CHARACTER SET ascii COLLATE ascii_bin PRIMARY KEY,
   fk_cedula_estudiante VARCHAR(20) NOT NULL,
+  fk_id_institucion INT NULL,
   creada_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   expira_at DATETIME NOT NULL,
   revocada_at DATETIME NULL DEFAULT NULL,
@@ -346,8 +391,11 @@ CREATE TABLE sesion (
   user_agent VARCHAR(255) NULL,
   motivo_revocacion VARCHAR(80) NULL,
   INDEX idx_sesion_usuario_activa (fk_cedula_estudiante, revocada_at, expira_at),
+  INDEX idx_sesion_institucion (fk_id_institucion, fk_cedula_estudiante, revocada_at),
   CONSTRAINT fk_sesion_estudiante FOREIGN KEY (fk_cedula_estudiante)
-    REFERENCES estudiante(cedula) ON DELETE CASCADE
+    REFERENCES estudiante(cedula) ON DELETE CASCADE,
+  CONSTRAINT fk_sesion_institucion FOREIGN KEY (fk_id_institucion)
+    REFERENCES institucion(id_institucion) ON DELETE SET NULL
 );
 
 -- 23. bitácora append-only. Los triggers de inmutabilidad se instalan mediante

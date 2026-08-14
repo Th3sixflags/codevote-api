@@ -31,7 +31,7 @@ export function esAdministracion(rol: unknown): boolean {
  */
 export async function filtroCarreraDe(req: Request): Promise<FiltroCarrera> {
   if (esAdministracion(req.user?.rol)) return undefined;
-  return estudianteRepo.findCarreraId(req.user!.sub);
+  return estudianteRepo.findCarreraId(req.user!.sub, req.user?.fk_id_institucion);
 }
 
 /**
@@ -47,7 +47,7 @@ export async function filtroCarreraDe(req: Request): Promise<FiltroCarrera> {
 export async function visibilidadListasDe(req: Request): Promise<VisibilidadListas> {
   if (esAdministracion(req.user?.rol)) return VISIBILIDAD_TOTAL;
   return {
-    filtro:        await estudianteRepo.findCarreraId(req.user!.sub),
+    filtro:        await estudianteRepo.findCarreraId(req.user!.sub, req.user?.fk_id_institucion),
     soloAprobadas: true,
     cedula:        req.user!.sub,
   };

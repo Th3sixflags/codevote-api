@@ -49,7 +49,7 @@ function ejecutar(sqlCrudo: string, params: any[] = []): any {
   const sql = sqlCrudo.replace(/\s+/g, ' ').trim();
   sentencias.push(sql);
 
-  if (sql.includes('FROM estudiante') && sql.includes('correo_institucional = ? OR cedula = ?')) {
+  if (sql.includes('FROM estudiante') && sql.includes('correo_institucional = ?') && sql.includes('cedula = ?')) {
     const cuenta = porIdentificador(params[0]);
     return cuenta ? [cuenta] : [];
   }

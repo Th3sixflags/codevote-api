@@ -31,8 +31,12 @@ export async function padronDePapeleta(
 ): Promise<Destinatario[]> {
   const [rows] = await pool.query(
     `SELECT e.cedula, e.nombres, e.apellidos, e.correo_institucional
-       FROM estudiante e
-      WHERE e.estado_academico = 'activo'
+       FROM estudiante_por_institucion e
+       JOIN votacion v ON v.id_votacion = ?
+       JOIN proceso_electoral p ON p.id_proceso = v.fk_id_proceso
+      WHERE e.fk_id_institucion = p.fk_id_institucion
+        AND e.estado_academico = 'activo'
+        AND e.membresia_activa = 1
         AND e.rol IN ('estudiante', 'candidato')
         AND (? IS NULL OR e.fk_id_carrera = ?)
         ${soloPendientes ? `AND NOT EXISTS (
@@ -40,8 +44,8 @@ export async function padronDePapeleta(
                WHERE cv.fk_id_votacion = ? AND cv.fk_cedula_estudiante = e.cedula)` : ''}
       ORDER BY e.apellidos, e.nombres`,
     soloPendientes
-      ? [carreraVotacion, carreraVotacion, votacionId]
-      : [carreraVotacion, carreraVotacion]
+      ? [votacionId, carreraVotacion, carreraVotacion, votacionId]
+      : [votacionId, carreraVotacion, carreraVotacion]
   ) as [any[], any];
   return rows as Destinatario[];
 }
@@ -50,9 +54,12 @@ export async function padronDePapeleta(
 export async function padronDeProceso(procesoId: number): Promise<Destinatario[]> {
   const [rows] = await pool.query(
     `SELECT DISTINCT e.cedula, e.nombres, e.apellidos, e.correo_institucional
-       FROM estudiante e
+       FROM estudiante_por_institucion e
        JOIN votacion v ON v.fk_id_proceso = ?
-      WHERE e.estado_academico = 'activo'
+       JOIN proceso_electoral p ON p.id_proceso = v.fk_id_proceso
+      WHERE e.fk_id_institucion = p.fk_id_institucion
+        AND e.estado_academico = 'activo'
+        AND e.membresia_activa = 1
         AND e.rol IN ('estudiante', 'candidato')
         AND (v.fk_id_carrera IS NULL OR v.fk_id_carrera = e.fk_id_carrera)
       ORDER BY e.apellidos, e.nombres`,
@@ -190,10 +197,11 @@ const SANCION_QUERY = `
          c.nombre_carrera,
          v.titulo_papeleta, p.id_proceso, p.nombre_proceso
     FROM sancion_electoral s
-    JOIN estudiante e ON e.cedula = s.fk_cedula_estudiante
-    LEFT JOIN carrera c ON c.id_carrera = e.fk_id_carrera
     JOIN votacion v ON v.id_votacion = s.fk_id_votacion
     JOIN proceso_electoral p ON p.id_proceso = v.fk_id_proceso
+    JOIN estudiante_por_institucion e
+      ON e.cedula = s.fk_cedula_estudiante AND e.fk_id_institucion = p.fk_id_institucion
+    LEFT JOIN carrera c ON c.id_carrera = e.fk_id_carrera
 `;
 
 /** Sanciones para el panel administrativo, filtrables por papeleta o proceso. */

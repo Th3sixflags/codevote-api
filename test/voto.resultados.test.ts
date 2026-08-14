@@ -72,7 +72,7 @@ before(async () => {
     if (sql.includes('FROM lista_candidata l') && sql.includes('total_votos')) {
       return [escenario.conteo, []];
     }
-    if (sql.includes('FROM estudiante e') && sql.includes('COUNT(*) AS total')) {
+    if ((sql.includes('FROM estudiante e') || sql.includes('FROM estudiante_por_institucion e')) && sql.includes('COUNT(*) AS total')) {
       // Se comprueba de paso que el filtro de carrera llega como parámetro.
       assert.deepEqual(params, [1, escenario.carrera_votacion, escenario.carrera_votacion]);
       return [[{ total: escenario.habilitados }], []];
@@ -159,7 +159,7 @@ test('papeleta de carrera: el padron se filtra por esa carrera', async () => {
   const { cuerpo } = await pedirResultados();
 
   assert.equal(cuerpo.resumen.total_habilitados, 11);
-  const consultaPadron = consultas.find((s) => s.includes('FROM estudiante e'));
+  const consultaPadron = consultas.find((s) => s.includes('FROM estudiante e') || s.includes('FROM estudiante_por_institucion e'));
   assert.ok(consultaPadron, 'no se consultó el padrón');
   assert.ok(
     consultaPadron!.includes('e.fk_id_carrera = ?'),
@@ -171,7 +171,7 @@ test('el padrón incluye a los candidatos y excluye a la administración', async
   // Competir no quita el derecho al voto, así que los candidatos entran en el
   // padrón: si no, la participación nunca podría llegar al 100%.
   await pedirResultados();
-  const consultaPadron = consultas.find((s) => s.includes('FROM estudiante e'))!;
+  const consultaPadron = consultas.find((s) => s.includes('FROM estudiante e') || s.includes('FROM estudiante_por_institucion e'))!;
 
   assert.ok(
     consultaPadron.includes("e.rol IN ('estudiante', 'candidato')"),

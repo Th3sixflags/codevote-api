@@ -54,6 +54,10 @@ export async function eliminarProcesoEnCascada(procesoId: number) {
     // 0. Quién dirigía candidaturas aquí: hay que liberarlos al terminar, y la
     //    consulta debe hacerse ANTES de borrar las listas.
     const responsables = await responsablesDelProceso(procesoId, conn);
+    const [proceso] = await conn.query(
+      'SELECT fk_id_institucion FROM proceso_electoral WHERE id_proceso = ?',
+      [procesoId]
+    ) as [any[], any];
 
     // 1. Dependencias de las listas del proceso.
     await conn.query(
@@ -96,7 +100,7 @@ export async function eliminarProcesoEnCascada(procesoId: number) {
 
     // 5. Quien dirigía una de estas listas y no dirige ninguna otra vigente
     //    vuelve a ser estudiante, y queda libre para postularse de nuevo.
-    await degradarResponsablesLiberados(responsables, conn);
+    await degradarResponsablesLiberados(responsables, Number(proceso[0]?.fk_id_institucion) || undefined, conn);
 
     await conn.commit();
   } catch (err) {

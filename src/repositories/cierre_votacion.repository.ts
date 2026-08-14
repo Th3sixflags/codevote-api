@@ -192,7 +192,7 @@ export async function administradoresActivos(institucionId: number): Promise<
 > {
   const [rows] = await pool.query(
     `SELECT cedula, nombres, apellidos, correo_institucional
-      FROM estudiante
+      FROM estudiante_por_institucion
       WHERE rol = 'admin' AND estado_academico = 'activo'
         AND fk_id_institucion = ?
       ORDER BY apellidos, nombres`

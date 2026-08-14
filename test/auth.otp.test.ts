@@ -41,6 +41,7 @@ interface Codigo {
 
 interface Estado {
   cuentaActiva: boolean;
+  cuentas: any[];
   codigos: Codigo[];
   sentencias: string[];
   proximoId: number;
@@ -71,21 +72,13 @@ function ejecutar(sqlCrudo: string, params: any[] = []): any {
   const sql = sqlCrudo.replace(/\s+/g, ' ').trim();
   estado.sentencias.push(sql);
 
-  if (sql.includes('FROM estudiante') && sql.includes('correo_institucional = ? OR cedula = ?')) {
+  if ((sql.includes('FROM estudiante') || sql.includes('FROM estudiante_por_institucion')) && sql.includes('correo_institucional') && sql.includes('cedula')) {
     if (!estado.cuentaActiva) return [];
-    if (params[0] === CORREO || params[0] === CEDULA) {
-      return [{
-        cedula: CEDULA, nombres: 'Ana', apellidos: 'Carpio',
-        correo_institucional: CORREO, rol: 'estudiante', foto_url: null,
-      }];
-    }
-    if (params[0] === 'admin@uide.edu.ec' || params[0] === '1105830812') {
-      return [{
-        cedula: '1105830812', nombres: 'Deyvi', apellidos: 'Admin',
-        correo_institucional: 'admin@uide.edu.ec', rol: 'admin', foto_url: null,
-      }];
-    }
-    return [];
+    const slug = params[2] ?? null;
+    return estado.cuentas.filter((cuenta) =>
+      (cuenta.correo_institucional === params[0] || cuenta.cedula === params[0])
+      && (!slug || cuenta.institucion_slug === slug)
+    );
   }
   if (sql.includes('FROM codigo_acceso') && sql.includes('usado_at IS NULL')) {
     const c = vigenteDe(params[0]);
@@ -98,7 +91,7 @@ function ejecutar(sqlCrudo: string, params: any[] = []): any {
     return { affectedRows: 1 };
   }
   if (sql.startsWith('INSERT INTO codigo_acceso')) {
-    const [cedula, hash, vigencia] = params;
+    const [cedula, hash, , vigencia] = params;
     const id = (estado.proximoId += 1);
     estado.codigos.push({
       id_codigo: id, fk_cedula_estudiante: cedula, codigo_hash: hash,
@@ -156,7 +149,14 @@ after(async () => {
 });
 
 beforeEach(() => {
-  estado = { cuentaActiva: true, codigos: [], sentencias: [], proximoId: 0 };
+  estado = {
+    cuentaActiva: true,
+    cuentas: [
+      { cedula: CEDULA, nombres: 'Ana', apellidos: 'Carpio', correo_institucional: CORREO, rol: 'estudiante', foto_url: null, fk_id_institucion: 1, institucion_slug: 'uide', institucion_nombre: 'UIDE' },
+      { cedula: '1105830812', nombres: 'Deyvi', apellidos: 'Admin', correo_institucional: 'admin@uide.edu.ec', rol: 'admin', foto_url: null, fk_id_institucion: 1, institucion_slug: 'uide', institucion_nombre: 'UIDE' },
+    ],
+    codigos: [], sentencias: [], proximoId: 0,
+  };
   avisos = [];
 });
 
@@ -170,9 +170,10 @@ async function post(ruta: string, cuerpo: object) {
   return { http: respuesta.status, cuerpo: texto ? JSON.parse(texto) : null };
 }
 
-const pedirCodigo = (identificador = CORREO) => post('/codigo', { identificador });
-const verificar = (codigo: string, identificador = CORREO) =>
-  post('/verificar', { identificador, codigo });
+const pedirCodigo = (identificador = CORREO, institucion_slug?: string) =>
+  post('/codigo', { identificador, ...(institucion_slug ? { institucion_slug } : {}) });
+const verificar = (codigo: string, identificador = CORREO, institucion_slug?: string) =>
+  post('/verificar', { identificador, codigo, ...(institucion_slug ? { institucion_slug } : {}) });
 
 /**
  * Código realmente emitido en la última solicitud.
@@ -216,6 +217,32 @@ test('también se puede pedir con la cédula', async () => {
 
   assert.equal(http, 200);
   assert.equal(cuerpo.correo_enmascarado, enmascararCorreo(CORREO));
+});
+
+test('una cédula ambigua exige seleccionar la institución y no escoge el primer tenant', async () => {
+  estado.cuentas = [
+    { cedula: CEDULA, nombres: 'Ana', apellidos: 'A', correo_institucional: 'ana@a.test', rol: 'estudiante', foto_url: null, fk_id_institucion: 1, institucion_slug: 'institucion-a', institucion_nombre: 'Institución A' },
+    { cedula: CEDULA, nombres: 'Ana', apellidos: 'B', correo_institucional: 'ana@b.test', rol: 'estudiante', foto_url: null, fk_id_institucion: 2, institucion_slug: 'institucion-b', institucion_nombre: 'Institución B' },
+  ];
+  const respuesta = await pedirCodigo(CEDULA);
+  assert.equal(respuesta.http, 409);
+  assert.match(respuesta.cuerpo.error, /varias instituciones/i);
+  assert.deepEqual(respuesta.cuerpo.details.instituciones.map((i: any) => i.slug), ['institucion-a', 'institucion-b']);
+  assert.equal(estado.codigos.length, 0);
+});
+
+test('una cédula ambigua puede iniciar sesión con el slug seleccionado y el JWT conserva el tenant', async () => {
+  estado.cuentas = [
+    { cedula: CEDULA, nombres: 'Ana', apellidos: 'A', correo_institucional: 'ana@a.test', rol: 'estudiante', foto_url: null, fk_id_institucion: 1, institucion_slug: 'institucion-a', institucion_nombre: 'Institución A' },
+    { cedula: CEDULA, nombres: 'Ana', apellidos: 'B', correo_institucional: 'ana@b.test', rol: 'estudiante', foto_url: null, fk_id_institucion: 2, institucion_slug: 'institucion-b', institucion_nombre: 'Institución B' },
+  ];
+  assert.equal((await pedirCodigo(CEDULA, 'institucion-b')).http, 200);
+  const codigo = ultimoCodigoEmitido();
+  const respuesta = await verificar(codigo, CEDULA, 'institucion-b');
+  assert.equal(respuesta.http, 200);
+  const payload = jwt.verify(respuesta.cuerpo.token, process.env.JWT_SECRET!) as any;
+  assert.equal(payload.fk_id_institucion, 2);
+  assert.equal(respuesta.cuerpo.usuario.correo_institucional, 'ana@b.test');
 });
 
 test('admin puede iniciar sesión por cédula y correo', async () => {

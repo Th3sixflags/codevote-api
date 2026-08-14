@@ -9,6 +9,9 @@ import * as carreraService from '../src/services/carrera.service.js';
 import * as votoRepo from '../src/repositories/voto.repository.js';
 import * as cierreRepo from '../src/repositories/cierre_votacion.repository.js';
 import * as estudianteRepo from '../src/repositories/estudiante.repository.js';
+import * as codigoRepo from '../src/repositories/codigo_acceso.repository.js';
+import * as sesiones from '../src/repositories/sesion.repository.js';
+import { randomUUID } from 'node:crypto';
 
 const sufijo = String(Date.now()).slice(-8);
 let instA = 0;
@@ -22,6 +25,7 @@ let carreraB = 0;
 const adminA = `admA${sufijo}`;
 const adminB = `admB${sufijo}`;
 const estudianteB = `estB${sufijo}`;
+const personaCompartida = `per${sufijo}`;
 
 before(async () => {
   const [a] = await pool.query(
@@ -45,10 +49,12 @@ before(async () => {
   await estudianteService.crearEstudiante({ cedula: adminA, nombres: 'Admin', apellidos: 'A', correo_institucional: `aa${sufijo}@test.dev`, rol: 'admin' }, instA);
   await estudianteService.crearEstudiante({ cedula: adminB, nombres: 'Admin', apellidos: 'B', correo_institucional: `ab${sufijo}@test.dev`, rol: 'admin' }, instB);
   await estudianteService.crearEstudiante({ cedula: estudianteB, nombres: 'Est', apellidos: 'B', correo_institucional: `eb${sufijo}@test.dev`, fk_id_carrera: carreraB }, instB);
+  await estudianteService.crearEstudiante({ cedula: personaCompartida, nombres: 'Persona', apellidos: 'Compartida', correo_institucional: `pa${sufijo}@test.dev`, fk_id_carrera: carreraA }, instA);
+  await estudianteService.crearEstudiante({ cedula: personaCompartida, nombres: 'Persona', apellidos: 'Compartida', correo_institucional: `pb${sufijo}@test.dev`, fk_id_carrera: carreraB }, instB);
 });
 
 after(async () => {
-  await pool.query('DELETE FROM estudiante WHERE cedula IN (?, ?, ?)', [adminA, adminB, estudianteB]);
+  await pool.query('DELETE FROM estudiante WHERE cedula IN (?, ?, ?, ?)', [adminA, adminB, estudianteB, personaCompartida]);
   await pool.query('DELETE FROM carrera WHERE id_carrera IN (?, ?)', [carreraA, carreraB]);
   await pool.query('DELETE FROM director WHERE id_director IN (?, ?)', [directorA, directorB]);
   await pool.query('DELETE FROM facultad WHERE id_facultad IN (?, ?)', [facultadA, facultadB]);
@@ -95,4 +101,42 @@ test('el buscador de integrantes del portal candidato no cruza instituciones', a
     (await estudianteRepo.buscarPosiblesIntegrantes(null, 'Est', instB)).map((e) => e.cedula),
     [estudianteB]
   );
+});
+
+test('una misma persona puede tener membresías independientes en dos instituciones', async () => {
+  const miembroA = await estudianteService.obtenerEstudiante(personaCompartida, instA);
+  const miembroB = await estudianteService.obtenerEstudiante(personaCompartida, instB);
+  assert.equal(miembroA?.correo_institucional, `pa${sufijo}@test.dev`);
+  assert.equal(miembroB?.correo_institucional, `pb${sufijo}@test.dev`);
+  assert.equal(miembroA?.fk_id_carrera, carreraA);
+  assert.equal(miembroB?.fk_id_carrera, carreraB);
+  assert.equal((await estudianteService.listarEstudiantes(instA)).some((e) => e.cedula === personaCompartida), true);
+  assert.equal((await estudianteService.listarEstudiantes(instB)).some((e) => e.cedula === personaCompartida), true);
+  await assert.rejects(
+    estudianteService.crearEstudiante({
+      cedula: personaCompartida, nombres: 'Persona', apellidos: 'Duplicada',
+      correo_institucional: `pa2${sufijo}@test.dev`, fk_id_carrera: carreraA,
+    }, instA),
+    /ya pertenece a esta institución/
+  );
+});
+
+test('el login por cédula devuelve dos tenants, selecciona por slug y no cruza la sesión', async () => {
+  const cuentas = await codigoRepo.buscarCuentasActivas(personaCompartida);
+  assert.deepEqual(
+    cuentas.map((cuenta: any) => cuenta.institucion_slug).sort(),
+    [`inst-a-${sufijo}`, `inst-b-${sufijo}`].sort()
+  );
+  const cuentaB = (await codigoRepo.buscarCuentasActivas(personaCompartida, `inst-b-${sufijo}`))[0] as any;
+  assert.equal(Number(cuentaB.fk_id_institucion), instB);
+  assert.equal(cuentaB.correo_institucional, `pb${sufijo}@test.dev`);
+
+  const idSesion = randomUUID();
+  await sesiones.crearSiEstaDisponible({
+    idSesion, cedula: personaCompartida, institucionId: instB,
+    expiraAt: new Date(Date.now() + 60_000), ip: null, userAgent: 'test',
+  });
+  assert.equal(await sesiones.estaActiva(idSesion, personaCompartida, instB), true);
+  assert.equal(await sesiones.estaActiva(idSesion, personaCompartida, instA), false);
+  await sesiones.revocar(idSesion, personaCompartida);
 });

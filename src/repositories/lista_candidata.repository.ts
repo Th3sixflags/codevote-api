@@ -264,11 +264,23 @@ export async function crearListaConPresidente(
  *      responsable de otra candidatura.
  */
 export async function transferirResponsable(
-  listaId: number, votacionId: number, nuevaCedula: string, anteriorCedula: string | null
+  listaId: number, votacionId: number, nuevaCedula: string, anteriorCedula: string | null,
+  institucionId?: number
 ) {
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
+
+    const [procesoRows] = await conn.query(
+      `SELECT p.fk_id_institucion
+         FROM votacion v
+         JOIN proceso_electoral p ON p.id_proceso = v.fk_id_proceso
+        WHERE v.id_votacion = ?
+        LIMIT 1`,
+      [votacionId]
+    ) as [any[], any];
+    const tenant = institucionId ?? Number(procesoRows[0]?.fk_id_institucion);
+    if (!tenant) throw new Error('La papeleta no tiene institución asociada.');
 
     // 1. Nuevo responsable en la lista.
     await conn.query(
@@ -325,26 +337,35 @@ export async function transferirResponsable(
       [nuevaCedula, votacionId]
     );
     await conn.query(
-      `UPDATE estudiante SET rol = 'candidato' WHERE cedula = ? AND rol <> 'admin'`,
-      [nuevaCedula]
+      `UPDATE estudiante_institucion
+          SET rol = 'candidato'
+        WHERE cedula = ? AND fk_id_institucion = ? AND rol <> 'admin'`,
+      [nuevaCedula, tenant]
     );
 
     // 4. El responsable anterior deja de serlo: pierde la asignación y vuelve a
     //    'estudiante' salvo que administre otra candidatura.
     if (anteriorCedula && anteriorCedula !== nuevaCedula) {
       await conn.query(
-        'DELETE FROM asignacion_candidatura WHERE fk_cedula_estudiante = ?',
-        [anteriorCedula]
+        `DELETE a FROM asignacion_candidatura a
+          JOIN votacion v ON v.id_votacion = a.fk_id_votacion
+          JOIN proceso_electoral p ON p.id_proceso = v.fk_id_proceso
+         WHERE a.fk_cedula_estudiante = ? AND p.fk_id_institucion = ?`,
+        [anteriorCedula, tenant]
       );
       await conn.query(
-        `UPDATE estudiante e
+        `UPDATE estudiante_institucion e
             SET e.rol = 'estudiante'
           WHERE e.cedula = ?
+            AND e.fk_id_institucion = ?
             AND e.rol = 'candidato'
             AND NOT EXISTS (
-              SELECT 1 FROM lista_candidata l WHERE l.fk_cedula_responsable = e.cedula
+              SELECT 1 FROM lista_candidata l
+                JOIN proceso_electoral p ON p.id_proceso = l.fk_id_proceso
+               WHERE l.fk_cedula_responsable = e.cedula
+                 AND p.fk_id_institucion = e.fk_id_institucion
             )`,
-        [anteriorCedula]
+        [anteriorCedula, tenant]
       );
     }
 

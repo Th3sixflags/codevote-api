@@ -25,12 +25,22 @@ export const identificadorSchema = z
     'Escribe un correo electrónico válido o tu cédula de 10 dígitos.'
   );
 
+/** Slug público de la institución, usado para desambiguar una cédula. */
+export const institucionSlugSchema = z
+  .string()
+  .trim()
+  .min(2)
+  .max(100)
+  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/i, 'La institución indicada no es válida.');
+
 export const solicitarCodigoSchema = z.object({
   identificador: identificadorSchema,
+  institucion_slug: institucionSlugSchema.optional(),
 }).strict();
 
 export const verificarCodigoSchema = z.object({
   identificador: identificadorSchema,
+  institucion_slug: institucionSlugSchema.optional(),
   // Se aceptan espacios y guiones porque al pegar el código desde el correo
   // suelen colarse; se limpian antes de comparar.
   codigo: z

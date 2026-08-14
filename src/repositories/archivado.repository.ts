@@ -59,37 +59,62 @@ export async function retirarAsignacionesDelProceso(procesoId: number, cx: Ejecu
  *
  * Los admin nunca se tocan.
  */
-export async function degradarResponsablesLiberados(cedulas: string[], cx: Ejecutor = pool): Promise<string[]> {
+export async function degradarResponsablesLiberados(cedulas: string[], institucionId?: number, cx: Ejecutor = pool): Promise<string[]> {
   if (cedulas.length === 0) return [];
 
   const marcadores = cedulas.map(() => '?').join(', ');
-  const [resultado] = await cx.query(
-    `UPDATE estudiante e
-        SET e.rol = 'estudiante'
-      WHERE e.cedula IN (${marcadores})
-        AND e.rol = 'candidato'
-        AND NOT EXISTS (
-          SELECT 1 FROM lista_candidata l
-            JOIN proceso_electoral p ON p.id_proceso = l.fk_id_proceso
-           WHERE l.fk_cedula_responsable = e.cedula
-             AND p.archivado_at IS NULL
-        )
-        AND NOT EXISTS (
-          SELECT 1 FROM asignacion_candidatura a
-            JOIN votacion v2 ON v2.id_votacion = a.fk_id_votacion
-            JOIN proceso_electoral p2 ON p2.id_proceso = v2.fk_id_proceso
-           WHERE a.fk_cedula_estudiante = e.cedula
-             AND a.estado = 'activa'
-             AND p2.archivado_at IS NULL
-        )`,
-    cedulas
-  ) as [any, any];
+  const tenant = institucionId === undefined ? '' : ' AND e.fk_id_institucion = ?';
+  const params = institucionId === undefined ? cedulas : [...cedulas, institucionId];
+  const [resultado] = institucionId === undefined
+    ? await cx.query(
+      `UPDATE estudiante e
+          SET e.rol = 'estudiante'
+        WHERE e.cedula IN (${marcadores})
+          AND e.rol = 'candidato'
+          AND NOT EXISTS (
+            SELECT 1 FROM lista_candidata l
+              JOIN proceso_electoral p ON p.id_proceso = l.fk_id_proceso
+             WHERE l.fk_cedula_responsable = e.cedula AND p.archivado_at IS NULL
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM asignacion_candidatura a
+              JOIN votacion v2 ON v2.id_votacion = a.fk_id_votacion
+              JOIN proceso_electoral p2 ON p2.id_proceso = v2.fk_id_proceso
+             WHERE a.fk_cedula_estudiante = e.cedula AND a.estado = 'activa' AND p2.archivado_at IS NULL
+          )`,
+      params
+    ) as [any, any]
+    : await cx.query(
+      `UPDATE estudiante_institucion e
+          SET e.rol = 'estudiante'
+        WHERE e.cedula IN (${marcadores})${tenant}
+          AND e.rol = 'candidato'
+          AND NOT EXISTS (
+            SELECT 1 FROM lista_candidata l
+              JOIN proceso_electoral p ON p.id_proceso = l.fk_id_proceso
+             WHERE l.fk_cedula_responsable = e.cedula
+               AND p.fk_id_institucion = e.fk_id_institucion
+               AND p.archivado_at IS NULL
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM asignacion_candidatura a
+              JOIN votacion v2 ON v2.id_votacion = a.fk_id_votacion
+              JOIN proceso_electoral p2 ON p2.id_proceso = v2.fk_id_proceso
+             WHERE a.fk_cedula_estudiante = e.cedula
+               AND a.estado = 'activa'
+               AND p2.fk_id_institucion = e.fk_id_institucion
+               AND p2.archivado_at IS NULL
+          )`,
+      params
+    ) as [any, any];
 
   // Se devuelven las cédulas realmente degradadas para poder informar y probar.
   if ((resultado.affectedRows ?? 0) === 0) return [];
   const [rows] = await cx.query(
-    `SELECT cedula FROM estudiante WHERE cedula IN (${marcadores}) AND rol = 'estudiante'`,
-    cedulas
+    `SELECT cedula FROM ${institucionId === undefined ? 'estudiante' : 'estudiante_institucion'}
+      WHERE cedula IN (${marcadores})${institucionId === undefined ? '' : ' AND fk_id_institucion = ?'}
+        AND rol = 'estudiante'`,
+    params
   ) as [any[], any];
   return rows.map((r) => String(r.cedula));
 }
@@ -113,7 +138,8 @@ export async function archivarYLiberar(procesoId: number) {
 
     const responsables = await responsablesDelProceso(procesoId, conn);
     const asignacionesRetiradas = await retirarAsignacionesDelProceso(procesoId, conn);
-    const liberados = await degradarResponsablesLiberados(responsables, conn);
+    const [proceso] = await conn.query('SELECT fk_id_institucion FROM proceso_electoral WHERE id_proceso = ?', [procesoId]) as [any[], any];
+    const liberados = await degradarResponsablesLiberados(responsables, Number(proceso[0]?.fk_id_institucion) || undefined, conn);
 
     await conn.commit();
     return {
@@ -142,7 +168,7 @@ export async function archivarYLiberar(procesoId: number) {
  */
 export async function reconciliarArchivados() {
   const [procesos] = await pool.query(
-    `SELECT DISTINCT p.id_proceso, p.nombre_proceso
+    `SELECT DISTINCT p.id_proceso, p.nombre_proceso, p.fk_id_institucion
        FROM proceso_electoral p
       WHERE p.archivado_at IS NOT NULL
         AND (
@@ -186,7 +212,7 @@ export async function reconciliarArchivados() {
       await conn.beginTransaction();
       const responsables = await responsablesDelProceso(proceso.id_proceso, conn);
       const asignacionesRetiradas = await retirarAsignacionesDelProceso(proceso.id_proceso, conn);
-      const responsablesLiberados = await degradarResponsablesLiberados(responsables, conn);
+      const responsablesLiberados = await degradarResponsablesLiberados(responsables, Number(proceso.fk_id_institucion) || undefined, conn);
       await conn.commit();
       // Solo se informa si algo cambió de verdad, para que el log no repita
       // procesos que ya estaban bien.

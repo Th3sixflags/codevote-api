@@ -26,7 +26,7 @@ export function errorHandler(
 
   // 2. Errores de la aplicación con estado explícito
   if (err instanceof HttpError) {
-    res.status(err.status).json({ error: err.message });
+    res.status(err.status).json({ error: err.message, ...(err.details === undefined ? {} : { details: err.details }) });
     return;
   }
 

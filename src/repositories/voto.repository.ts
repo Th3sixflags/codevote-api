@@ -171,10 +171,11 @@ export async function votanteHabilitadoParaActualizar(
 ) {
   const [rows] = await executor.query(
     `SELECT cedula, rol, estado_academico, fk_id_carrera, fk_id_institucion
-       FROM estudiante
+       FROM estudiante_por_institucion
       WHERE cedula = ?
         AND fk_id_institucion = ?
         AND estado_academico = 'activo'
+        AND membresia_activa = 1
         AND rol IN ('estudiante', 'candidato')
       FOR UPDATE`,
     [cedula, institucionId]
@@ -229,8 +230,9 @@ export async function countByVotacion(votacionId: number) {
 export async function countHabilitados(carreraVotacion: number | null, institucionId: number) {
   const [rows] = await pool.query(
     `SELECT COUNT(*) AS total
-       FROM estudiante e
+       FROM estudiante_por_institucion e
       WHERE e.estado_academico = 'activo'
+        AND e.membresia_activa = 1
         AND e.rol IN ('estudiante', 'candidato')
         AND e.fk_id_institucion = ?
         AND (? IS NULL OR e.fk_id_carrera = ?)`,

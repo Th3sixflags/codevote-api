@@ -7,6 +7,7 @@ function tablaNoExiste(err: any): boolean {
 export async function crearSiEstaDisponible(datos: {
   idSesion: string;
   cedula: string;
+  institucionId?: number | null;
   expiraAt: Date;
   ip: string | null;
   userAgent: string | null;
@@ -14,9 +15,9 @@ export async function crearSiEstaDisponible(datos: {
   try {
     await pool.query(
       `INSERT INTO sesion
-         (id_sesion, fk_cedula_estudiante, expira_at, ip, user_agent)
-       VALUES (?, ?, ?, ?, ?)`,
-      [datos.idSesion, datos.cedula, datos.expiraAt, datos.ip, datos.userAgent]
+         (id_sesion, fk_cedula_estudiante, fk_id_institucion, expira_at, ip, user_agent)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [datos.idSesion, datos.cedula, datos.institucionId ?? null, datos.expiraAt, datos.ip, datos.userAgent]
     );
     return true;
   } catch (err) {
@@ -34,20 +35,38 @@ export async function tablaDisponible(): Promise<boolean> {
 }
 
 /** Comprueba revocación, caducidad y que la cuenta siga activa. */
-export async function estaActiva(idSesion: string, cedula: string): Promise<boolean> {
-  const [rows] = await pool.query(
-    `SELECT 1
-       FROM sesion s
-       JOIN estudiante e ON e.cedula = s.fk_cedula_estudiante
-      WHERE s.id_sesion = ?
-        AND s.fk_cedula_estudiante = ?
-        AND s.revocada_at IS NULL
-        AND s.expira_at > NOW()
-        AND e.estado_academico = 'activo'
-      LIMIT 1`,
-    [idSesion, cedula]
-  ) as [any[], any];
-  if (rows.length === 0) return false;
+export async function estaActiva(idSesion: string, cedula: string, institucionId?: number): Promise<boolean> {
+  const [rows] = institucionId == null
+    ? await pool.query(
+      `SELECT 1
+         FROM sesion s
+         JOIN estudiante e ON e.cedula = s.fk_cedula_estudiante
+        WHERE s.id_sesion = ?
+          AND s.fk_cedula_estudiante = ?
+          AND s.fk_id_institucion IS NULL
+          AND s.revocada_at IS NULL
+          AND s.expira_at > NOW()
+          AND e.estado_academico = 'activo'
+        LIMIT 1`,
+      [idSesion, cedula]
+    )
+    : await pool.query(
+      `SELECT 1
+         FROM sesion s
+         JOIN estudiante_por_institucion e ON e.cedula = s.fk_cedula_estudiante
+                                          AND e.fk_id_institucion = s.fk_id_institucion
+        WHERE s.id_sesion = ?
+          AND s.fk_cedula_estudiante = ?
+          AND s.fk_id_institucion = ?
+          AND s.revocada_at IS NULL
+          AND s.expira_at > NOW()
+          AND e.estado_academico = 'activo'
+          AND e.membresia_activa = 1
+        LIMIT 1`,
+      [idSesion, cedula, institucionId]
+    ) as [any[], any];
+  const filas = rows as any[];
+  if (filas.length === 0) return false;
 
   // Reduce escrituras: una sesión usada continuamente se marca como máximo
   // una vez cada cinco minutos.
@@ -96,7 +115,7 @@ export async function guardarRefresh(idSesion: string, hash: string, expiraAt: D
 /** Consume el refresh una sola vez. La fila queda marcada antes de emitir otra sesión. */
 export async function consumirRefresh(hash: string) {
   const [rows] = await pool.query(
-    `SELECT r.id_sesion, s.fk_cedula_estudiante
+    `SELECT r.id_sesion, s.fk_cedula_estudiante, s.fk_id_institucion
        FROM sesion_refresh r
        JOIN sesion s ON s.id_sesion = r.id_sesion
       WHERE r.token_hash = ?

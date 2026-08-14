@@ -49,6 +49,10 @@ function ejecutar(sqlCrudo: string, params: any[] = []): any {
     return { affectedRows: 1 };
   }
 
+  if (sql.startsWith('SELECT fk_id_institucion FROM proceso_electoral')) {
+    return [{ fk_id_institucion: 1 }];
+  }
+
   if (sql.startsWith('UPDATE asignacion_candidatura a')) {
     const procesoId = Number(params[0]);
     const afectadas = asignaciones.filter(
@@ -57,7 +61,7 @@ function ejecutar(sqlCrudo: string, params: any[] = []): any {
     return { affectedRows: afectadas.length };
   }
 
-  if (sql.startsWith('UPDATE estudiante e SET e.rol =')) {
+  if (sql.startsWith('UPDATE estudiante e SET e.rol =') || sql.startsWith('UPDATE estudiante_institucion e')) {
     const degradadas = params.filter((cedula: string) =>
       roles[cedula] === 'candidato'
       // No dirige ninguna lista de un proceso sin archivar…

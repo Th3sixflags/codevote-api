@@ -17,8 +17,9 @@ const BASE_QUERY = `
   FROM asignacion_candidatura a
   JOIN votacion v ON v.id_votacion = a.fk_id_votacion
   JOIN proceso_electoral p ON p.id_proceso = v.fk_id_proceso
-  JOIN estudiante e ON e.cedula = a.fk_cedula_estudiante
   LEFT JOIN carrera c ON c.id_carrera = v.fk_id_carrera
+  JOIN estudiante_por_institucion e
+    ON e.cedula = a.fk_cedula_estudiante AND e.fk_id_institucion = p.fk_id_institucion
 `;
 
 function condicionInstitucion(institucionId?: number) {
@@ -82,7 +83,7 @@ export async function create(cedula: string, votacionId: number, institucionId?:
 /** Reasigna la papeleta (se mantiene una sola fila por persona). */
 export async function updateVotacion(cedula: string, votacionId: number, institucionId?: number) {
   const filtro = institucionId === undefined ? '' : `
-       AND EXISTS (SELECT 1 FROM estudiante e WHERE e.cedula = asignacion_candidatura.fk_cedula_estudiante AND e.fk_id_institucion = ?)
+       AND EXISTS (SELECT 1 FROM estudiante_por_institucion e WHERE e.cedula = asignacion_candidatura.fk_cedula_estudiante AND e.fk_id_institucion = ? AND e.membresia_activa = 1)
        AND EXISTS (
          SELECT 1 FROM votacion v JOIN proceso_electoral p ON p.id_proceso = v.fk_id_proceso
           WHERE v.id_votacion = ? AND p.fk_id_institucion = ?
@@ -102,7 +103,7 @@ export async function updateVotacion(cedula: string, votacionId: number, institu
 /** Retira la asignación eliminándola (deja libre al candidato). */
 export async function remove(cedula: string, institucionId?: number) {
   const filtro = institucionId === undefined ? '' : `
-     AND EXISTS (SELECT 1 FROM estudiante e WHERE e.cedula = asignacion_candidatura.fk_cedula_estudiante AND e.fk_id_institucion = ?)
+     AND EXISTS (SELECT 1 FROM estudiante_por_institucion e WHERE e.cedula = asignacion_candidatura.fk_cedula_estudiante AND e.fk_id_institucion = ? AND e.membresia_activa = 1)
      AND EXISTS (
        SELECT 1 FROM votacion v JOIN proceso_electoral p ON p.id_proceso = v.fk_id_proceso
         WHERE v.id_votacion = asignacion_candidatura.fk_id_votacion AND p.fk_id_institucion = ?

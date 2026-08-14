@@ -19,7 +19,7 @@ export async function countProcesosActivos() {
 }
 
 export async function countMiembrosTotal() {
-  const [rows] = await pool.query<RowDataPacket[]>('SELECT COUNT(*) as count FROM estudiante');
+  const [rows] = await pool.query<RowDataPacket[]>('SELECT COUNT(*) as count FROM estudiante_por_institucion');
   return rows[0].count;
 }
 

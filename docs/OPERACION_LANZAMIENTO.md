@@ -21,6 +21,22 @@ MIGRATIONS_OPERATOR="nombre.apellido" \
 npm run migraciones:estado
 ```
 
+Para esta fase, después de verificar el backup, aplicar la migración de
+membresías (permite una misma cédula en varios tenants sin duplicar la
+identidad histórica) y registrarla:
+
+```bash
+mysql -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" \
+  < db/migrations/2026-08-14_membresias_multinstitucion.sql
+MIGRATIONS_OPERATOR="nombre.apellido" \
+  npm run migraciones:registrar -- 2026-08-14_membresias_multinstitucion.sql
+```
+
+La migración no elimina filas de `estudiante`: crea `estudiante_institucion`,
+importa las membresías existentes y deja la vista de compatibilidad
+`estudiante_por_institucion`. No debe ejecutarse el código funcional nuevo en
+AWS hasta que el SQL haya sido aplicado y registrado.
+
 `PENDIENTE` significa que el SQL aún no está registrado; `CHECKSUM_DISTINTO` o
 `NO_EN_REPOSITORIO` bloquean el despliegue hasta investigar. El comando de
 registro no ejecuta DDL: solo deja evidencia del archivo que el operador ya

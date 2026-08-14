@@ -26,32 +26,57 @@ export interface CodigoVigente {
  *     del padrón y no debe poder entrar;
  *   - los tres roles reales (estudiante, candidato y admin) usan el mismo flujo.
  */
-export async function buscarCuentaActiva(identificador: string) {
+export async function buscarCuentasActivas(identificador: string, institucionSlug?: string) {
   const [rows] = await pool.query(
-    `SELECT cedula, nombres, apellidos, correo_institucional, rol, foto_url, fk_id_institucion
-       FROM estudiante
-      WHERE estado_academico = 'activo'
-        AND (correo_institucional = ? OR cedula = ?)
-      LIMIT 1`,
-    [identificador, identificador]
+    `SELECT e.cedula, e.nombres, e.apellidos, e.correo_institucional,
+            e.rol, e.foto_url, e.fk_id_institucion,
+            i.slug AS institucion_slug, i.nombre AS institucion_nombre
+       FROM (
+         SELECT id_membresia, cedula, fk_id_institucion, nombres, apellidos,
+                correo_institucional, estado_academico, membresia_activa, rol, foto_url
+           FROM estudiante_por_institucion
+         UNION ALL
+         SELECT NULL, cedula, fk_id_institucion, nombres, apellidos,
+                correo_institucional, estado_academico, membresia_activa, rol, foto_url
+           FROM estudiante
+          WHERE fk_id_institucion IS NULL AND rol = 'superadmin'
+       ) e
+       LEFT JOIN institucion i ON i.id_institucion = e.fk_id_institucion
+      WHERE e.estado_academico = 'activo'
+        AND e.membresia_activa = 1
+        AND (e.correo_institucional = ? OR e.cedula = ?)
+        AND (? IS NULL OR i.slug = ?)
+        AND (i.id_institucion IS NULL OR i.activo = 1)
+      ORDER BY CASE WHEN e.correo_institucional = ? THEN 0 ELSE 1 END, e.id_membresia`,
+    [identificador, identificador, institucionSlug ?? null, institucionSlug ?? null, identificador]
   ) as [any[], any];
-  return rows[0] ?? null;
+  return rows;
+}
+
+/**
+ * Compatibilidad para consumidores internos que esperan una sola cuenta. El
+ * login usa `buscarCuentasActivas` para detectar y rechazar ambigüedades.
+ */
+export async function buscarCuentaActiva(identificador: string, institucionSlug?: string) {
+  const cuentas = await buscarCuentasActivas(identificador, institucionSlug);
+  return cuentas[0] ?? null;
 }
 
 /**
  * Código vigente de esa cuenta: no usado y sin expirar. Solo puede haber uno,
  * porque `crear` invalida los anteriores.
  */
-export async function buscarVigente(cedula: string): Promise<CodigoVigente | null> {
+export async function buscarVigente(cedula: string, institucionId?: number | null): Promise<CodigoVigente | null> {
   const [rows] = await pool.query(
     `SELECT id_codigo, codigo_hash, intentos, expira_at, creado_at
        FROM codigo_acceso
       WHERE fk_cedula_estudiante = ?
+        AND fk_id_institucion <=> ?
         AND usado_at IS NULL
         AND expira_at > NOW()
       ORDER BY id_codigo DESC
       LIMIT 1`,
-    [cedula]
+    [cedula, institucionId ?? null]
   ) as [any[], any];
   return rows[0] ?? null;
 }
@@ -63,7 +88,7 @@ export async function buscarVigente(cedula: string): Promise<CodigoVigente | nul
  * ventana de un correo interceptado.
  */
 export async function crear(
-  cedula: string, codigoHash: string, vigenciaSegundos: number, ip: string | null
+  cedula: string, codigoHash: string, vigenciaSegundos: number, ip: string | null, institucionId?: number | null
 ) {
   const conn = await pool.getConnection();
   try {
@@ -71,13 +96,13 @@ export async function crear(
 
     await conn.query(
       `UPDATE codigo_acceso SET usado_at = NOW()
-        WHERE fk_cedula_estudiante = ? AND usado_at IS NULL`,
-      [cedula]
+        WHERE fk_cedula_estudiante = ? AND fk_id_institucion <=> ? AND usado_at IS NULL`,
+      [cedula, institucionId ?? null]
     );
     const [result] = await conn.query(
-      `INSERT INTO codigo_acceso (fk_cedula_estudiante, codigo_hash, expira_at, ip)
-       VALUES (?, ?, DATE_ADD(NOW(), INTERVAL ? SECOND), ?)`,
-      [cedula, codigoHash, vigenciaSegundos, ip]
+      `INSERT INTO codigo_acceso (fk_cedula_estudiante, codigo_hash, fk_id_institucion, expira_at, ip)
+       VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL ? SECOND), ?)`,
+      [cedula, codigoHash, institucionId ?? null, vigenciaSegundos, ip]
     ) as [any, any];
 
     await conn.commit();
@@ -117,10 +142,10 @@ export async function consumir(idCodigo: number): Promise<boolean> {
 }
 
 /** Invalida todos los códigos vigentes de la cuenta (tras agotar los intentos). */
-export async function invalidarTodos(cedula: string) {
+export async function invalidarTodos(cedula: string, institucionId?: number | null) {
   await pool.query(
-    'UPDATE codigo_acceso SET usado_at = NOW() WHERE fk_cedula_estudiante = ? AND usado_at IS NULL',
-    [cedula]
+    'UPDATE codigo_acceso SET usado_at = NOW() WHERE fk_cedula_estudiante = ? AND fk_id_institucion <=> ? AND usado_at IS NULL',
+    [cedula, institucionId ?? null]
   );
 }
 

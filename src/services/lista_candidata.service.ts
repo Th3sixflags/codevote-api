@@ -161,7 +161,7 @@ export async function aprobarLista(id: number, institucionId?: number) {
   const integrantes = await candidatoRepo.findByLista(id);
   
   for (const integrante of integrantes) {
-    const estudiante = await estudianteRepo.findByCedula(integrante.fk_cedula_estudiante);
+    const estudiante = await estudianteRepo.findByCedula(integrante.fk_cedula_estudiante, institucionId);
     if (estudiante) {
       try {
         validarRequisitosCandidato(estudiante, config, carreraExigida, votacionLista?.nombre_carrera);
@@ -242,7 +242,7 @@ export async function transferirResponsable(listaId: number, nuevaCedula: string
     throw new HttpError(409, 'Esa persona ya es la responsable de la lista.');
   }
 
-  const nuevo = await estudianteRepo.findByCedula(nuevaCedula);
+  const nuevo = await estudianteRepo.findByCedula(nuevaCedula, institucionId);
   if (!nuevo) throw new HttpError(404, 'El estudiante indicado no existe.');
   if (String(nuevo.rol).toLowerCase() === 'admin') {
     throw new HttpError(409, 'Una cuenta de administración no puede ser responsable de una candidatura.');
@@ -275,7 +275,7 @@ export async function transferirResponsable(listaId: number, nuevaCedula: string
   }
 
   await repo.transferirResponsable(
-    listaId, Number(lista.fk_id_votacion), nuevaCedula, lista.fk_cedula_responsable ?? null
+    listaId, Number(lista.fk_id_votacion), nuevaCedula, lista.fk_cedula_responsable ?? null, institucionId
   );
   // Se devuelve el detalle completo (responsable + integrantes) para que el
   // frontend refresque la vista sin una segunda llamada.

@@ -23,7 +23,7 @@ export async function listarPorLista(id: number, institucionId?: number) {
 export async function crearCandidato(data: CrearCandidatoDTO, institucionId?: number) {
   // El cargo ya lo valida Zod (enum). Aquí validamos las referencias y el duplicado
   // para responder mensajes claros en lugar de un 500 por clave foránea.
-  const estudiante = await estudianteRepo.findByCedula(data.fk_cedula_estudiante);
+  const estudiante = await estudianteRepo.findByCedula(data.fk_cedula_estudiante, institucionId);
   if (!estudiante) {
     throw new HttpError(404, 'El estudiante con esa cédula no existe.');
   }

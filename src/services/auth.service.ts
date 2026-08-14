@@ -21,8 +21,9 @@ import { hashRefreshToken, nuevoRefreshToken } from '../utils/sessionCookies.js'
  *   4. Máximo 5 intentos por código; al sexto se invalida y hay que pedir otro.
  *   5. Hay un tiempo mínimo entre envíos, para no convertir el login en un
  *      generador de correos hacia el buzón de cualquiera.
- *   6. La respuesta de "solicitar código" es siempre la misma exista o no la
- *      cuenta, así que no sirve para averiguar qué correos están registrados.
+ *   6. La respuesta de "solicitar código" es uniforme cuando no hay una cuenta;
+ *      la única excepción es una cuenta ambigua, que responde 409 y ofrece solo
+ *      slugs/nombres públicos para que la persona elija su institución.
  */
 
 export const VIGENCIA_SEGUNDOS  = 10 * 60;
@@ -52,6 +53,29 @@ function hashesIguales(a: string, b: string): boolean {
   const bufA = Buffer.from(a, 'utf8');
   const bufB = Buffer.from(b, 'utf8');
   return bufA.length === bufB.length && timingSafeEqual(bufA, bufB);
+}
+
+/**
+ * Resuelve la cuenta de login sin escoger silenciosamente el primer tenant.
+ * Una cédula puede pertenecer legítimamente a varias instituciones; en ese
+ * caso el cliente debe reenviar el slug público elegido por la persona.
+ */
+export async function resolverCuentaActiva(identificador: string, institucionSlug?: string) {
+  const cuentas = await repo.buscarCuentasActivas(identificador, institucionSlug?.trim().toLowerCase());
+  if (cuentas.length === 0) return null;
+  if (cuentas.length > 1) {
+    throw new HttpError(
+      409,
+      'Esta cuenta pertenece a varias instituciones. Selecciona una institución para continuar.',
+      {
+        instituciones: cuentas
+          .filter((cuenta: any) => cuenta.institucion_slug)
+          .map((cuenta: any) => ({ slug: cuenta.institucion_slug, nombre: cuenta.institucion_nombre }))
+          .filter((cuenta: any, indice: number, todas: any[]) => todas.findIndex((otra) => otra.slug === cuenta.slug) === indice),
+      }
+    );
+  }
+  return cuentas[0];
 }
 
 /**
@@ -133,13 +157,13 @@ export interface SolicitudDeCodigo {
 /**
  * Genera y envía un código.
  *
- * Devuelve SIEMPRE la misma forma exista o no la cuenta: si el identificador no
+ * Devuelve la misma forma exista o no la cuenta: si el identificador no
  * corresponde a nadie, no se envía nada y `correo_enmascarado` va en null, pero
  * ni el estado HTTP ni el mensaje cambian. Así el login no sirve para averiguar
  * qué correos o cédulas están registrados.
  */
-export async function solicitarCodigo(identificador: string, ip: string | null): Promise<SolicitudDeCodigo> {
-  const cuenta = await repo.buscarCuentaActiva(identificador.trim().toLowerCase());
+export async function solicitarCodigo(identificador: string, ip: string | null, institucionSlug?: string): Promise<SolicitudDeCodigo> {
+  const cuenta = await resolverCuentaActiva(identificador.trim().toLowerCase(), institucionSlug);
   if (!cuenta) {
     return { correo_enmascarado: null, expira_en_segundos: VIGENCIA_SEGUNDOS };
   }
@@ -147,7 +171,8 @@ export async function solicitarCodigo(identificador: string, ip: string | null):
   // Un código recién enviado no se reemplaza: evita que pedirlo dos veces
   // seguidas invalide el que la persona está a punto de escribir, y que el login
   // sirva para inundar un buzón ajeno.
-  const vigente = await repo.buscarVigente(cuenta.cedula);
+  const institucionId = cuenta.rol === 'superadmin' ? null : cuenta.fk_id_institucion;
+  const vigente = await repo.buscarVigente(cuenta.cedula, institucionId);
   if (vigente) {
     const segundosDesdeEnvio = (Date.now() - new Date(vigente.creado_at).getTime()) / 1000;
     if (segundosDesdeEnvio < ESPERA_REENVIO_SEG) {
@@ -159,7 +184,7 @@ export async function solicitarCodigo(identificador: string, ip: string | null):
   }
 
   const codigo = generarCodigo();
-  await repo.crear(cuenta.cedula, hashear(codigo), VIGENCIA_SEGUNDOS, ip);
+  await repo.crear(cuenta.cedula, hashear(codigo), VIGENCIA_SEGUNDOS, ip, institucionId);
 
   const { asunto, texto, html } = componerCorreoDeCodigo({
     nombres: cuenta.nombres,
@@ -220,6 +245,7 @@ async function iniciarSesion(cuenta: any, contexto: { ip?: string | null; userAg
   const refreshExpira = new Date(Date.now() + REFRESH_VIGENCIA_MS);
   const persistida = await sesiones.crearSiEstaDisponible({
     idSesion, cedula: cuenta.cedula, expiraAt: refreshExpira,
+    institucionId: cuenta.rol === 'superadmin' ? null : cuenta.fk_id_institucion,
     ip: contexto?.ip ?? null, userAgent: contexto?.userAgent?.slice(0, 255) ?? null,
   });
   if (!persistida) throw new HttpError(503, 'El sistema de sesiones todavía no está disponible.');
@@ -230,22 +256,24 @@ async function iniciarSesion(cuenta: any, contexto: { ip?: string | null; userAg
 /** Verifica el código y devuelve el JWT. */
 export async function verificarCodigo(
   identificador: string, codigo: string,
-  contexto: { ip?: string | null; userAgent?: string | null } | null = {}
+  contexto: { ip?: string | null; userAgent?: string | null } | null = {},
+  institucionSlug?: string,
 ): Promise<SesionIniciada> {
   // Mensaje único para cuenta inexistente, código equivocado y código caducado:
   // distinguirlos permitiría averiguar qué cuentas existen.
   const generico = 'El código no es válido o ya caducó. Solicita uno nuevo.';
 
-  const cuenta = await repo.buscarCuentaActiva(identificador.trim().toLowerCase());
+  const cuenta = await resolverCuentaActiva(identificador.trim().toLowerCase(), institucionSlug);
   if (!cuenta) throw new HttpError(401, generico);
 
-  const vigente = await repo.buscarVigente(cuenta.cedula);
+  const institucionId = cuenta.rol === 'superadmin' ? null : cuenta.fk_id_institucion;
+  const vigente = await repo.buscarVigente(cuenta.cedula, institucionId);
   if (!vigente) throw new HttpError(401, generico);
 
   if (!hashesIguales(vigente.codigo_hash, hashear(codigo))) {
     const intentos = await repo.sumarIntento(vigente.id_codigo);
     if (intentos >= MAX_INTENTOS) {
-      await repo.invalidarTodos(cuenta.cedula);
+      await repo.invalidarTodos(cuenta.cedula, institucionId);
       throw new HttpError(429, 'Demasiados intentos con ese código. Solicita uno nuevo.');
     }
     throw new HttpError(401, `${generico} Te quedan ${MAX_INTENTOS - intentos} intentos.`);
@@ -278,15 +306,20 @@ export async function verificarCodigo(
 export async function refrescarSesion(refreshToken: string, contexto: { ip?: string | null; userAgent?: string | null }) {
   const anterior = await sesiones.consumirRefresh(hashRefreshToken(refreshToken));
   if (!anterior) throw new HttpError(401, 'La sesión ya no es válida. Inicia sesión nuevamente.');
-  const cuenta = await repo.buscarCuentaActiva(String(anterior.fk_cedula_estudiante));
-  if (!cuenta) throw new HttpError(401, 'La sesión ya no es válida. Inicia sesión nuevamente.');
-  await sesiones.revocar(String(anterior.id_sesion), cuenta.cedula, 'rotacion_refresh');
-  const nueva = await iniciarSesion(cuenta, contexto);
+  const cuentas = await repo.buscarCuentasActivas(String(anterior.fk_cedula_estudiante));
+  // El refresh conserva la institución elegida en la sesión. No se reutiliza
+  // una cuenta de otro tenant si la cédula es miembro de varios.
+  const cuentaDeInstitucion = anterior.fk_id_institucion == null
+    ? cuentas.find((fila: any) => fila.rol === 'superadmin') ?? cuentas[0]
+    : cuentas.find((fila: any) => Number(fila.fk_id_institucion) === Number(anterior.fk_id_institucion));
+  if (!cuentaDeInstitucion) throw new HttpError(401, 'La sesión ya no es válida. Inicia sesión nuevamente.');
+  await sesiones.revocar(String(anterior.id_sesion), cuentaDeInstitucion.cedula, 'rotacion_refresh');
+  const nueva = await iniciarSesion(cuentaDeInstitucion, contexto);
   return { ...nueva, usuario: {
-    cedula: cuenta.cedula, nombres: cuenta.nombres, apellidos: cuenta.apellidos,
-    correo_institucional: cuenta.correo_institucional, rol: cuenta.rol,
-    foto_url: cuenta.foto_url ?? null,
-    fk_id_institucion: cuenta.rol === 'superadmin' ? undefined : cuenta.fk_id_institucion,
+    cedula: cuentaDeInstitucion.cedula, nombres: cuentaDeInstitucion.nombres, apellidos: cuentaDeInstitucion.apellidos,
+    correo_institucional: cuentaDeInstitucion.correo_institucional, rol: cuentaDeInstitucion.rol,
+    foto_url: cuentaDeInstitucion.foto_url ?? null,
+    fk_id_institucion: cuentaDeInstitucion.rol === 'superadmin' ? undefined : cuentaDeInstitucion.fk_id_institucion,
   }};
 }
 

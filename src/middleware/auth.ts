@@ -41,7 +41,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 
   try {
     if (payload.jti) {
-      if (!(await sesiones.estaActiva(payload.jti, payload.sub))) {
+      if (!(await sesiones.estaActiva(payload.jti, payload.sub, payload.fk_id_institucion))) {
         res.status(401).json({ error: 'La sesión fue revocada o ya caducó.' });
         return;
       }

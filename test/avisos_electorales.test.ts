@@ -72,7 +72,7 @@ function ejecutar(sqlCrudo: string, params: any[] = []): any {
     return { insertId: estado.reservados.size };
   }
   if (sql.startsWith('UPDATE aviso_papeleta')) return { affectedRows: 1 };
-  if (sql.includes('FROM estudiante e') && sql.includes("e.rol IN ('estudiante', 'candidato')")) {
+  if ((sql.includes('FROM estudiante e') || sql.includes('FROM estudiante_por_institucion e')) && sql.includes("e.rol IN ('estudiante', 'candidato')")) {
     return estado.padron;
   }
   if (sql.startsWith('INSERT IGNORE INTO sancion_electoral')) {
@@ -181,7 +181,7 @@ test('la reserva ocurre ANTES de consultar el padrón y enviar', async () => {
   await avisos.avisarApertura(PAPELETA);
 
   const iReserva = estado.sentencias.findIndex((s) => s.startsWith('INSERT INTO aviso_papeleta'));
-  const iPadron  = estado.sentencias.findIndex((s) => s.includes('FROM estudiante e'));
+  const iPadron  = estado.sentencias.findIndex((s) => s.includes('FROM estudiante e') || s.includes('FROM estudiante_por_institucion e'));
 
   assert.ok(iReserva >= 0 && iPadron >= 0);
   assert.ok(iReserva < iPadron, 'se consultó el padrón antes de reservar el aviso');
@@ -207,7 +207,7 @@ test('cada tipo de aviso es independiente', async () => {
 test('la última llamada solo va a quienes no han votado', async () => {
   await avisos.avisarCierreProximo(PAPELETA, 24);
 
-  const consulta = estado.sentencias.find((s) => s.includes('FROM estudiante e'))!;
+  const consulta = estado.sentencias.find((s) => s.includes('FROM estudiante e') || s.includes('FROM estudiante_por_institucion e'))!;
   assert.match(consulta, /NOT EXISTS/, 'no filtra a quienes ya votaron');
   assert.match(consulta, /FROM codigo_voto/, 'no se apoya en el comprobante');
   assert.ok(!consulta.includes('FROM voto '), 'consultó la tabla anónima de votos');
@@ -216,14 +216,14 @@ test('la última llamada solo va a quienes no han votado', async () => {
 test('la apertura va a todo el padrón, hayan votado o no', async () => {
   await avisos.avisarApertura(PAPELETA);
 
-  const consulta = estado.sentencias.find((s) => s.includes('FROM estudiante e'))!;
+  const consulta = estado.sentencias.find((s) => s.includes('FROM estudiante e') || s.includes('FROM estudiante_por_institucion e'))!;
   assert.ok(!consulta.includes('NOT EXISTS'), 'la apertura excluyó a alguien del padrón');
 });
 
 test('el padrón es el mismo que puede votar: activos, estudiantes y candidatos', async () => {
   await avisos.avisarApertura(PAPELETA);
 
-  const consulta = estado.sentencias.find((s) => s.includes('FROM estudiante e'))!;
+  const consulta = estado.sentencias.find((s) => s.includes('FROM estudiante e') || s.includes('FROM estudiante_por_institucion e'))!;
   assert.match(consulta, /e\.estado_academico = 'activo'/);
   assert.match(consulta, /e\.rol IN \('estudiante', 'candidato'\)/);
   assert.match(consulta, /e\.fk_id_carrera = \?/, 'no segmenta por carrera');

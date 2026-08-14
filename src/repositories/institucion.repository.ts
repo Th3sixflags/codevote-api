@@ -88,8 +88,8 @@ export async function toggleActivo(id: number) {
 export async function countStats(id: number) {
   const [[procesos], [admins], [miembros]] = await Promise.all([
     pool.query<RowDataPacket[]>('SELECT COUNT(*) as count FROM proceso_electoral WHERE fk_id_institucion = ?', [id]),
-    pool.query<RowDataPacket[]>('SELECT COUNT(*) as count FROM estudiante WHERE rol = "admin" AND fk_id_institucion = ?', [id]),
-    pool.query<RowDataPacket[]>('SELECT COUNT(*) as count FROM estudiante WHERE fk_id_institucion = ?', [id]),
+    pool.query<RowDataPacket[]>('SELECT COUNT(*) as count FROM estudiante_por_institucion WHERE rol = "admin" AND fk_id_institucion = ?', [id]),
+    pool.query<RowDataPacket[]>('SELECT COUNT(*) as count FROM estudiante_por_institucion WHERE fk_id_institucion = ?', [id]),
   ]);
   
   return {
@@ -100,7 +100,7 @@ export async function countStats(id: number) {
 }
 
 export async function findAdmins(id: number) {
-  const query = 'SELECT * FROM estudiante WHERE rol = "admin" AND fk_id_institucion = ? ORDER BY apellidos, nombres';
+  const query = 'SELECT cedula, nombres, apellidos, correo_institucional, estado_academico, rol, foto_url FROM estudiante_por_institucion WHERE rol = "admin" AND fk_id_institucion = ? ORDER BY apellidos, nombres';
   const [rows] = await pool.query<RowDataPacket[]>(query, [id]);
   return rows;
 }
@@ -122,7 +122,7 @@ export async function findMiembrosParaAdministrar(id: number, buscar = '') {
   }
   const [rows] = await pool.query<RowDataPacket[]>(
     `SELECT cedula, nombres, apellidos, correo_institucional, estado_academico, rol
-     FROM estudiante
+     FROM estudiante_por_institucion
      WHERE fk_id_institucion = ?${filtroBusqueda}
      ORDER BY apellidos, nombres
      LIMIT 30`,
@@ -133,25 +133,47 @@ export async function findMiembrosParaAdministrar(id: number, buscar = '') {
 
 export async function promoteMiembroAAdmin(id: number, cedula: string) {
   const [result] = await pool.query<ResultSetHeader>(
+    `UPDATE estudiante_institucion
+     SET rol = 'admin'
+     WHERE cedula = ? AND fk_id_institucion = ? AND rol = 'estudiante' AND estado_academico = 'activo' AND membresia_activa = 1`,
+    [cedula, id]
+  );
+  if (Number(result.affectedRows ?? 0) > 0) return true;
+  const [legacy] = await pool.query<ResultSetHeader>(
     `UPDATE estudiante
      SET rol = 'admin'
      WHERE cedula = ? AND fk_id_institucion = ? AND rol = 'estudiante' AND estado_academico = 'activo'`,
     [cedula, id]
   );
-  return Number(result.affectedRows ?? 0) > 0;
+  return Number(legacy.affectedRows ?? 0) > 0;
 }
 
 export async function assignAdmin(id: number, admin: AsignarAdminDTO) {
-  const query = `
-    INSERT INTO estudiante (cedula, nombres, apellidos, correo_institucional, estado_academico, rol, fk_id_institucion, password, debe_cambiar_password)
-    VALUES (?, ?, ?, ?, 'activo', 'admin', ?, '', 1)
-  `;
-  const [result] = await pool.query<ResultSetHeader>(query, [
-    admin.cedula,
-    admin.nombres,
-    admin.apellidos,
-    admin.correo_institucional,
-    id
-  ]);
-  return result.affectedRows;
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [identidad] = await conn.query('SELECT cedula FROM estudiante WHERE cedula = ? FOR UPDATE', [admin.cedula]) as [any[], any];
+    if (identidad.length === 0) {
+      await conn.query(
+        `INSERT INTO estudiante
+          (cedula, nombres, apellidos, correo_institucional, estado_academico, rol, fk_id_institucion, password, debe_cambiar_password)
+         VALUES (?, ?, ?, ?, 'activo', 'admin', ?, '', 1)`,
+        [admin.cedula, admin.nombres, admin.apellidos, admin.correo_institucional, id]
+      );
+    }
+    const [result] = await conn.query<ResultSetHeader>(
+      `INSERT INTO estudiante_institucion
+        (cedula, fk_id_institucion, nombres, apellidos, correo_institucional,
+         estado_academico, membresia_activa, rol, foto_url)
+       VALUES (?, ?, ?, ?, ?, 'activo', 1, 'admin', NULL)`,
+      [admin.cedula, id, admin.nombres, admin.apellidos, admin.correo_institucional]
+    );
+    await conn.commit();
+    return result.affectedRows;
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
 }

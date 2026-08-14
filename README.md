@@ -90,6 +90,10 @@ Para utilizar los endpoints protegidos, primero debes autenticarte:
        "identificador": "stchinininca@uide.edu.ec"
    }
    ```
+   Si una cédula pertenece a más de una institución, la API responde `409` con
+   los slugs públicos disponibles. Repite la solicitud incluyendo, por ejemplo,
+   `"institucion_slug": "institucion-b"`; el mismo campo debe enviarse al
+   canjear el código. Un correo que sea único no necesita selector.
 2. Canjea el código recibido con `POST /api/auth/verificar` enviando el mismo
    identificador y el código de 6 dígitos.
 3. La API devolverá un objeto JSON que incluye el atributo `"token"`.
@@ -223,6 +227,12 @@ Aplicar la migración:
 ```bash
 mysql -u <usuario> -p codevote_db < db/migrations/2026-08-01_responsable_presidente.sql
 ```
+
+Para permitir que una misma persona pertenezca a varias instituciones, aplicar
+también `db/migrations/2026-08-14_membresias_multinstitucion.sql`. La migración
+crea `estudiante_institucion`, importa las membresías actuales y conserva
+`estudiante` como identidad canónica; no se deben borrar ni duplicar las filas
+históricas.
 
 La base se indica en la línea de comandos: el script no fija ninguna con `USE`.
 MySQL hace `COMMIT` implícito en cada sentencia DDL, así que la migración **no

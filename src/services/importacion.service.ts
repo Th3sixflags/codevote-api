@@ -96,7 +96,7 @@ export async function previsualizarCSV(buffer: Buffer, nombreArchivo: string, in
   }
 
   const existingIds = await repo.buscarIdentificadoresExistentes(allIds, institucionId);
-  const existingCorreos = await repo.buscarCorreosExistentes(allCorreos);
+  const existingCorreos = await repo.buscarCorreosExistentes(allCorreos, institucionId);
 
   for (let i = 0; i < records.length; i++) {
     const row = records[i];
@@ -137,7 +137,7 @@ export async function previsualizarCSV(buffer: Buffer, nombreArchivo: string, in
     // Duplicado en DB
     if (existingIds.has(data.identificador)) {
       duplicadas++;
-      errores.push({ fila, identificador: data.identificador, motivo: 'El identificador ya existe en el sistema.' });
+      errores.push({ fila, identificador: data.identificador, motivo: 'La persona ya pertenece a esta institución.' });
       continue;
     }
     if (existingCorreos.has(data.correo)) {

@@ -25,25 +25,26 @@ export async function mapCarreras(institucionId: number): Promise<Record<string,
   return mapa;
 }
 
-/** Recibe una lista de identificadores y devuelve un Set de aquellos que YA existen en la base de datos (global o por institución). */
+/** Recibe una lista de identificadores y devuelve los que ya son miembros de este tenant. */
 export async function buscarIdentificadoresExistentes(identificadores: string[], institucionId: number): Promise<Set<string>> {
   if (identificadores.length === 0) return new Set();
   const placeholders = identificadores.map(() => '?').join(',');
-  // Se valida de forma global porque 'cedula' es PK primaria en 'estudiante', no puede haber repetidos en todo el sistema.
   const [rows] = await pool.query<RowDataPacket[]>(
-    `SELECT cedula FROM estudiante WHERE cedula IN (${placeholders})`,
-    identificadores
+    `SELECT cedula FROM estudiante_por_institucion
+      WHERE fk_id_institucion = ? AND cedula IN (${placeholders})`,
+    [institucionId, ...identificadores]
   );
   return new Set(rows.map(r => r.cedula));
 }
 
-/** Recibe una lista de correos y devuelve un Set de aquellos que YA existen. */
-export async function buscarCorreosExistentes(correos: string[]): Promise<Set<string>> {
+/** Recibe una lista de correos y devuelve los ya usados en este tenant. */
+export async function buscarCorreosExistentes(correos: string[], institucionId: number): Promise<Set<string>> {
   if (correos.length === 0) return new Set();
   const placeholders = correos.map(() => '?').join(',');
   const [rows] = await pool.query<RowDataPacket[]>(
-    `SELECT correo_institucional FROM estudiante WHERE correo_institucional IN (${placeholders})`,
-    correos
+    `SELECT correo_institucional FROM estudiante_por_institucion
+      WHERE fk_id_institucion = ? AND correo_institucional IN (${placeholders})`,
+    [institucionId, ...correos]
   );
   return new Set(rows.map(r => r.correo_institucional));
 }
@@ -56,30 +57,27 @@ export async function insertarMiembros(filas: FilaValida[], institucionId: numbe
   try {
     await conn.beginTransaction();
 
-    const query = `
-      INSERT INTO estudiante 
-        (cedula, nombres, apellidos, correo_institucional, fk_id_carrera, estado_academico, fecha_ingreso, membresia_activa, fk_id_institucion, rol, debe_cambiar_password, password)
-      VALUES ?
-    `;
-
-    // password por defecto puede ser NULL, el flujo normal asume que si es nulo no puede hacer login por contraseña.
-    // O si se requiere login por contraseña, se genera uno (pero CodeVote usa OTP ahora para todos).
-    const values = filas.map(f => [
-      f.identificador,
-      f.nombres,
-      f.apellidos,
-      f.correo,
-      f.fk_id_carrera,
-      f.estado_academico,
-      f.fecha_ingreso,
-      f.membresia_activa,
-      institucionId,
-      'estudiante', // rol
-      0, // debe_cambiar_password
-      '' // password (required by schema)
-    ]);
-
-    await conn.query(query, [values]);
+    for (const f of filas) {
+      const [identidad] = await conn.query('SELECT cedula FROM estudiante WHERE cedula = ? FOR UPDATE', [f.identificador]) as [any[], any];
+      if (identidad.length === 0) {
+        await conn.query(
+          `INSERT INTO estudiante
+            (cedula, nombres, apellidos, correo_institucional, fk_id_carrera, estado_academico,
+             fecha_ingreso, membresia_activa, fk_id_institucion, rol, debe_cambiar_password, password)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'estudiante', 0, '')`,
+          [f.identificador, f.nombres, f.apellidos, f.correo, f.fk_id_carrera, f.estado_academico,
+           f.fecha_ingreso, f.membresia_activa, institucionId]
+        );
+      }
+      await conn.query(
+        `INSERT INTO estudiante_institucion
+          (cedula, fk_id_institucion, nombres, apellidos, correo_institucional,
+           fk_id_carrera, estado_academico, fecha_ingreso, membresia_activa, rol)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'estudiante')`,
+        [f.identificador, institucionId, f.nombres, f.apellidos, f.correo,
+         f.fk_id_carrera, f.estado_academico, f.fecha_ingreso, f.membresia_activa]
+      );
+    }
 
     await conn.commit();
   } catch (err) {
